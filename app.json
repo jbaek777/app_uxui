@@ -42,16 +42,7 @@
           "cameraPermission": "축산물 이력번호 바코드 스캔을 위해 카메라 접근 권한이 필요합니다."
         }
       ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#e8950a",
-          "sounds": []
-        }
-      ],
-      "expo-asset",
-      "expo-font"
+      "expo-notifications"
     ],
     "extra": {
       "eas": {
