@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Expo (기본 QR)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--clear"],
+      "port": 8081
+    },
+    {
+      "name": "Expo Web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--web", "--clear"],
+      "port": 8081
+    },
+    {
+      "name": "Expo (포트 8082)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--clear", "--port", "8082"],
+      "port": 8082
+    }
+  ]
+}

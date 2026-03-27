@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "MeatManager",
+    "slug": "meatmanager",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.kmeatmaster.meatmanager",
+      "buildNumber": "1"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.kmeatmaster.meatmanager",
+      "versionCode": 1
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "서류 사진을 촬영하거나 갤러리에서 선택합니다.",
+          "cameraPermission": "서류를 촬영하여 AI로 자동 인식합니다."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "축산물 이력번호 바코드 스캔을 위해 카메라 접근 권한이 필요합니다."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#e8950a",
+          "sounds": []
+        }
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-barcode-scanner"
+    ]
+  }
+}
