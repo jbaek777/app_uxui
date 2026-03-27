@@ -1,348 +1,242 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  Switch,
-  Alert,
-  RefreshControl,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Card from '../components/Card';
-import Badge from '../components/Badge';
-import EmptyState from '../components/EmptyState';
-import { colors, spacing, typography, radius } from '../theme';
+import { colors, fontSize, spacing, radius, shadow } from '../theme';
+import { PrimaryBtn, OutlineBtn } from '../components/UI';
+import { OXPair } from '../components/OXButton';
+import { hygieneData as initData } from '../data/mockData';
 
-const CHECK_ITEMS = [
-  { key: 'handWash', label: '손 세척 및 소독' },
-  { key: 'apron', label: '앞치마 착용 여부' },
-  { key: 'gloves', label: '위생장갑 착용' },
-  { key: 'hairNet', label: '두발 위생 (모자/헤어넷)' },
-  { key: 'equipClean', label: '도마·칼 소독' },
-  { key: 'roomClean', label: '작업장 청소·소독' },
-  { key: 'wasteDispose', label: '폐기물 처리' },
-  { key: 'tempCheck', label: '냉장고 온도 점검' },
+const SESSIONS = ['오전', '오후', '마감'];
+const CHECKLIST = [
+  { key: 'personal',  label: '개인위생',      icon: '🙌', desc: '손 세척·위생복 착용 확인' },
+  { key: 'tools',     label: '도마·칼 소독',  icon: '🔪', desc: '200ppm 염소 소독 후 건조' },
+  { key: 'fridge',    label: '냉장고 온도',   icon: '🌡️', desc: '10°C 이하 (숙성실 0~4°C)' },
+  { key: 'workbench', label: '작업대 청결',   icon: '🪣', desc: '작업 전·후 소독 및 건조' },
+  { key: 'pest',      label: '방충·방서',     icon: '🐛', desc: '해충 흔적 없음 확인' },
+  { key: 'origin',    label: '원산지 표시판', icon: '🪧', desc: '현재 판매 부위와 일치 확인' },
 ];
-
-const INITIAL_LOGS = [
-  {
-    id: '1',
-    date: '2024-01-28',
-    shift: '오전',
-    inspector: '김철수',
-    checks: { handWash: true, apron: true, gloves: true, hairNet: true, equipClean: true, roomClean: true, wasteDispose: true, tempCheck: true },
-    notes: '이상 없음',
-    score: 100,
-  },
-  {
-    id: '2',
-    date: '2024-01-27',
-    shift: '오후',
-    inspector: '이영희',
-    checks: { handWash: true, apron: true, gloves: false, hairNet: true, equipClean: true, roomClean: false, wasteDispose: true, tempCheck: true },
-    notes: '장갑 재고 부족, 작업장 청소 미흡',
-    score: 75,
-  },
-];
-
-function calcScore(checks) {
-  const vals = Object.values(checks);
-  return Math.round((vals.filter(Boolean).length / vals.length) * 100);
-}
-
-function getScoreType(score) {
-  if (score >= 90) return 'success';
-  if (score >= 70) return 'warning';
-  return 'danger';
-}
 
 export default function HygieneScreen() {
-  const [logs, setLogs] = useState(INITIAL_LOGS);
-  const [refreshing, setRefreshing] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedLog, setSelectedLog] = useState(null);
-  const [form, setForm] = useState({
-    shift: '오전',
-    inspector: '',
-    checks: Object.fromEntries(CHECK_ITEMS.map((c) => [c.key, false])),
-    notes: '',
-  });
+  const [logs, setLogs] = useState(initData);
+  const [modal, setModal] = useState(false);
+  const [session, setSession] = useState('오전');
+  const [checks, setChecks] = useState({});
+  const [fridgeTemp, setFridgeTemp] = useState(null);
+  const [step, setStep] = useState(0);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await new Promise((r) => setTimeout(r, 600));
-    setRefreshing(false);
-  }, []);
+  const totalItems = CHECKLIST.length;
+  const doneItems = Object.keys(checks).filter(k => checks[k]).length;
 
-  const openAdd = () => {
-    setSelectedLog(null);
-    setForm({
-      shift: '오전',
-      inspector: '',
-      checks: Object.fromEntries(CHECK_ITEMS.map((c) => [c.key, false])),
-      notes: '',
-    });
-    setModalVisible(true);
-  };
-
-  const openDetail = (log) => {
-    setSelectedLog(log);
-    setModalVisible(true);
+  const openModal = () => {
+    setChecks({});
+    setFridgeTemp(null);
+    setStep(0);
+    setModal(true);
   };
 
   const handleSave = () => {
-    if (!form.inspector.trim()) {
-      Alert.alert('입력 오류', '점검자를 입력해주세요.');
-      return;
-    }
+    const items = CHECKLIST.map(c => `${c.label} ${checks[c.key] || '?'}`);
+    if (fridgeTemp) items.push(`냉장고 온도: ${fridgeTemp}°C`);
+    const hasX = Object.values(checks).includes('X');
     const newLog = {
       id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
-      ...form,
-      score: calcScore(form.checks),
+      date: new Date().toLocaleDateString('ko-KR'),
+      time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+      session,
+      items,
+      status: hasX ? 'warning' : 'pass',
+      inspector: '홍길동',
+      signature: true,
     };
-    setLogs((prev) => [newLog, ...prev]);
-    setModalVisible(false);
+    setLogs([newLog, ...logs]);
+    setModal(false);
+    Alert.alert('점검 완료 ✓', `${session} 위생점검이 저장되었습니다.`);
   };
 
-  const handleDelete = (id) => {
-    Alert.alert('삭제', '이 일지를 삭제하시겠습니까?', [
-      { text: '취소', style: 'cancel' },
-      { text: '삭제', style: 'destructive', onPress: () => { setLogs((p) => p.filter((l) => l.id !== id)); setModalVisible(false); } },
-    ]);
-  };
+  const pass = logs.filter(l => l.status === 'pass').length;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>위생일지</Text>
-          <Text style={styles.subtitle}>일일 위생 점검 기록</Text>
-        </View>
-        <TouchableOpacity style={styles.addBtn} onPress={openAdd}>
-          <Ionicons name="add" size={22} color="#fff" />
-          <Text style={styles.addBtnText}>작성</Text>
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <View style={styles.statRow}>
+        <StatBox value={`${logs.length}건`} label="이번 달" color={colors.a2} />
+        <StatBox value={`${pass}건`} label="적합 판정" color={colors.gn} />
+        <StatBox value="94점" label="위생 점수" color={colors.ac} />
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-      >
-        {logs.length === 0 ? (
-          <EmptyState icon="clipboard-outline" title="위생일지 없음" message="오늘 위생 점검을 기록해주세요." />
-        ) : (
-          logs.map((log) => (
-            <TouchableOpacity key={log.id} onPress={() => openDetail(log)}>
-              <Card style={styles.logCard}>
-                <View style={styles.logHeader}>
-                  <View>
-                    <Text style={styles.logDate}>{log.date}</Text>
-                    <Text style={styles.logMeta}>{log.shift}조 · 점검자: {log.inspector}</Text>
-                  </View>
-                  <View style={styles.scoreWrap}>
-                    <Text style={[styles.scoreNum, { color: log.score >= 90 ? colors.status.success : log.score >= 70 ? colors.status.warning : colors.status.danger }]}>
-                      {log.score}점
-                    </Text>
-                    <Badge label={log.score >= 90 ? '우수' : log.score >= 70 ? '양호' : '미흡'} type={getScoreType(log.score)} />
-                  </View>
-                </View>
-                <View style={styles.checkGrid}>
-                  {CHECK_ITEMS.map((c) => (
-                    <View key={c.key} style={styles.checkItem}>
-                      <Ionicons
-                        name={log.checks[c.key] ? 'checkmark-circle' : 'close-circle'}
-                        size={16}
-                        color={log.checks[c.key] ? colors.status.success : colors.status.danger}
-                      />
-                      <Text style={[styles.checkLabel, !log.checks[c.key] && styles.checkFailed]}>
-                        {c.label}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-                {log.notes ? (
-                  <View style={styles.noteBox}>
-                    <Ionicons name="chatbubble-outline" size={12} color={colors.text.tertiary} />
-                    <Text style={styles.noteText}>{log.notes}</Text>
-                  </View>
-                ) : null}
-              </Card>
-            </TouchableOpacity>
-          ))
-        )}
+      {/* 오늘 세션 현황 */}
+      <View style={styles.todayRow}>
+        {SESSIONS.map(s => {
+          const done = logs.find(l => l.session === s);
+          return (
+            <View key={s} style={[styles.sessionCard, { borderColor: done ? colors.gn + '70' : colors.bd }]}>
+              <Text style={{ fontSize: 20 }}>{s === '오전' ? '🌅' : s === '오후' ? '☀️' : '🌙'}</Text>
+              <Text style={[styles.sessionLabel, { color: done ? colors.gn : colors.t3 }]}>
+                {done ? '✓ ' : ''}{s}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.md }}>
+        <PrimaryBtn label="📋 지금 점검 시작" onPress={openModal} />
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
+        {logs.map(log => (
+          <View key={log.id} style={styles.logCard}>
+            <View style={styles.logTop}>
+              <View>
+                <Text style={styles.logDate}>{log.date} {log.time}</Text>
+                <Text style={styles.logMeta}>{log.session} 점검 · {log.inspector}</Text>
+              </View>
+              <View style={[styles.badge, { backgroundColor: log.status === 'pass' ? colors.gn + '20' : colors.yw + '20' }]}>
+                <Text style={[styles.badgeText, { color: log.status === 'pass' ? colors.gn : colors.yw }]}>
+                  {log.status === 'pass' ? '✓ 적합' : '⚠ 주의'}
+                </Text>
+              </View>
+            </View>
+            <View style={{ gap: 3, marginTop: spacing.sm }}>
+              {log.items.slice(0, 3).map((item, i) => (
+                <Text key={i} style={styles.logItem}>• {item}</Text>
+              ))}
+              {log.items.length > 3 && <Text style={styles.logMore}>+ {log.items.length - 3}개 더</Text>}
+            </View>
+          </View>
+        ))}
       </ScrollView>
 
-      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.modalSafe}>
+      {/* 점검 모달 */}
+      <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.modalWrap}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{selectedLog ? '위생일지 상세' : '위생일지 작성'}</Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Ionicons name="close" size={24} color={colors.text.primary} />
+            <Text style={styles.modalTitle}>위생·HACCP 점검</Text>
+            <TouchableOpacity onPress={() => setModal(false)}>
+              <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
-            {selectedLog ? (
-              <View>
-                <Card style={{ marginBottom: spacing.md }}>
-                  <Text style={styles.detailDate}>{selectedLog.date} {selectedLog.shift}조</Text>
-                  <Text style={styles.detailInspector}>점검자: {selectedLog.inspector}</Text>
-                  <View style={[styles.scoreRow, { marginVertical: spacing.sm }]}>
-                    <Text style={styles.formLabel}>종합 점수</Text>
-                    <Text style={[styles.scoreNum, { color: selectedLog.score >= 90 ? colors.status.success : selectedLog.score >= 70 ? colors.status.warning : colors.status.danger }]}>
-                      {selectedLog.score}점
-                    </Text>
-                  </View>
-                  {CHECK_ITEMS.map((c) => (
-                    <View key={c.key} style={styles.detailCheck}>
-                      <Ionicons
-                        name={selectedLog.checks[c.key] ? 'checkmark-circle' : 'close-circle'}
-                        size={18}
-                        color={selectedLog.checks[c.key] ? colors.status.success : colors.status.danger}
-                      />
-                      <Text style={styles.detailCheckLabel}>{c.label}</Text>
-                      <Text style={{ ...typography.bodySmall, color: selectedLog.checks[c.key] ? colors.status.success : colors.status.danger, marginLeft: 'auto' }}>
-                        {selectedLog.checks[c.key] ? '완료' : '미완료'}
-                      </Text>
-                    </View>
-                  ))}
-                  {selectedLog.notes ? (
-                    <View style={{ marginTop: spacing.md }}>
-                      <Text style={styles.formLabel}>특이사항</Text>
-                      <Text style={{ ...typography.body, marginTop: 4 }}>{selectedLog.notes}</Text>
-                    </View>
-                  ) : null}
-                </Card>
-                <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(selectedLog.id)}>
-                  <Ionicons name="trash-outline" size={18} color={colors.status.danger} />
-                  <Text style={styles.deleteBtnText}>삭제</Text>
-                </TouchableOpacity>
+
+          {step === 0 && (
+            <View style={styles.stepWrap}>
+              <Text style={styles.stepTitle}>점검 시간을{'\n'}선택하세요</Text>
+              <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
+                {SESSIONS.map(s => (
+                  <TouchableOpacity key={s}
+                    style={[styles.sessionSelectBtn, session === s && styles.sessionSelectBtnActive]}
+                    onPress={() => setSession(s)}>
+                    <Text style={{ fontSize: 36 }}>{s === '오전' ? '🌅' : s === '오후' ? '☀️' : '🌙'}</Text>
+                    <Text style={[styles.sessionSelectText, session === s && { color: colors.ac }]}>{s} 점검</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            ) : (
-              <View style={{ gap: spacing.md }}>
-                <View style={styles.formRow}>
-                  <View style={[styles.formGroup, { flex: 1 }]}>
-                    <Text style={styles.formLabel}>근무조</Text>
-                    <View style={styles.chipRow}>
-                      {['오전', '오후', '야간'].map((s) => (
-                        <TouchableOpacity
-                          key={s}
-                          style={[styles.chip, form.shift === s && styles.chipActive]}
-                          onPress={() => setForm((p) => ({ ...p, shift: s }))}
-                        >
-                          <Text style={[styles.chipText, form.shift === s && styles.chipTextActive]}>{s}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>점검자 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="이름 입력"
-                    value={form.inspector}
-                    onChangeText={(v) => setForm((p) => ({ ...p, inspector: v }))}
-                    placeholderTextColor={colors.text.tertiary}
-                  />
-                </View>
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>점검 항목</Text>
-                  <Card style={{ gap: 0, padding: 0 }}>
-                    {CHECK_ITEMS.map((c, i) => (
-                      <View key={c.key} style={[styles.switchRow, i < CHECK_ITEMS.length - 1 && styles.switchBorder]}>
-                        <Text style={styles.switchLabel}>{c.label}</Text>
-                        <Switch
-                          value={form.checks[c.key]}
-                          onValueChange={(v) =>
-                            setForm((p) => ({ ...p, checks: { ...p.checks, [c.key]: v } }))
-                          }
-                          trackColor={{ false: colors.border, true: colors.primary + '60' }}
-                          thumbColor={form.checks[c.key] ? colors.primary : '#ccc'}
-                        />
+              <PrimaryBtn label="시작 →" onPress={() => setStep(1)} style={{ marginTop: spacing.xl }} />
+            </View>
+          )}
+
+          {step === 1 && (
+            <>
+              <View style={styles.progressWrap}>
+                <View style={[styles.progressFill, { width: `${(doneItems / totalItems) * 100}%` }]} />
+              </View>
+              <Text style={styles.progressText}>{doneItems} / {totalItems} 완료</Text>
+
+              <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
+                {CHECKLIST.map(item => (
+                  <View key={item.key} style={styles.checkItem}>
+                    <View style={styles.checkLeft}>
+                      <Text style={{ fontSize: 30 }}>{item.icon}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.checkLabel}>{item.label}</Text>
+                        <Text style={styles.checkDesc}>{item.desc}</Text>
                       </View>
+                    </View>
+                    <OXPair value={checks[item.key]} onChange={val => setChecks(p => ({ ...p, [item.key]: val }))} />
+                  </View>
+                ))}
+
+                <View style={styles.tempBox}>
+                  <Text style={styles.tempTitle}>🌡️ 냉장고 실측 온도 (°C)</Text>
+                  <View style={styles.tempBtns}>
+                    {['1', '2', '3', '4', '5+'].map(t => (
+                      <TouchableOpacity key={t}
+                        style={[styles.tempBtn, fridgeTemp === t && styles.tempBtnActive]}
+                        onPress={() => setFridgeTemp(t)}>
+                        <Text style={[styles.tempBtnText, fridgeTemp === t && { color: '#fff', fontWeight: '900' }]}>
+                          {t === '5+' ? '5°C↑' : `${t}°C`}
+                        </Text>
+                      </TouchableOpacity>
                     ))}
-                  </Card>
-                  <Text style={styles.scorePreview}>
-                    현재 점수: {calcScore(form.checks)}점
-                  </Text>
+                  </View>
                 </View>
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>특이사항</Text>
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="특이사항 또는 조치사항 입력..."
-                    value={form.notes}
-                    multiline
-                    numberOfLines={3}
-                    onChangeText={(v) => setForm((p) => ({ ...p, notes: v }))}
-                    placeholderTextColor={colors.text.tertiary}
-                  />
-                </View>
-                <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                  <Text style={styles.saveBtnText}>저장</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </ScrollView>
-        </SafeAreaView>
+
+                <PrimaryBtn
+                  label={doneItems >= totalItems ? '✓ 점검 완료 — 저장하기' : `${totalItems - doneItems}개 항목이 남았습니다`}
+                  onPress={doneItems >= totalItems ? handleSave : undefined}
+                  color={doneItems >= totalItems ? colors.gn : colors.t3}
+                  style={{ marginTop: spacing.lg, opacity: doneItems >= totalItems ? 1 : 0.55 }}
+                />
+                <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
+              </ScrollView>
+            </>
+          )}
+        </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
+const StatBox = ({ value, label, color }) => (
+  <View style={styles.statBox}>
+    <Text style={[styles.statVal, { color }]}>{value}</Text>
+    <Text style={styles.statLbl}>{label}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, paddingBottom: spacing.sm },
-  title: { ...typography.h2 },
-  subtitle: { ...typography.bodySmall },
-  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, gap: 4 },
-  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  scroll: { flex: 1 },
-  content: { padding: spacing.md, paddingBottom: spacing.xxl },
-  logCard: { marginBottom: spacing.sm },
-  logHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm },
-  logDate: { ...typography.h4, marginBottom: 2 },
-  logMeta: { ...typography.bodySmall },
-  scoreWrap: { alignItems: 'flex-end', gap: 4 },
-  scoreNum: { fontSize: 20, fontWeight: '700' },
-  scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  checkGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  checkItem: { flexDirection: 'row', alignItems: 'center', gap: 4, width: '48%' },
-  checkLabel: { fontSize: 11, color: colors.text.secondary, flex: 1 },
-  checkFailed: { color: colors.status.danger },
-  noteBox: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm, backgroundColor: colors.background, padding: spacing.sm, borderRadius: radius.sm },
-  noteText: { ...typography.caption, flex: 1 },
-  // Modal
-  modalSafe: { flex: 1, backgroundColor: colors.background },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
-  modalTitle: { ...typography.h3 },
-  detailDate: { ...typography.h3, marginBottom: 4 },
-  detailInspector: { ...typography.bodySmall, marginBottom: spacing.sm },
-  detailCheck: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  detailCheckLabel: { ...typography.body, flex: 1 },
-  formGroup: { gap: spacing.xs },
-  formRow: { flexDirection: 'row', gap: spacing.sm },
-  formLabel: { ...typography.bodySmall, fontWeight: '600' },
-  input: { backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, fontSize: 15, color: colors.text.primary },
-  textArea: { height: 80, textAlignVertical: 'top' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  chip: { paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: 13, color: colors.text.secondary, fontWeight: '500' },
-  chipTextActive: { color: '#fff', fontWeight: '700' },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: 12 },
-  switchBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  switchLabel: { ...typography.body, flex: 1 },
-  scorePreview: { ...typography.bodySmall, color: colors.primary, fontWeight: '700', textAlign: 'right', marginTop: 4 },
-  saveBtn: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: spacing.md, alignItems: 'center', marginTop: spacing.sm },
-  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.status.danger + '40', backgroundColor: colors.status.danger + '08' },
-  deleteBtnText: { color: colors.status.danger, fontWeight: '600', fontSize: 15 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  statRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md },
+  statBox: { flex: 1, backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, alignItems: 'center', ...shadow.sm },
+  statVal: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 3 },
+  statLbl: { fontSize: fontSize.xxs, color: colors.t3, fontWeight: '600', textAlign: 'center' },
+
+  todayRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, marginBottom: spacing.md },
+  sessionCard: { flex: 1, backgroundColor: colors.s1, borderRadius: radius.sm, borderWidth: 1.5, padding: spacing.sm, alignItems: 'center', gap: 4 },
+  sessionLabel: { fontSize: fontSize.sm, fontWeight: '700' },
+
+  logCard: { backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
+  logTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  logDate: { fontSize: fontSize.md, fontWeight: '700', color: colors.tx, marginBottom: 3 },
+  logMeta: { fontSize: fontSize.xs, color: colors.t3 },
+  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  badgeText: { fontSize: fontSize.xs, fontWeight: '800' },
+  logItem: { fontSize: fontSize.xs, color: colors.t2 },
+  logMore: { fontSize: fontSize.xs, color: colors.t3, fontStyle: 'italic' },
+
+  modalWrap: { flex: 1, backgroundColor: colors.bg },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.bd, backgroundColor: colors.s1 },
+  modalTitle: { fontSize: fontSize.lg, fontWeight: '900', color: colors.tx },
+  closeBtn: { fontSize: 22, color: colors.t2, padding: 4 },
+
+  stepWrap: { flex: 1, padding: spacing.lg },
+  stepTitle: { fontSize: fontSize.xxl, fontWeight: '900', color: colors.tx, lineHeight: 44, marginTop: spacing.lg },
+  sessionSelectBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 2, borderColor: colors.bd, padding: spacing.lg, ...shadow.sm },
+  sessionSelectBtnActive: { borderColor: colors.ac, backgroundColor: colors.ac + '15' },
+  sessionSelectText: { fontSize: fontSize.lg, fontWeight: '800', color: colors.t2 },
+
+  progressWrap: { height: 6, backgroundColor: colors.bd, marginHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: 6, backgroundColor: colors.ac, borderRadius: 3 },
+  progressText: { fontSize: fontSize.xs, color: colors.t3, textAlign: 'right', paddingHorizontal: spacing.lg, marginTop: 4, marginBottom: spacing.sm },
+
+  checkItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
+  checkLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, marginRight: spacing.sm },
+  checkLabel: { fontSize: fontSize.md, fontWeight: '800', color: colors.tx, marginBottom: 3 },
+  checkDesc: { fontSize: fontSize.xs, color: colors.t3 },
+
+  tempBox: { backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, marginBottom: spacing.sm },
+  tempTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.tx, marginBottom: spacing.sm },
+  tempBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  tempBtn: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: radius.sm, borderWidth: 1.5, borderColor: colors.bd, backgroundColor: colors.s2 },
+  tempBtnActive: { backgroundColor: colors.cyan, borderColor: colors.cyan },
+  tempBtnText: { fontSize: fontSize.sm, color: colors.t2, fontWeight: '700' },
 });

@@ -285,12 +285,12 @@ const styles = StyleSheet.create({
   resultTitle: { fontSize: fontSize.lg, fontWeight: '800', color: colors.tx },
   resultClose: { fontSize: 20, color: colors.t2, padding: 4 },
   traceBox: {
-    backgroundColor: '#fffbeb', borderRadius: radius.md, borderWidth: 1.5,
-    borderColor: '#fde68a', padding: spacing.md, marginBottom: spacing.md, alignItems: 'center',
+    backgroundColor: colors.a2 + '18', borderRadius: radius.md, borderWidth: 1.5,
+    borderColor: colors.a2 + '50', padding: spacing.md, marginBottom: spacing.md, alignItems: 'center',
   },
-  traceLabel: { fontSize: fontSize.xxs, color: '#92400e', fontWeight: '700', marginBottom: 4 },
-  traceNo: { fontSize: fontSize.lg, fontWeight: '900', color: '#92400e', fontFamily: 'Courier', letterSpacing: 1 },
-  traceTime: { fontSize: fontSize.xxs, color: '#b45309', marginTop: 4 },
+  traceLabel: { fontSize: fontSize.xxs, color: colors.t2, fontWeight: '700', marginBottom: 4 },
+  traceNo: { fontSize: fontSize.lg, fontWeight: '900', color: colors.a2, fontFamily: 'Courier', letterSpacing: 1 },
+  traceTime: { fontSize: fontSize.xxs, color: colors.t3, marginTop: 4 },
 
   infoSection: {
     backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1,

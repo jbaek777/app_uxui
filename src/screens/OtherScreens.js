@@ -174,7 +174,7 @@ export function HygieneScreen() {
               <TouchableOpacity key={c.key} style={styles.checkRow}
                 onPress={() => setChecks({ ...checks, [c.key]: !checks[c.key] })}>
                 <View style={[styles.checkBox, checks[c.key] && styles.checkBoxOn]}>
-                  {checks[c.key] && <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>✓</Text>}
+                  {checks[c.key] && <Text style={{ color: '#fff', fontSize: fontSize.xs, fontWeight: '800' }}>✓</Text>}
                 </View>
                 <Text style={styles.checkLabel}>{c.label}</Text>
               </TouchableOpacity>
@@ -309,7 +309,7 @@ const DocSection = ({ title, docs, checked, onToggle }) => (
           <TouchableOpacity
             style={[styles.checkBox, isChecked && styles.checkBoxOn, isMissing && styles.checkBoxWarn]}
             onPress={() => onToggle(doc.key)}>
-            {isChecked && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>✓</Text>}
+            {isChecked && <Text style={{ color: '#fff', fontSize: fontSize.xxs, fontWeight: '800' }}>✓</Text>}
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={[styles.docLabel, isMissing && { color: colors.rd }]}>{doc.label}</Text>
@@ -372,8 +372,8 @@ export function StaffScreen() {
 
 const DocBadge = ({ icon, label, expiry, expired }) => (
   <View style={[styles.docBadge, expired ? styles.docBadgeRed : styles.docBadgeGreen]}>
-    <Text style={{ fontSize: 11 }}>{icon}</Text>
-    <Text style={{ fontSize: 11, fontWeight: '700', color: expired ? colors.rd : colors.gn }}>{label} ~{expiry}</Text>
+    <Text style={{ fontSize: fontSize.xs }}>{icon}</Text>
+    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: expired ? colors.rd : colors.gn }}>{label} ~{expiry}</Text>
   </View>
 );
 
@@ -421,8 +421,7 @@ export function InventoryScreen() {
         </View>
       )}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm }}>
+      <View style={styles.filterRow}>
         {[{ k: 'all', l: '전체' }, { k: 'critical', l: '🔴 긴급' }, { k: 'low', l: '🟡 부족' }, { k: 'ok', l: '🟢 정상' }].map(f => (
           <TouchableOpacity key={f.k}
             style={[styles.filterBtn, filter === f.k && styles.filterBtnActive]}
@@ -430,7 +429,7 @@ export function InventoryScreen() {
             <Text style={[styles.filterBtnText, filter === f.k && styles.filterBtnTextActive]}>{f.l}</Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </View>
 
       <View style={styles.toolbar}>
         <Text style={styles.toolTitle}>📦 재고 현황</Text>
@@ -604,7 +603,8 @@ const styles = StyleSheet.create({
   barLabel: { fontSize: fontSize.xxs, color: colors.t3, marginBottom: 4, fontWeight: '600' },
 
   // 재고
-  filterBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.bd, backgroundColor: colors.s1 },
+  filterRow: { flexDirection: 'row', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm },
+  filterBtn: { flex: 1, paddingVertical: 10, borderRadius: radius.sm, borderWidth: 1.5, borderColor: colors.bd, backgroundColor: colors.s1, alignItems: 'center', justifyContent: 'center' },
   filterBtnActive: { backgroundColor: colors.ac, borderColor: colors.ac },
   filterBtnText: { fontSize: fontSize.sm, color: colors.t2, fontWeight: '600' },
   filterBtnTextActive: { color: '#fff', fontWeight: '800' },
