@@ -24,7 +24,6 @@
       "package": "com.kmeatmaster.meatmanager",
       "versionCode": 1,
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA"
       ]
     },
@@ -49,6 +48,12 @@
         "projectId": "05a0fe1c-65ec-464e-a161-5c14fe31d3e2"
       }
     },
-    "owner": "jbaek777"
+    "owner": "jbaek777",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/05a0fe1c-65ec-464e-a161-5c14fe31d3e2"
+    }
   }
 }
