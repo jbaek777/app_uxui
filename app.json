@@ -51,8 +51,7 @@
         }
       ],
       "expo-asset",
-      "expo-font",
-      "expo-barcode-scanner"
+      "expo-font"
     ],
     "extra": {
       "eas": {
