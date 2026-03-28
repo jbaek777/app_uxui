@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, Alert } from 'react-native';
 import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn } from '../components/UI';
@@ -48,7 +48,12 @@ const DOCS = [
 ];
 
 async function printDoc(doc) {
-  await printAndShare(doc.getHTML(), doc.title);
+  const html = doc.getHTML();
+  if (!html || html.trim().length === 0) {
+    Alert.alert('오류', 'PDF 내용을 생성할 수 없습니다.');
+    return;
+  }
+  await printAndShare(html, doc.title);
 }
 
 export default function DocumentScreen({ navigation }) {
@@ -59,10 +64,20 @@ export default function DocumentScreen({ navigation }) {
   const [printing, setPrinting] = useState(false);
 
   const handlePrint = async (doc) => {
-    setPrinting(true);
+    // 1. 모달 먼저 닫기
     setPrintModal(false);
-    await printDoc(doc);
-    setPrinting(false);
+    // 2. 모달 닫힘 애니메이션(300ms) 완료 대기 후 PDF 실행
+    //    → 모달과 시스템 다이얼로그 동시 오픈 충돌 방지
+    setTimeout(async () => {
+      setPrinting(true);
+      try {
+        await printDoc(doc);
+      } catch (e) {
+        Alert.alert('출력 오류', e?.message || 'PDF 생성 중 문제가 발생했습니다.');
+      } finally {
+        setPrinting(false);
+      }
+    }, 400);
   };
 
   return (
@@ -118,6 +133,23 @@ export default function DocumentScreen({ navigation }) {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* ── 출력 로딩 오버레이 ── */}
+      {printing && (
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.55)',
+          alignItems: 'center', justifyContent: 'center', zIndex: 999,
+        }}>
+          <View style={{
+            backgroundColor: pal.s1, borderRadius: radius.lg,
+            padding: spacing.xl, alignItems: 'center', gap: spacing.md,
+          }}>
+            <ActivityIndicator size="large" color={pal.ac} />
+            <Text style={{ color: pal.tx, fontSize: fontSize.sm, fontWeight: '700' }}>PDF 생성 중...</Text>
+          </View>
+        </View>
+      )}
 
       {/* ── 출력 선택 모달 ── */}
       <Modal visible={printModal} animationType="slide" presentationStyle="pageSheet">

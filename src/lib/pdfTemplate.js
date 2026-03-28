@@ -753,31 +753,42 @@ export function genStaffHTML(staff) {
 // 공통 출력 실행 함수
 // ═══════════════════════════════════════════════════════════════
 export async function printAndShare(html, fileName = 'MeatBig_문서') {
+  // Step 1: PDF 파일 생성
+  let uri;
   try {
-    const { uri } = await Print.printToFileAsync({ html });
-    let shared = false;
-    try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: `${fileName} 내보내기`,
-          UTI: 'com.adobe.pdf',
-        });
-        shared = true;
-      }
-    } catch (_) {}
-    if (!shared) {
-      // 공유 불가 시 네이티브 인쇄 다이얼로그 사용
-      await Print.printAsync({ html });
-    }
+    const result = await Print.printToFileAsync({ html, base64: false });
+    uri = result.uri;
   } catch (e) {
-    console.error('PDF 오류:', e);
+    console.error('PDF 파일 생성 실패:', e);
+    // 파일 생성 실패 시 바로 인쇄 다이얼로그 시도
     try {
-      // 최종 fallback: 인쇄 다이얼로그
       await Print.printAsync({ html });
     } catch (_) {
-      Alert.alert('오류', 'PDF 생성 중 문제가 발생했습니다.\n잠시 후 다시 시도해주세요.');
+      Alert.alert('출력 오류', 'PDF를 생성할 수 없습니다.\n잠시 후 다시 시도해주세요.');
     }
+    return;
+  }
+
+  // Step 2: 공유 시도
+  try {
+    const canShare = await Sharing.isAvailableAsync();
+    if (canShare) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `${fileName} 내보내기`,
+        UTI: 'com.adobe.pdf',
+      });
+      return;
+    }
+  } catch (e) {
+    console.warn('공유 실패, 인쇄 다이얼로그로 전환:', e);
+  }
+
+  // Step 3: 공유 불가 시 인쇄 다이얼로그
+  try {
+    await Print.printAsync({ html });
+  } catch (e) {
+    console.error('인쇄 다이얼로그 실패:', e);
+    Alert.alert('출력 완료', `${fileName}.pdf 파일이 기기에 저장되었습니다.`);
   }
 }
