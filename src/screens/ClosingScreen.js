@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert,
 } from 'react-native';
 import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
-import { todaySales as initSales, meatInventory } from '../data/mockData';
+import { todaySales as initSales, meatInventory as initMeat } from '../data/mockData';
 import { genClosingHTML, printAndShare } from '../lib/pdfTemplate';
-import { closingStore } from '../lib/dataStore';
+import { closingStore, meatStore } from '../lib/dataStore';
 
 export default function ClosingScreen() {
   const { isDark } = useTheme();
@@ -17,15 +17,23 @@ export default function ClosingScreen() {
   const [form, setForm] = useState({ cut: '', qty: '', price: '' });
   const [waste, setWaste] = useState([]);
   const [wasteModal, setWasteModal] = useState(false);
-  const [wasteForm, setWasteForm] = useState({ cut: '', qty: '', reason: '' });
+  const [wasteForm, setWasteForm] = useState({ cut: '', qty: '', reason: '', price: '' });
+  const [realMeat, setRealMeat] = useState([]);
+
+  useEffect(() => {
+    meatStore.load(initMeat).then(data => setRealMeat(data.filter(m => !m.sold)));
+  }, []);
 
   const totalSales = sales.reduce((s, r) => s + r.total, 0);
   const totalCost = sales.reduce((s, r) => {
-    const item = meatInventory.find(m => m.cut === r.cut);
+    const item = (realMeat.length > 0 ? realMeat : initMeat).find(m => m.cut === r.cut);
     return s + (item ? item.buyPrice * r.qty : 0);
   }, 0);
   const margin = totalCost > 0 ? ((totalSales - totalCost) / totalSales * 100).toFixed(1) : 0;
-  const wasteTotal = waste.reduce((s, w) => s + (parseFloat(w.qty) || 0) * 5000, 0);
+  const wasteTotal = waste.reduce((s, w) => {
+    const price = parseFloat(w.price) || 5000;
+    return s + (parseFloat(w.qty) || 0) * price;
+  }, 0);
 
   const addSale = () => {
     if (!form.cut || !form.qty || !form.price) { Alert.alert('입력 오류', '부위, 중량, 단가를 모두 입력해주세요.'); return; }
@@ -49,7 +57,7 @@ export default function ClosingScreen() {
     if (!wasteForm.cut || !wasteForm.qty) { Alert.alert('입력 오류', '부위와 폐기량을 입력해주세요.'); return; }
     setWaste([...waste, { ...wasteForm, id: Date.now().toString() }]);
     setWasteModal(false);
-    setWasteForm({ cut: '', qty: '', reason: '' });
+    setWasteForm({ cut: '', qty: '', reason: '', price: '' });
   };
 
   return (
@@ -113,7 +121,7 @@ export default function ClosingScreen() {
               <View key={w.id} style={[styles.wasteRow, { borderBottomColor: pal.bd + '50' }]}>
                 <Text style={[styles.wasteCut, { color: pal.tx }]}>{w.cut}</Text>
                 <Text style={[styles.wasteMeta, { color: pal.t3 }]}>{w.qty}kg · {w.reason || '사유 미입력'}</Text>
-                <Text style={[styles.wasteVal, { color: pal.rd }]}>손실 추정 {(parseFloat(w.qty) * 5000).toLocaleString()}원</Text>
+                <Text style={[styles.wasteVal, { color: pal.rd }]}>손실 추정 {(parseFloat(w.qty) * (parseFloat(w.price) || 5000)).toLocaleString()}원</Text>
               </View>
             ))
           )}
@@ -128,7 +136,7 @@ export default function ClosingScreen() {
         {/* 잔여 재고 */}
         <View style={[styles.section, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
           <Text style={[styles.sectionTitle, { color: pal.tx }]}>📦 잔여 재고</Text>
-          {meatInventory.map(m => (
+          {(realMeat.length > 0 ? realMeat : initMeat.filter(m => !m.sold)).map(m => (
             <View key={m.id} style={[styles.stockRow, { borderBottomColor: pal.bd + '40' }]}>
               <Text style={[styles.stockCut, { color: pal.tx }]}>{m.cut}</Text>
               <Text style={[styles.stockOrigin, { color: pal.t3 }]}>{m.origin}</Text>
@@ -149,7 +157,7 @@ export default function ClosingScreen() {
               total_cost: totalCost,
               total_waste: wasteTotal,
             });
-            const html = genClosingHTML(sales, waste, meatInventory);
+            const html = genClosingHTML(sales, waste, realMeat.length > 0 ? realMeat : initMeat.filter(m => !m.sold));
             await printAndShare(html, '일일마감정산서');
           }}
         />
@@ -194,6 +202,7 @@ export default function ClosingScreen() {
               { label: '부위명', key: 'cut', placeholder: '예: 안심' },
               { label: '폐기량 (kg)', key: 'qty', placeholder: '0.0', keyboardType: 'numeric' },
               { label: '폐기 사유', key: 'reason', placeholder: '예: 소비기한 경과' },
+              { label: '매입가 (원/kg, 선택)', key: 'price', placeholder: '미입력 시 5,000원 기준', keyboardType: 'numeric' },
             ].map(f => (
               <View key={f.key} style={{ marginBottom: spacing.md }}>
                 <Text style={[styles.fieldLabel, { color: pal.t2 }]}>{f.label}</Text>

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { colors, radius, shadow, fontSize, spacing } from '../theme';
+import { colors, darkColors, lightColors, radius, shadow, fontSize, spacing } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn, StatusBadge } from '../components/UI';
 
@@ -53,6 +53,7 @@ async function checkOnline() {
 
 export default function ScanScreen() {
   const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -150,59 +151,59 @@ export default function ScanScreen() {
   };
 
   if (!permission) return (
-    <View style={[styles.center, { backgroundColor: colors.bg }]}>
-      <ActivityIndicator color={colors.ac} />
+    <View style={[styles.center, { backgroundColor: pal.bg }]}>
+      <ActivityIndicator color={pal.ac} />
     </View>
   );
 
   if (!permission.granted) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.bg }]}>
+      <View style={[styles.center, { backgroundColor: pal.bg }]}>
         <Text style={styles.permIcon}>📷</Text>
-        <Text style={[styles.permTitle, { color: colors.tx }]}>카메라 권한 필요</Text>
-        <Text style={[styles.permSub, { color: colors.t2 }]}>이력번호 바코드 스캔을 위해{'\n'}카메라 접근 권한이 필요합니다</Text>
+        <Text style={[styles.permTitle, { color: pal.tx }]}>카메라 권한 필요</Text>
+        <Text style={[styles.permSub, { color: pal.t2 }]}>이력번호 바코드 스캔을 위해{'\n'}카메라 접근 권한이 필요합니다</Text>
         <PrimaryBtn label="권한 허용" onPress={requestPermission} style={{ marginTop: 20, paddingHorizontal: 40 }} />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: pal.bg }}>
       {/* 오프라인 / 동기화 배너 */}
       {!isOnline && (
-        <View style={[styles.offlineBanner, { backgroundColor: colors.yw + '22', borderColor: colors.yw + '60' }]}>
-          <Text style={[styles.offlineBannerText, { color: colors.yw }]}>
+        <View style={[styles.offlineBanner, { backgroundColor: pal.yw + '22', borderColor: pal.yw + '60' }]}>
+          <Text style={[styles.offlineBannerText, { color: pal.yw }]}>
             📡 오프라인 모드 — 스캔 결과가 로컬에 저장됩니다
           </Text>
         </View>
       )}
       {pendingQueue.length > 0 && (
         <TouchableOpacity
-          style={[styles.syncBanner, { backgroundColor: colors.a2 + '18', borderColor: colors.a2 + '40' }]}
+          style={[styles.syncBanner, { backgroundColor: pal.a2 + '18', borderColor: pal.a2 + '40' }]}
           onPress={trySyncQueue}
           activeOpacity={0.8}
         >
           <View style={{ flex: 1 }}>
-            <Text style={[styles.syncBannerTitle, { color: colors.a2 }]}>
+            <Text style={[styles.syncBannerTitle, { color: pal.a2 }]}>
               🔄 미동기화 {pendingQueue.length}건
             </Text>
-            <Text style={[styles.syncBannerSub, { color: colors.t3 }]}>탭하여 서버에 동기화</Text>
+            <Text style={[styles.syncBannerSub, { color: pal.t3 }]}>탭하여 서버에 동기화</Text>
           </View>
           {syncing
-            ? <ActivityIndicator size="small" color={colors.a2} />
-            : <Text style={{ color: colors.a2, fontSize: 18 }}>↑</Text>
+            ? <ActivityIndicator size="small" color={pal.a2} />
+            : <Text style={{ color: pal.a2, fontSize: 18 }}>↑</Text>
           }
         </TouchableOpacity>
       )}
 
       {/* 스캔 버튼 */}
-      <View style={[styles.scanLaunchArea, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
-        <Text style={[styles.scanTitle, { color: colors.tx }]}>🏷️ 축산물 이력번호 조회</Text>
-        <Text style={[styles.scanSub, { color: colors.t2 }]}>
+      <View style={[styles.scanLaunchArea, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+        <Text style={[styles.scanTitle, { color: pal.tx }]}>🏷️ 축산물 이력번호 조회</Text>
+        <Text style={[styles.scanSub, { color: pal.t2 }]}>
           바코드·QR코드를 스캔하면{'\n'}도축 정보·등급·원산지를 즉시 확인합니다
         </Text>
         <TouchableOpacity
-          style={[styles.scanBigBtn, { backgroundColor: colors.ac }]}
+          style={[styles.scanBigBtn, { backgroundColor: pal.ac }]}
           onPress={() => { setScanning(true); setScanned(false); }}
         >
           <Text style={styles.scanBigIcon}>📷</Text>
@@ -214,26 +215,26 @@ export default function ScanScreen() {
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
         {history.length > 0 && (
           <>
-            <Text style={[styles.histTitle, { color: colors.tx }]}>최근 조회 이력</Text>
+            <Text style={[styles.histTitle, { color: pal.tx }]}>최근 조회 이력</Text>
             {history.map((h, i) => (
               <TouchableOpacity
                 key={i}
-                style={[styles.histCard, { backgroundColor: colors.s1, borderColor: colors.bd }]}
+                style={[styles.histCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}
                 onPress={() => setResult(h)}
               >
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={[styles.histTrace, { color: colors.tx }]}>{h.traceNo}</Text>
+                    <Text style={[styles.histTrace, { color: pal.tx }]}>{h.traceNo}</Text>
                     {h.synced === false && (
-                      <View style={[styles.pendingBadge, { backgroundColor: colors.yw + '30' }]}>
-                        <Text style={[styles.pendingBadgeText, { color: colors.yw }]}>미동기화</Text>
+                      <View style={[styles.pendingBadge, { backgroundColor: pal.yw + '30' }]}>
+                        <Text style={[styles.pendingBadgeText, { color: pal.yw }]}>미동기화</Text>
                       </View>
                     )}
                   </View>
-                  <Text style={[styles.histMeta, { color: colors.t2 }]}>{h.animalType} · {h.grade}등급 · {h.farmName}</Text>
-                  <Text style={[styles.histTime, { color: colors.t3 }]}>{h.scanTime}</Text>
+                  <Text style={[styles.histMeta, { color: pal.t2 }]}>{h.animalType} · {h.grade}등급 · {h.farmName}</Text>
+                  <Text style={[styles.histTime, { color: pal.t3 }]}>{h.scanTime}</Text>
                 </View>
-                <Text style={{ fontSize: 18, color: colors.t3 }}>›</Text>
+                <Text style={{ fontSize: 18, color: pal.t3 }}>›</Text>
               </TouchableOpacity>
             ))}
           </>
@@ -241,7 +242,7 @@ export default function ScanScreen() {
         {history.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>🔍</Text>
-            <Text style={[styles.emptyText, { color: colors.t3 }]}>스캔 이력이 없습니다{'\n'}바코드를 스캔해보세요</Text>
+            <Text style={[styles.emptyText, { color: pal.t3 }]}>스캔 이력이 없습니다{'\n'}바코드를 스캔해보세요</Text>
           </View>
         )}
       </ScrollView>
@@ -278,9 +279,9 @@ export default function ScanScreen() {
       {/* 로딩 */}
       <Modal visible={loading} transparent animationType="fade">
         <View style={styles.loadingOverlay}>
-          <View style={[styles.loadingBox, { backgroundColor: colors.s1 }]}>
-            <ActivityIndicator size="large" color={colors.ac} />
-            <Text style={[styles.loadingText, { color: colors.t2 }]}>이력 정보 조회 중...</Text>
+          <View style={[styles.loadingBox, { backgroundColor: pal.s1 }]}>
+            <ActivityIndicator size="large" color={pal.ac} />
+            <Text style={[styles.loadingText, { color: pal.t2 }]}>이력 정보 조회 중...</Text>
           </View>
         </View>
       </Modal>
@@ -288,18 +289,18 @@ export default function ScanScreen() {
       {/* 결과 모달 */}
       <Modal visible={!!result && !loading} animationType="slide" presentationStyle="pageSheet">
         {result && (
-          <View style={{ flex: 1, backgroundColor: colors.bg }}>
-            <View style={[styles.resultHeader, { borderBottomColor: colors.bd, backgroundColor: colors.s1 }]}>
-              <Text style={[styles.resultTitle, { color: colors.tx }]}>🏷️ 이력 조회 결과</Text>
+          <View style={{ flex: 1, backgroundColor: pal.bg }}>
+            <View style={[styles.resultHeader, { borderBottomColor: pal.bd, backgroundColor: pal.s1 }]}>
+              <Text style={[styles.resultTitle, { color: pal.tx }]}>🏷️ 이력 조회 결과</Text>
               <TouchableOpacity onPress={() => setResult(null)}>
-                <Text style={[styles.resultClose, { color: colors.t2 }]}>✕</Text>
+                <Text style={[styles.resultClose, { color: pal.t2 }]}>✕</Text>
               </TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
-              <View style={[styles.traceBox, { backgroundColor: colors.a2 + '18', borderColor: colors.a2 + '50' }]}>
-                <Text style={[styles.traceLabel, { color: colors.t2 }]}>이력번호</Text>
-                <Text style={[styles.traceNo, { color: colors.a2 }]}>{result.traceNo}</Text>
-                <Text style={[styles.traceTime, { color: colors.t3 }]}>조회: {result.scanTime}</Text>
+              <View style={[styles.traceBox, { backgroundColor: pal.a2 + '18', borderColor: pal.a2 + '50' }]}>
+                <Text style={[styles.traceLabel, { color: pal.t2 }]}>이력번호</Text>
+                <Text style={[styles.traceNo, { color: pal.a2 }]}>{result.traceNo}</Text>
+                <Text style={[styles.traceTime, { color: pal.t3 }]}>조회: {result.scanTime}</Text>
               </View>
 
               <InfoSection title="📋 기본 정보">
@@ -317,17 +318,17 @@ export default function ScanScreen() {
                 <InfoRow label="도축일" value={result.slaughterDate} />
                 <InfoRow label="도축장" value={result.slaughterPlace} />
                 <InfoRow label="검사 결과" value={result.inspection}
-                  highlight={result.inspection === '적합'} highlightColor={colors.gn} />
+                  highlight={result.inspection === '적합'} highlightColor={pal.gn} />
               </InfoSection>
 
               {result.synced === false && (
                 <View style={[styles.offlineBanner, { marginHorizontal: 0, marginBottom: spacing.sm }]}>
-                  <Text style={[styles.offlineBannerText, { color: colors.yw }]}>
+                  <Text style={[styles.offlineBannerText, { color: pal.yw }]}>
                     ⚠️ 오프라인 스캔 — 인터넷 연결 시 자동으로 서버에 동기화됩니다
                   </Text>
                 </View>
               )}
-              <PrimaryBtn label="✓ 숙성 관리에 등록" color={colors.ac}
+              <PrimaryBtn label="✓ 숙성 관리에 등록" color={pal.ac}
                 onPress={() => {
                   Alert.alert('등록', `이력번호 ${result.traceNo}를 숙성 관리에 등록합니다.`);
                   setResult(null);

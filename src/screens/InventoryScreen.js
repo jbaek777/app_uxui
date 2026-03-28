@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Modal, TextInput, Alert,
 } from 'react-native';
-import { colors, fontSize, spacing, radius, shadow } from '../theme';
+import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn, AlertBox } from '../components/UI';
 import { GaugeBar } from '../components/GaugeBar';
@@ -14,6 +14,7 @@ const TABS = ['재고 현황', '판매내역', '수율 계산기', '소비기한
 
 export default function InventoryScreen() {
   const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
   const [tab, setTab] = useState(0);
   const [meat, setMeat] = useState([]);
   const [loaded, setLoaded] = useState(false);
@@ -22,7 +23,16 @@ export default function InventoryScreen() {
   // 앱 실행 시 데이터 로드 (Supabase → AsyncStorage → mockData)
   useEffect(() => {
     meatStore.load(initMeat.map(m => ({ ...m, editCount: 0, editLog: [] })))
-      .then(data => { setMeat(data); setLoaded(true); });
+      .then(data => {
+        const now = new Date();
+        const refreshed = data.map(m => {
+          if (!m.expire) return m;
+          const dday = Math.ceil((new Date(m.expire) - now) / 86400000);
+          return { ...m, dday, status: dday <= 0 ? 'critical' : dday <= 2 ? 'low' : 'ok' };
+        });
+        setMeat(refreshed);
+        setLoaded(true);
+      });
   }, []);
 
   // 데이터 변경 시 자동 저장 (첫 로드 제외)
@@ -33,19 +43,20 @@ export default function InventoryScreen() {
     }
   }, [meat]);
 
-  const critical = meat.filter(m => m.dday <= 1 && !m.sold);
+  const getDdaySafe = m => m.dday != null ? m.dday : (m.d_day != null ? m.d_day : 99);
+  const critical = meat.filter(m => getDdaySafe(m) <= 1 && !m.sold);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: pal.bg }}>
       {/* 탭 바 */}
-      <View style={[styles.tabBar, { backgroundColor: colors.s1, borderBottomColor: colors.bd }]}>
+      <View style={[styles.tabBar, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
         {TABS.map((t, i) => (
           <TouchableOpacity
             key={t}
-            style={[styles.tab, tab === i && { borderBottomColor: colors.ac }]}
+            style={[styles.tab, tab === i && { borderBottomColor: pal.ac }]}
             onPress={() => setTab(i)}
           >
-            <Text style={[styles.tabText, { color: tab === i ? colors.ac : colors.t3 }, tab === i && styles.tabTextActive]}>
+            <Text style={[styles.tabText, { color: tab === i ? pal.ac : pal.t3 }, tab === i && styles.tabTextActive]}>
               {t}
             </Text>
           </TouchableOpacity>
@@ -62,6 +73,8 @@ export default function InventoryScreen() {
 
 // ── 재고 현황 탭 ──────────────────────────────────────────
 function StockTab({ meat, setMeat, critical }) {
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ cut: '', origin: '', qty: '', buyPrice: '', sellPrice: '', expire: '' });
 
@@ -110,14 +123,15 @@ function StockTab({ meat, setMeat, critical }) {
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         {/* 2×2 요약 그리드 */}
         <View style={styles.summaryGrid}>
-          <SummaryBox icon="📦" label="재고 부위"  value={`${activeItems.length}종`}                                       color={colors.a2}   />
-          <SummaryBox icon="✅" label="판매완료"   value={`${soldItems.length}건`}                                          color={colors.gn}   />
-          <SummaryBox icon="💰" label="재고 가치"  value={`${(totalValue / 10000).toFixed(0)}만원`}                         color={colors.cyan} />
+          <SummaryBox icon="📦" label="재고 부위"  value={`${activeItems.length}종`}                                       color={pal.a2}   pal={pal} />
+          <SummaryBox icon="✅" label="판매완료"   value={`${soldItems.length}건`}                                          color={pal.gn}   pal={pal} />
+          <SummaryBox icon="💰" label="재고 가치"  value={`${(totalValue / 10000).toFixed(0)}만원`}                         color={pal.cyan} pal={pal} />
           <SummaryBox
             icon={lossRisk > 0 ? '⚠️' : '🛡️'}
             label="손실위험"
             value={lossRisk > 0 ? `-${(lossRisk / 10000).toFixed(0)}만원` : '없음'}
-            color={lossRisk > 0 ? colors.rd : colors.gn}
+            color={lossRisk > 0 ? pal.rd : pal.gn}
+            pal={pal}
           />
         </View>
 
@@ -130,12 +144,12 @@ function StockTab({ meat, setMeat, critical }) {
         <View style={{ padding: spacing.md }}>
         {activeItems.length === 0 && (
           <View style={styles.emptyBox}>
-            <Text style={[styles.emptyText, { color: colors.t3 }]}>재고 항목이 없습니다</Text>
+            <Text style={[styles.emptyText, { color: pal.t3 }]}>재고 항목이 없습니다</Text>
           </View>
         )}
 
         {activeItems.map(item => (
-          <View key={item.id} style={[styles.meatCard, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
+          <View key={item.id} style={[styles.meatCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
             <GaugeBar
               label={item.cut}
               sub={`${item.origin} · 매입가 ${item.buyPrice.toLocaleString()}원/kg`}
@@ -146,39 +160,39 @@ function StockTab({ meat, setMeat, critical }) {
               height={14}
             />
             <View style={styles.priceRow}>
-              <Text style={[styles.priceLabel, { color: colors.t3 }]}>매입가</Text>
-              <Text style={[styles.priceVal,   { color: colors.t2 }]}>{item.buyPrice.toLocaleString()}원</Text>
-              <Text style={[styles.priceLabel, { color: colors.t3 }]}>권장 판매가</Text>
-              <Text style={[styles.priceVal,   { color: colors.a2 }]}>{item.sellPrice.toLocaleString()}원</Text>
+              <Text style={[styles.priceLabel, { color: pal.t3 }]}>매입가</Text>
+              <Text style={[styles.priceVal,   { color: pal.t2 }]}>{item.buyPrice.toLocaleString()}원</Text>
+              <Text style={[styles.priceLabel, { color: pal.t3 }]}>권장 판매가</Text>
+              <Text style={[styles.priceVal,   { color: pal.a2 }]}>{item.sellPrice.toLocaleString()}원</Text>
               {item.dday <= 3 && (
                 <>
-                  <Text style={[styles.priceLabel, { color: colors.rd }]}>손실위험</Text>
-                  <Text style={[styles.priceVal, { color: colors.rd }]}>
+                  <Text style={[styles.priceLabel, { color: pal.rd }]}>손실위험</Text>
+                  <Text style={[styles.priceVal, { color: pal.rd }]}>
                     -{((item.qty * item.buyPrice) / 10000).toFixed(1)}만원
                   </Text>
                 </>
               )}
             </View>
             <TouchableOpacity
-              style={[styles.soldBtn, { borderTopColor: colors.bd }]}
+              style={[styles.soldBtn, { borderTopColor: pal.bd }]}
               onPress={() => handleSold(item.id)}
               activeOpacity={0.75}
             >
-              <Text style={[styles.soldBtnText, { color: colors.gn }]}>판매 완료 처리 →</Text>
+              <Text style={[styles.soldBtnText, { color: pal.gn }]}>판매 완료 처리 →</Text>
             </TouchableOpacity>
           </View>
         ))}
 
-        <PrimaryBtn label="+ 재고 추가" onPress={() => setModal(true)} color={colors.a2} style={{ marginTop: spacing.sm }} />
+        <PrimaryBtn label="+ 재고 추가" onPress={() => setModal(true)} color={pal.a2} style={{ marginTop: spacing.sm }} />
         </View>
       </ScrollView>
 
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={[styles.modalHeader, { borderBottomColor: colors.bd, backgroundColor: colors.s1 }]}>
-            <Text style={[styles.modalTitle, { color: colors.tx }]}>재고 추가</Text>
+        <View style={{ flex: 1, backgroundColor: pal.bg }}>
+          <View style={[styles.modalHeader, { borderBottomColor: pal.bd, backgroundColor: pal.s1 }]}>
+            <Text style={[styles.modalTitle, { color: pal.tx }]}>재고 추가</Text>
             <TouchableOpacity onPress={() => setModal(false)}>
-              <Text style={[styles.closeBtn, { color: colors.t2 }]}>✕</Text>
+              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
@@ -191,17 +205,17 @@ function StockTab({ meat, setMeat, critical }) {
               { label: '소비기한 (YYYY-MM-DD)', key: 'expire',    placeholder: '2026-04-01' },
             ].map(f => (
               <View key={f.key} style={{ marginBottom: spacing.md }}>
-                <Text style={[styles.fieldLabel, { color: colors.t2 }]}>{f.label}</Text>
+                <Text style={[styles.fieldLabel, { color: pal.t2 }]}>{f.label}</Text>
                 <TextInput
-                  style={[styles.input, { backgroundColor: colors.s2, borderColor: colors.bd, color: colors.tx }]}
+                  style={[styles.input, { backgroundColor: pal.s2, borderColor: pal.bd, color: pal.tx }]}
                   value={form[f.key]}
                   onChangeText={t => setForm({ ...form, [f.key]: t })}
                   placeholder={f.placeholder}
-                  placeholderTextColor={colors.t3}
+                  placeholderTextColor={pal.t3}
                   keyboardType={f.keyboardType}
                 />
                 {f.key === 'sellPrice' && form.buyPrice ? (
-                  <Text style={{ fontSize: fontSize.xxs, color: colors.a2, marginTop: 4 }}>
+                  <Text style={{ fontSize: fontSize.xxs, color: pal.a2, marginTop: 4 }}>
                     💡 권장: {Math.round((parseInt(form.buyPrice) || 0) * 1.55).toLocaleString()}원 (마진 35%)
                   </Text>
                 ) : null}
@@ -218,6 +232,8 @@ function StockTab({ meat, setMeat, critical }) {
 
 // ── 판매내역 탭 ───────────────────────────────────────────
 function SoldHistoryTab({ meat }) {
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
   const soldItems = meat.filter(m => m.sold);
 
   // 날짜별로 그룹핑
@@ -238,16 +254,16 @@ function SoldHistoryTab({ meat }) {
       {soldItems.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={{ fontSize: 48, marginBottom: spacing.md }}>📋</Text>
-          <Text style={[styles.emptyText, { color: colors.t3 }]}>판매완료 내역이 없습니다</Text>
+          <Text style={[styles.emptyText, { color: pal.t3 }]}>판매완료 내역이 없습니다</Text>
         </View>
       ) : (
         <>
           {/* 합계 요약 */}
           <View style={styles.summaryGrid}>
-            <SummaryBox icon="📦" label="판매 건수"  value={`${soldItems.length}건`}                              color={colors.a2}   />
-            <SummaryBox icon="💰" label="총 매출액"  value={`${(totalRevenue / 10000).toFixed(0)}만원`}           color={colors.gn}   />
-            <SummaryBox icon="📉" label="총 매입액"  value={`${(totalCost / 10000).toFixed(0)}만원`}              color={colors.cyan} />
-            <SummaryBox icon="📈" label="총 마진"    value={`${(totalProfit / 10000).toFixed(0)}만원`}            color={totalProfit >= 0 ? colors.gn : colors.rd} />
+            <SummaryBox icon="📦" label="판매 건수"  value={`${soldItems.length}건`}                              color={pal.a2}   pal={pal} />
+            <SummaryBox icon="💰" label="총 매출액"  value={`${(totalRevenue / 10000).toFixed(0)}만원`}           color={pal.gn}   pal={pal} />
+            <SummaryBox icon="📉" label="총 매입액"  value={`${(totalCost / 10000).toFixed(0)}만원`}              color={pal.cyan} pal={pal} />
+            <SummaryBox icon="📈" label="총 마진"    value={`${(totalProfit / 10000).toFixed(0)}만원`}            color={totalProfit >= 0 ? pal.gn : pal.rd} pal={pal} />
           </View>
 
           {dates.map(date => {
@@ -257,36 +273,36 @@ function SoldHistoryTab({ meat }) {
             return (
               <View key={date} style={styles.soldGroup}>
                 <View style={styles.soldGroupHeader}>
-                  <Text style={[styles.soldGroupDate, { color: colors.t2 }]}>📅 {date}</Text>
-                  <Text style={[styles.soldGroupTotal, { color: colors.gn }]}>
+                  <Text style={[styles.soldGroupDate, { color: pal.t2 }]}>📅 {date}</Text>
+                  <Text style={[styles.soldGroupTotal, { color: pal.gn }]}>
                     매출 {(dayRev / 10000).toFixed(0)}만원 · 마진 {((dayRev - dayCost) / 10000).toFixed(0)}만원
                   </Text>
                 </View>
                 {items.map(item => (
-                  <View key={item.id} style={[styles.soldCard, { backgroundColor: colors.s1, borderColor: colors.gn + '40' }]}>
+                  <View key={item.id} style={[styles.soldCard, { backgroundColor: pal.s1, borderColor: pal.gn + '40' }]}>
                     <View style={styles.soldCardTop}>
-                      <View style={[styles.soldBadge, { backgroundColor: colors.gn + '20' }]}>
-                        <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: colors.gn }}>✓ 판매완료</Text>
+                      <View style={[styles.soldBadge, { backgroundColor: pal.gn + '20' }]}>
+                        <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: pal.gn }}>✓ 판매완료</Text>
                       </View>
-                      <Text style={[styles.soldCardCut, { color: colors.tx }]}>{item.cut}</Text>
-                      <Text style={[styles.soldCardOrigin, { color: colors.t3 }]}>{item.origin}</Text>
+                      <Text style={[styles.soldCardCut, { color: pal.tx }]}>{item.cut}</Text>
+                      <Text style={[styles.soldCardOrigin, { color: pal.t3 }]}>{item.origin}</Text>
                     </View>
                     <View style={styles.soldCardRow}>
                       <View style={styles.soldCardStat}>
-                        <Text style={[styles.soldStatLabel, { color: colors.t3 }]}>중량</Text>
-                        <Text style={[styles.soldStatVal, { color: colors.tx }]}>{item.qty}kg</Text>
+                        <Text style={[styles.soldStatLabel, { color: pal.t3 }]}>중량</Text>
+                        <Text style={[styles.soldStatVal, { color: pal.tx }]}>{item.qty}kg</Text>
                       </View>
                       <View style={styles.soldCardStat}>
-                        <Text style={[styles.soldStatLabel, { color: colors.t3 }]}>매입가</Text>
-                        <Text style={[styles.soldStatVal, { color: colors.t2 }]}>{item.buyPrice.toLocaleString()}원</Text>
+                        <Text style={[styles.soldStatLabel, { color: pal.t3 }]}>매입가</Text>
+                        <Text style={[styles.soldStatVal, { color: pal.t2 }]}>{item.buyPrice.toLocaleString()}원</Text>
                       </View>
                       <View style={styles.soldCardStat}>
-                        <Text style={[styles.soldStatLabel, { color: colors.t3 }]}>판매가</Text>
-                        <Text style={[styles.soldStatVal, { color: colors.a2 }]}>{item.sellPrice.toLocaleString()}원</Text>
+                        <Text style={[styles.soldStatLabel, { color: pal.t3 }]}>판매가</Text>
+                        <Text style={[styles.soldStatVal, { color: pal.a2 }]}>{item.sellPrice.toLocaleString()}원</Text>
                       </View>
                       <View style={styles.soldCardStat}>
-                        <Text style={[styles.soldStatLabel, { color: colors.t3 }]}>마진</Text>
-                        <Text style={[styles.soldStatVal, { color: colors.gn }]}>
+                        <Text style={[styles.soldStatLabel, { color: pal.t3 }]}>마진</Text>
+                        <Text style={[styles.soldStatVal, { color: pal.gn }]}>
                           {(((item.sellPrice - item.buyPrice) * item.qty) / 10000).toFixed(1)}만원
                         </Text>
                       </View>
@@ -304,6 +320,8 @@ function SoldHistoryTab({ meat }) {
 
 // ── 수율 계산기 탭 ────────────────────────────────────────
 function YieldTab() {
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
   const [initWeight,  setInitWeight]  = useState('');
   const [finalWeight, setFinalWeight] = useState('');
   const [buyPrice,    setBuyPrice]    = useState('');
@@ -346,43 +364,43 @@ function YieldTab() {
       <AlertBox type="info" icon="ℹ️" message="원육 중량과 정육 후 중량을 입력하면 수율과 실제 원가를 계산합니다." />
 
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={[styles.fieldLabel, { color: colors.t2 }]}>부위명 (선택, 히스토리 식별용)</Text>
-        <TextInput style={[styles.inputLg, { backgroundColor: colors.s1, borderColor: colors.bd, color: colors.tx }]}
+        <Text style={[styles.fieldLabel, { color: pal.t2 }]}>부위명 (선택, 히스토리 식별용)</Text>
+        <TextInput style={[styles.inputLg, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
           value={label} onChangeText={setLabel}
-          placeholder="예: 등심 3월 28일 작업" placeholderTextColor={colors.t3} />
+          placeholder="예: 등심 3월 28일 작업" placeholderTextColor={pal.t3} />
       </View>
       <View style={styles.rowInputs}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.fieldLabel, { color: colors.t2 }]}>원육 중량 (kg)</Text>
-          <TextInput style={[styles.inputLg, { backgroundColor: colors.s1, borderColor: colors.bd, color: colors.tx }]}
+          <Text style={[styles.fieldLabel, { color: pal.t2 }]}>원육 중량 (kg)</Text>
+          <TextInput style={[styles.inputLg, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
             value={initWeight} onChangeText={setInitWeight}
-            placeholder="예: 15.0" placeholderTextColor={colors.t3} keyboardType="numeric" />
+            placeholder="예: 15.0" placeholderTextColor={pal.t3} keyboardType="numeric" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.fieldLabel, { color: colors.t2 }]}>정육 후 중량 (kg)</Text>
-          <TextInput style={[styles.inputLg, { backgroundColor: colors.s1, borderColor: colors.bd, color: colors.tx }]}
+          <Text style={[styles.fieldLabel, { color: pal.t2 }]}>정육 후 중량 (kg)</Text>
+          <TextInput style={[styles.inputLg, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
             value={finalWeight} onChangeText={setFinalWeight}
-            placeholder="예: 12.5" placeholderTextColor={colors.t3} keyboardType="numeric" />
+            placeholder="예: 12.5" placeholderTextColor={pal.t3} keyboardType="numeric" />
         </View>
       </View>
       <View style={{ marginBottom: spacing.lg }}>
-        <Text style={[styles.fieldLabel, { color: colors.t2 }]}>매입가 (원/kg, 선택)</Text>
-        <TextInput style={[styles.inputLg, { backgroundColor: colors.s1, borderColor: colors.bd, color: colors.tx }]}
+        <Text style={[styles.fieldLabel, { color: pal.t2 }]}>매입가 (원/kg, 선택)</Text>
+        <TextInput style={[styles.inputLg, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
           value={buyPrice} onChangeText={setBuyPrice}
-          placeholder="예: 98000" placeholderTextColor={colors.t3} keyboardType="numeric" />
+          placeholder="예: 98000" placeholderTextColor={pal.t3} keyboardType="numeric" />
       </View>
 
       <PrimaryBtn label="수율 계산하기" onPress={calculate} />
       {result && <OutlineBtn label="입력 초기화" onPress={clearInputs} style={{ marginTop: spacing.sm }} />}
 
       {result && (
-        <View style={[styles.resultCard, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
+        <View style={[styles.resultCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
           <ResultRow label="수율" value={`${result.yieldPct}%`}
-            color={parseFloat(result.yieldPct) >= 80 ? colors.gn : colors.yw} big />
-          <ResultRow label="손실 중량" value={`${result.lossKg}kg`} color={colors.rd} />
+            color={parseFloat(result.yieldPct) >= 80 ? pal.gn : pal.yw} big pal={pal} />
+          <ResultRow label="손실 중량" value={`${result.lossKg}kg`} color={pal.rd} pal={pal} />
           {result.realCost > 0 && <>
-            <ResultRow label="실제 원가 (손실 반영)" value={`${result.realCost.toLocaleString()}원/kg`} color={colors.a2} />
-            <ResultRow label="권장 판매가 (마진 55%)" value={`${result.recommend.toLocaleString()}원/kg`} color={colors.gn} big />
+            <ResultRow label="실제 원가 (손실 반영)" value={`${result.realCost.toLocaleString()}원/kg`} color={pal.a2} pal={pal} />
+            <ResultRow label="권장 판매가 (마진 55%)" value={`${result.recommend.toLocaleString()}원/kg`} color={pal.gn} big pal={pal} />
           </>}
         </View>
       )}
@@ -391,38 +409,38 @@ function YieldTab() {
       {history.length > 0 && (
         <View style={{ marginTop: spacing.lg }}>
           <TouchableOpacity
-            style={[styles.historyToggle, { backgroundColor: colors.s1, borderColor: colors.bd }]}
+            style={[styles.historyToggle, { backgroundColor: pal.s1, borderColor: pal.bd }]}
             onPress={() => setShowHistory(v => !v)}
           >
-            <Text style={[styles.historyToggleText, { color: colors.a2 }]}>
+            <Text style={[styles.historyToggleText, { color: pal.a2 }]}>
               📊 계산 히스토리 ({history.length}건)  {showHistory ? '▲ 접기' : '▼ 펼치기'}
             </Text>
           </TouchableOpacity>
           {showHistory && history.map(h => (
-            <View key={h.id} style={[styles.historyCard, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
+            <View key={h.id} style={[styles.historyCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
               <View style={styles.historyTop}>
-                <Text style={[styles.historyLabel, { color: colors.tx }]}>{h.label}</Text>
-                <Text style={[styles.historyDate, { color: colors.t3 }]}>{h.date}</Text>
+                <Text style={[styles.historyLabel, { color: pal.tx }]}>{h.label}</Text>
+                <Text style={[styles.historyDate, { color: pal.t3 }]}>{h.date}</Text>
               </View>
               <View style={styles.historyRow}>
                 <View style={styles.historyStat}>
-                  <Text style={[styles.historyStatLabel, { color: colors.t3 }]}>원육</Text>
-                  <Text style={[styles.historyStatVal, { color: colors.t2 }]}>{h.initWeight}kg</Text>
+                  <Text style={[styles.historyStatLabel, { color: pal.t3 }]}>원육</Text>
+                  <Text style={[styles.historyStatVal, { color: pal.t2 }]}>{h.initWeight}kg</Text>
                 </View>
-                <Text style={{ color: colors.t3, fontSize: fontSize.lg }}>→</Text>
+                <Text style={{ color: pal.t3, fontSize: fontSize.lg }}>→</Text>
                 <View style={styles.historyStat}>
-                  <Text style={[styles.historyStatLabel, { color: colors.t3 }]}>정육</Text>
-                  <Text style={[styles.historyStatVal, { color: colors.t2 }]}>{h.finalWeight}kg</Text>
+                  <Text style={[styles.historyStatLabel, { color: pal.t3 }]}>정육</Text>
+                  <Text style={[styles.historyStatVal, { color: pal.t2 }]}>{h.finalWeight}kg</Text>
                 </View>
-                <View style={[styles.historyYieldBadge, { backgroundColor: parseFloat(h.yieldPct) >= 80 ? colors.gn + '20' : colors.yw + '20' }]}>
-                  <Text style={{ fontSize: fontSize.md, fontWeight: '900', color: parseFloat(h.yieldPct) >= 80 ? colors.gn : colors.yw }}>
+                <View style={[styles.historyYieldBadge, { backgroundColor: parseFloat(h.yieldPct) >= 80 ? pal.gn + '20' : pal.yw + '20' }]}>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '900', color: parseFloat(h.yieldPct) >= 80 ? pal.gn : pal.yw }}>
                     {h.yieldPct}%
                   </Text>
                 </View>
                 {h.realCost > 0 && (
                   <View style={styles.historyStat}>
-                    <Text style={[styles.historyStatLabel, { color: colors.t3 }]}>실제원가</Text>
-                    <Text style={[styles.historyStatVal, { color: colors.a2 }]}>{h.realCost.toLocaleString()}원</Text>
+                    <Text style={[styles.historyStatLabel, { color: pal.t3 }]}>실제원가</Text>
+                    <Text style={[styles.historyStatVal, { color: pal.a2 }]}>{h.realCost.toLocaleString()}원</Text>
                   </View>
                 )}
               </View>
@@ -436,13 +454,16 @@ function YieldTab() {
 
 // ── 소비기한 탭 ───────────────────────────────────────────
 function ExpiryTab({ meat, setMeat }) {
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
+  const getDdaySafe = m => m.dday != null ? m.dday : (m.d_day != null ? m.d_day : 99);
   const activeMeat = meat.filter(m => !m.sold);
-  const sorted     = [...activeMeat].sort((a, b) => a.dday - b.dday);
+  const sorted     = [...activeMeat].sort((a, b) => getDdaySafe(a) - getDdaySafe(b));
 
-  const today    = sorted.filter(m => m.dday === 0);
-  const tomorrow = sorted.filter(m => m.dday === 1);
-  const week     = sorted.filter(m => m.dday > 1 && m.dday <= 7);
-  const later    = sorted.filter(m => m.dday > 7);
+  const today    = sorted.filter(m => getDdaySafe(m) === 0);
+  const tomorrow = sorted.filter(m => getDdaySafe(m) === 1);
+  const week     = sorted.filter(m => getDdaySafe(m) > 1 && getDdaySafe(m) <= 7);
+  const later    = sorted.filter(m => getDdaySafe(m) > 7);
 
   const [editModal, setEditModal] = useState(false);
   const [logModal,  setLogModal]  = useState(false);
@@ -497,35 +518,35 @@ function ExpiryTab({ meat, setMeat }) {
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
-      {today.length    > 0 && <ExpiryGroup label="🔴 오늘 만료"  items={today}    color={colors.rd} onEdit={openEdit} onLog={openLog} />}
-      {tomorrow.length > 0 && <ExpiryGroup label="🟡 내일 만료"  items={tomorrow} color={colors.yw} onEdit={openEdit} onLog={openLog} />}
-      {week.length     > 0 && <ExpiryGroup label="🟠 이번 주"    items={week}     color={colors.a2} onEdit={openEdit} onLog={openLog} />}
-      {later.length    > 0 && <ExpiryGroup label="🟢 이후"       items={later}    color={colors.gn} onEdit={openEdit} onLog={openLog} />}
+      {today.length    > 0 && <ExpiryGroup label="🔴 오늘 만료"  items={today}    color={pal.rd} onEdit={openEdit} onLog={openLog} pal={pal} />}
+      {tomorrow.length > 0 && <ExpiryGroup label="🟡 내일 만료"  items={tomorrow} color={pal.yw} onEdit={openEdit} onLog={openLog} pal={pal} />}
+      {week.length     > 0 && <ExpiryGroup label="🟠 이번 주"    items={week}     color={pal.a2} onEdit={openEdit} onLog={openLog} pal={pal} />}
+      {later.length    > 0 && <ExpiryGroup label="🟢 이후"       items={later}    color={pal.gn} onEdit={openEdit} onLog={openLog} pal={pal} />}
 
       {/* 소비기한 수정 모달 */}
       <Modal visible={editModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.editModalBox, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
-            <Text style={[styles.editModalTitle, { color: colors.tx }]}>✏️ 소비기한 수정</Text>
-            <Text style={[styles.editModalSub, { color: colors.t3 }]}>
+          <View style={[styles.editModalBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+            <Text style={[styles.editModalTitle, { color: pal.tx }]}>✏️ 소비기한 수정</Text>
+            <Text style={[styles.editModalSub, { color: pal.t3 }]}>
               {target?.cut}  현재: {target?.expire}
             </Text>
             {(target?.editCount > 0) && (
-              <View style={[styles.editWarningBox, { backgroundColor: colors.yw + '20', borderColor: colors.yw + '50' }]}>
-                <Text style={[styles.editWarningText, { color: colors.yw }]}>
+              <View style={[styles.editWarningBox, { backgroundColor: pal.yw + '20', borderColor: pal.yw + '50' }]}>
+                <Text style={[styles.editWarningText, { color: pal.yw }]}>
                   ⚠️ 이미 {target.editCount}회 수정된 항목입니다
                 </Text>
               </View>
             )}
-            <Text style={[styles.fieldLabel, { color: colors.t2, marginTop: spacing.md }]}>새 소비기한 (YYYY-MM-DD)</Text>
+            <Text style={[styles.fieldLabel, { color: pal.t2, marginTop: spacing.md }]}>새 소비기한 (YYYY-MM-DD)</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: colors.bg, borderColor: colors.bd, color: colors.tx }]}
+              style={[styles.input, { backgroundColor: pal.bg, borderColor: pal.bd, color: pal.tx }]}
               value={newExpire}
               onChangeText={setNewExpire}
               placeholder="예: 2026-04-10"
-              placeholderTextColor={colors.t3}
+              placeholderTextColor={pal.t3}
             />
-            <Text style={[styles.editNotice, { color: colors.rd }]}>
+            <Text style={[styles.editNotice, { color: pal.rd }]}>
               🔴 수정 시 로그에 기록되며 취소할 수 없습니다
             </Text>
             <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
@@ -538,34 +559,34 @@ function ExpiryTab({ meat, setMeat }) {
 
       {/* 수정 로그 모달 */}
       <Modal visible={logModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={[styles.modalHeader, { backgroundColor: colors.s1, borderBottomColor: colors.bd }]}>
-            <Text style={[styles.modalTitle, { color: colors.tx }]}>📋 수정 이력 — {target?.cut}</Text>
+        <View style={{ flex: 1, backgroundColor: pal.bg }}>
+          <View style={[styles.modalHeader, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
+            <Text style={[styles.modalTitle, { color: pal.tx }]}>📋 수정 이력 — {target?.cut}</Text>
             <TouchableOpacity onPress={() => setLogModal(false)}>
-              <Text style={[styles.closeBtn, { color: colors.t2 }]}>✕</Text>
+              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.md }}>
             {(!target?.editLog || target.editLog.length === 0) ? (
               <View style={styles.emptyBox}>
-                <Text style={[styles.emptyText, { color: colors.t3 }]}>수정 이력이 없습니다</Text>
+                <Text style={[styles.emptyText, { color: pal.t3 }]}>수정 이력이 없습니다</Text>
               </View>
             ) : (
               target.editLog.map((log, idx) => (
-                <View key={idx} style={[styles.logCard, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
-                  <View style={[styles.logCountBadge, { backgroundColor: colors.yw + '20' }]}>
-                    <Text style={[styles.logCountText, { color: colors.yw }]}>수정 {log.count}회</Text>
+                <View key={idx} style={[styles.logCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+                  <View style={[styles.logCountBadge, { backgroundColor: pal.yw + '20' }]}>
+                    <Text style={[styles.logCountText, { color: pal.yw }]}>수정 {log.count}회</Text>
                   </View>
-                  <Text style={[styles.logDateTime, { color: colors.t3 }]}>{log.date} {log.time}</Text>
+                  <Text style={[styles.logDateTime, { color: pal.t3 }]}>{log.date} {log.time}</Text>
                   <View style={styles.logChangeRow}>
-                    <View style={[styles.logChangeBox, { backgroundColor: colors.rd + '15', borderColor: colors.rd + '40' }]}>
-                      <Text style={[styles.logChangeLabel, { color: colors.rd }]}>변경 전</Text>
-                      <Text style={[styles.logChangeVal, { color: colors.tx }]}>{log.oldExpire}</Text>
+                    <View style={[styles.logChangeBox, { backgroundColor: pal.rd + '15', borderColor: pal.rd + '40' }]}>
+                      <Text style={[styles.logChangeLabel, { color: pal.rd }]}>변경 전</Text>
+                      <Text style={[styles.logChangeVal, { color: pal.tx }]}>{log.oldExpire}</Text>
                     </View>
-                    <Text style={{ color: colors.t3, fontSize: 20 }}>→</Text>
-                    <View style={[styles.logChangeBox, { backgroundColor: colors.gn + '15', borderColor: colors.gn + '40' }]}>
-                      <Text style={[styles.logChangeLabel, { color: colors.gn }]}>변경 후</Text>
-                      <Text style={[styles.logChangeVal, { color: colors.tx }]}>{log.newExpire}</Text>
+                    <Text style={{ color: pal.t3, fontSize: 20 }}>→</Text>
+                    <View style={[styles.logChangeBox, { backgroundColor: pal.gn + '15', borderColor: pal.gn + '40' }]}>
+                      <Text style={[styles.logChangeLabel, { color: pal.gn }]}>변경 후</Text>
+                      <Text style={[styles.logChangeVal, { color: pal.tx }]}>{log.newExpire}</Text>
                     </View>
                   </View>
                 </View>
@@ -578,33 +599,33 @@ function ExpiryTab({ meat, setMeat }) {
   );
 }
 
-const ExpiryGroup = ({ label, items, color, onEdit, onLog }) => (
+const ExpiryGroup = ({ label, items, color, onEdit, onLog, pal }) => (
   <View style={styles.expiryGroup}>
     <Text style={[styles.expiryGroupLabel, { color }]}>{label}</Text>
     {items.map(item => (
-      <View key={item.id} style={[styles.expiryRow, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
+      <View key={item.id} style={[styles.expiryRow, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
         <View style={[styles.expiryDot, { backgroundColor: color }]} />
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={[styles.expiryName, { color: colors.tx }]}>{item.cut}</Text>
+            <Text style={[styles.expiryName, { color: pal.tx }]}>{item.cut}</Text>
             {item.editCount > 0 && (
-              <View style={[styles.editBadge, { backgroundColor: colors.yw + '25' }]}>
-                <Text style={[styles.editBadgeText, { color: colors.yw }]}>수정 {item.editCount}회</Text>
+              <View style={[styles.editBadge, { backgroundColor: pal.yw + '25' }]}>
+                <Text style={[styles.editBadgeText, { color: pal.yw }]}>수정 {item.editCount}회</Text>
               </View>
             )}
           </View>
-          <Text style={[styles.expiryOrigin, { color: colors.t3 }]}>{item.origin}</Text>
+          <Text style={[styles.expiryOrigin, { color: pal.t3 }]}>{item.origin}</Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={[styles.expiryQty, { color }]}>{item.qty}kg</Text>
-          <Text style={[styles.expiryDate, { color: colors.t3 }]}>{item.expire}</Text>
+          <Text style={[styles.expiryDate, { color: pal.t3 }]}>{item.expire}</Text>
           <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
             {item.editCount > 0 && (
               <TouchableOpacity
-                style={[styles.expiryActionBtn, { borderColor: colors.t3 + '50' }]}
+                style={[styles.expiryActionBtn, { borderColor: pal.t3 + '50' }]}
                 onPress={() => onLog(item)}
               >
-                <Text style={[styles.expiryActionText, { color: colors.t3 }]}>로그</Text>
+                <Text style={[styles.expiryActionText, { color: pal.t3 }]}>로그</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -620,17 +641,17 @@ const ExpiryGroup = ({ label, items, color, onEdit, onLog }) => (
   </View>
 );
 
-const SummaryBox = ({ icon, label, value, color }) => (
-  <View style={[styles.summaryBox, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
+const SummaryBox = ({ icon, label, value, color, pal }) => (
+  <View style={[styles.summaryBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
     <Text style={{ fontSize: 20, marginBottom: 4 }}>{icon}</Text>
     <Text style={[styles.summaryVal, { color }]}>{value}</Text>
-    <Text style={[styles.summaryLabel, { color: colors.t3 }]}>{label}</Text>
+    <Text style={[styles.summaryLabel, { color: pal.t3 }]}>{label}</Text>
   </View>
 );
 
-const ResultRow = ({ label, value, color, big }) => (
-  <View style={[styles.resultRow, { borderBottomColor: colors.bd }]}>
-    <Text style={[styles.resultLabel, { color: colors.t2 }]}>{label}</Text>
+const ResultRow = ({ label, value, color, big, pal }) => (
+  <View style={[styles.resultRow, { borderBottomColor: pal.bd }]}>
+    <Text style={[styles.resultLabel, { color: pal.t2 }]}>{label}</Text>
     <Text style={[styles.resultVal, { color, fontSize: big ? fontSize.xl : fontSize.lg }]}>{value}</Text>
   </View>
 );

@@ -42,7 +42,11 @@ export default function DashboardScreen({ navigation, route }) {
   const criticalLoss = urgent.reduce((s, m) => s + (m.qty || 0) * getBuyPrice(m), 0);
 
   // 오늘 위생점검 완료 여부
-  const todayHygiene = hygieneLogs.filter(h => (h.log_date || h.date || '') === todayStr);
+  const todayISO = today.toISOString().slice(0, 10); // "2026-03-29"
+  const todayHygiene = hygieneLogs.filter(h => {
+    const d = h.log_date || h.date || '';
+    return d === todayStr || d === todayISO || d.startsWith(todayISO);
+  });
   const hygieneNeeded = todayHygiene.length === 0;
   const tempNeeded = true; // 온도 기록 화면 연동 시 교체
 
@@ -54,6 +58,14 @@ export default function DashboardScreen({ navigation, route }) {
     { icon: '💰', label: '마감\n정산',  tab: 'DocsTab',     screen: 'Closing',  color: pal.cyan, initial: true  },
     { icon: '📦', label: '재고\n확인',  tab: 'InventoryTab',screen: null,       color: pal.a2,   initial: true  },
   ];
+
+  // 이번 달 위생 점수 계산 (pass 비율 기반)
+  const thisMonth = hygieneLogs.filter(h => {
+    const d = h.log_date || h.date || '';
+    return d.includes(today.getMonth() + 1 + '월') || d.startsWith(today.toISOString().slice(0, 7));
+  });
+  const hygieneScore = thisMonth.length === 0 ? '--' :
+    Math.round((thisMonth.filter(h => h.status === 'pass').length / thisMonth.length) * 100);
 
   const cardBg = isDark
     ? 'rgba(255,255,255,0.05)'
@@ -82,7 +94,7 @@ export default function DashboardScreen({ navigation, route }) {
           <Text style={[styles.date, { color: pal.t3 }]}>{dateStr}</Text>
         </View>
         <View style={[styles.scoreBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <Text style={[styles.scoreNum, { color: pal.gn }]}>94</Text>
+          <Text style={[styles.scoreNum, { color: pal.gn }]}>{hygieneScore}</Text>
           <Text style={[styles.scoreLabel, { color: pal.t3 }]}>위생점수</Text>
         </View>
       </View>
@@ -94,7 +106,7 @@ export default function DashboardScreen({ navigation, route }) {
         <CheckCard
           icon="📦"
           label="이력번호 미등록"
-          badge="2건 미처리"
+          badge="관리 필요"
           badgeColor={pal.rd}
           btnLabel="스캔"
           borderColor={pal.rd}
@@ -180,7 +192,7 @@ export default function DashboardScreen({ navigation, route }) {
             {nearExpiry3.slice(0, 3).map(item => (
               <View key={item.id} style={styles.lossRow}>
                 <View style={[styles.lossDot, {
-                  backgroundColor: item.dday === 0 ? pal.rd : item.dday === 1 ? pal.yw : pal.a2,
+                  backgroundColor: getDday(item) === 0 ? pal.rd : getDday(item) === 1 ? pal.yw : pal.a2,
                 }]} />
                 <Text style={[styles.lossItemName, { color: pal.tx }]}>{item.cut}</Text>
                 <Text style={[styles.lossItemQty, { color: pal.t2 }]}>{item.qty}kg</Text>
@@ -418,9 +430,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   quickLabel: {
-    fontSize: 18,
+    fontSize: fontSize.xs,
     fontWeight: '800',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 20,
   },
 });

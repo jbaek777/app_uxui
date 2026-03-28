@@ -71,6 +71,10 @@ export const lightShadow = {
 // 기존 호환성
 export const shadow = darkShadow;
 
+export function getShadow(isDark) {
+  return isDark ? darkShadow : lightShadow;
+}
+
 export const fontSize = {
   xxl: 36,
   xl:  28,

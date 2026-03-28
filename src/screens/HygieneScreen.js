@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, TextInput,
 } from 'react-native';
-import { colors, fontSize, spacing, radius, shadow } from '../theme';
+import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
+import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { OXPair } from '../components/OXButton';
 import { hygieneData as initData } from '../data/mockData';
@@ -19,6 +20,8 @@ const CHECKLIST = [
 ];
 
 export default function HygieneScreen() {
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
   const [logs, setLogs] = useState(initData);
   const [loaded, setLoaded] = useState(false);
   const isFirst = useRef(true);
@@ -77,23 +80,27 @@ export default function HygieneScreen() {
   };
 
   const pass = logs.filter(l => l.status === 'pass').length;
+  const passCount = logs.filter(l => l.status === 'pass').length;
+  const hygieneScore = logs.length === 0 ? '--' : Math.round((passCount / logs.length) * 100);
+
+  const todayStr = new Date().toLocaleDateString('ko-KR');
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: pal.bg }]}>
       <View style={styles.statRow}>
-        <StatBox value={`${logs.length}건`} label="이번 달" color={colors.a2} />
-        <StatBox value={`${pass}건`} label="적합 판정" color={colors.gn} />
-        <StatBox value="94점" label="위생 점수" color={colors.ac} />
+        <StatBox value={`${logs.length}건`} label="이번 달" color={pal.a2} pal={pal} />
+        <StatBox value={`${pass}건`} label="적합 판정" color={pal.gn} pal={pal} />
+        <StatBox value={logs.length === 0 ? '--점' : `${hygieneScore}점`} label="위생 점수" color={pal.ac} pal={pal} />
       </View>
 
       {/* 오늘 세션 현황 */}
       <View style={styles.todayRow}>
         {SESSIONS.map(s => {
-          const done = logs.find(l => l.session === s);
+          const done = logs.find(l => l.session === s && (l.date === todayStr || l.log_date === todayStr));
           return (
-            <View key={s} style={[styles.sessionCard, { borderColor: done ? colors.gn + '70' : colors.bd }]}>
+            <View key={s} style={[styles.sessionCard, { borderColor: done ? pal.gn + '70' : pal.bd, backgroundColor: pal.s1 }]}>
               <Text style={{ fontSize: 20 }}>{s === '오전' ? '🌅' : s === '오후' ? '☀️' : '🌙'}</Text>
-              <Text style={[styles.sessionLabel, { color: done ? colors.gn : colors.t3 }]}>
+              <Text style={[styles.sessionLabel, { color: done ? pal.gn : pal.t3 }]}>
                 {done ? '✓ ' : ''}{s}
               </Text>
             </View>
@@ -107,23 +114,23 @@ export default function HygieneScreen() {
 
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
         {logs.map(log => (
-          <View key={log.id} style={styles.logCard}>
+          <View key={log.id} style={[styles.logCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
             <View style={styles.logTop}>
               <View>
-                <Text style={styles.logDate}>{log.date} {log.time}</Text>
-                <Text style={styles.logMeta}>{log.session} 점검 · {log.inspector}</Text>
+                <Text style={[styles.logDate, { color: pal.tx }]}>{log.date} {log.time}</Text>
+                <Text style={[styles.logMeta, { color: pal.t3 }]}>{log.session} 점검 · {log.inspector}</Text>
               </View>
-              <View style={[styles.badge, { backgroundColor: log.status === 'pass' ? colors.gn + '20' : colors.yw + '20' }]}>
-                <Text style={[styles.badgeText, { color: log.status === 'pass' ? colors.gn : colors.yw }]}>
+              <View style={[styles.badge, { backgroundColor: log.status === 'pass' ? pal.gn + '20' : pal.yw + '20' }]}>
+                <Text style={[styles.badgeText, { color: log.status === 'pass' ? pal.gn : pal.yw }]}>
                   {log.status === 'pass' ? '✓ 적합' : '⚠ 주의'}
                 </Text>
               </View>
             </View>
             <View style={{ gap: 3, marginTop: spacing.sm }}>
               {log.items.slice(0, 3).map((item, i) => (
-                <Text key={i} style={styles.logItem}>• {item}</Text>
+                <Text key={i} style={[styles.logItem, { color: pal.t2 }]}>• {item}</Text>
               ))}
-              {log.items.length > 3 && <Text style={styles.logMore}>+ {log.items.length - 3}개 더</Text>}
+              {log.items.length > 3 && <Text style={[styles.logMore, { color: pal.t3 }]}>+ {log.items.length - 3}개 더</Text>}
             </View>
           </View>
         ))}
@@ -131,24 +138,24 @@ export default function HygieneScreen() {
 
       {/* 점검 모달 */}
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modalWrap}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>위생·HACCP 점검</Text>
+        <View style={[styles.modalWrap, { backgroundColor: pal.bg }]}>
+          <View style={[styles.modalHeader, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
+            <Text style={[styles.modalTitle, { color: pal.tx }]}>위생·HACCP 점검</Text>
             <TouchableOpacity onPress={() => setModal(false)}>
-              <Text style={styles.closeBtn}>✕</Text>
+              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
             </TouchableOpacity>
           </View>
 
           {step === 0 && (
             <View style={styles.stepWrap}>
-              <Text style={styles.stepTitle}>점검 시간을{'\n'}선택하세요</Text>
+              <Text style={[styles.stepTitle, { color: pal.tx }]}>점검 시간을{'\n'}선택하세요</Text>
               <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
                 {SESSIONS.map(s => (
                   <TouchableOpacity key={s}
-                    style={[styles.sessionSelectBtn, session === s && styles.sessionSelectBtnActive]}
+                    style={[styles.sessionSelectBtn, { backgroundColor: pal.s1, borderColor: session === s ? pal.ac : pal.bd }, session === s && { backgroundColor: pal.ac + '15' }]}
                     onPress={() => setSession(s)}>
                     <Text style={{ fontSize: 36 }}>{s === '오전' ? '🌅' : s === '오후' ? '☀️' : '🌙'}</Text>
-                    <Text style={[styles.sessionSelectText, session === s && { color: colors.ac }]}>{s} 점검</Text>
+                    <Text style={[styles.sessionSelectText, { color: session === s ? pal.ac : pal.t2 }]}>{s} 점검</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -158,33 +165,33 @@ export default function HygieneScreen() {
 
           {step === 1 && (
             <>
-              <View style={styles.progressWrap}>
-                <View style={[styles.progressFill, { width: `${(doneItems / totalItems) * 100}%` }]} />
+              <View style={[styles.progressWrap, { backgroundColor: pal.bd }]}>
+                <View style={[styles.progressFill, { width: `${(doneItems / totalItems) * 100}%`, backgroundColor: pal.ac }]} />
               </View>
-              <Text style={styles.progressText}>{doneItems} / {totalItems} 완료</Text>
+              <Text style={[styles.progressText, { color: pal.t3 }]}>{doneItems} / {totalItems} 완료</Text>
 
               <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
                 {CHECKLIST.map(item => (
-                  <View key={item.key} style={styles.checkItem}>
+                  <View key={item.key} style={[styles.checkItem, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
                     <View style={styles.checkLeft}>
                       <Text style={{ fontSize: 30 }}>{item.icon}</Text>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.checkLabel}>{item.label}</Text>
-                        <Text style={styles.checkDesc}>{item.desc}</Text>
+                        <Text style={[styles.checkLabel, { color: pal.tx }]}>{item.label}</Text>
+                        <Text style={[styles.checkDesc, { color: pal.t3 }]}>{item.desc}</Text>
                       </View>
                     </View>
                     <OXPair value={checks[item.key]} onChange={val => setChecks(p => ({ ...p, [item.key]: val }))} />
                   </View>
                 ))}
 
-                <View style={styles.tempBox}>
-                  <Text style={styles.tempTitle}>🌡️ 냉장고 실측 온도 (°C)</Text>
+                <View style={[styles.tempBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+                  <Text style={[styles.tempTitle, { color: pal.tx }]}>🌡️ 냉장고 실측 온도 (°C)</Text>
                   <View style={styles.tempBtns}>
                     {['1', '2', '3', '4', '5+'].map(t => (
                       <TouchableOpacity key={t}
-                        style={[styles.tempBtn, fridgeTemp === t && styles.tempBtnActive]}
+                        style={[styles.tempBtn, { borderColor: fridgeTemp === t ? pal.cyan : pal.bd, backgroundColor: fridgeTemp === t ? pal.cyan : pal.s2 }]}
                         onPress={() => setFridgeTemp(t)}>
-                        <Text style={[styles.tempBtnText, fridgeTemp === t && { color: '#fff', fontWeight: '900' }]}>
+                        <Text style={[styles.tempBtnText, { color: fridgeTemp === t ? '#fff' : pal.t2 }, fridgeTemp === t && { fontWeight: '900' }]}>
                           {t === '5+' ? '5°C↑' : `${t}°C`}
                         </Text>
                       </TouchableOpacity>
@@ -193,21 +200,21 @@ export default function HygieneScreen() {
                 </View>
 
                 {/* 점검자 이름 입력 */}
-                <View style={styles.inspectorBox}>
-                  <Text style={styles.inspectorLabel}>✍️ 점검자 이름</Text>
+                <View style={[styles.inspectorBox, { backgroundColor: pal.s1, borderColor: pal.a2 + '60' }]}>
+                  <Text style={[styles.inspectorLabel, { color: pal.a2 }]}>✍️ 점검자 이름</Text>
                   <TextInput
-                    style={styles.inspectorInput}
+                    style={[styles.inspectorInput, { backgroundColor: pal.s2, borderColor: pal.bd, color: pal.tx }]}
                     value={inspector}
                     onChangeText={setInspector}
                     placeholder="이름을 입력하세요"
-                    placeholderTextColor={colors.t3}
+                    placeholderTextColor={pal.t3}
                   />
                 </View>
 
                 <PrimaryBtn
                   label={doneItems >= totalItems ? '✓ 점검 완료 — 저장하기' : `${totalItems - doneItems}개 항목이 남았습니다`}
                   onPress={doneItems >= totalItems ? handleSave : undefined}
-                  color={doneItems >= totalItems ? colors.gn : colors.t3}
+                  color={doneItems >= totalItems ? pal.gn : pal.t3}
                   style={{ marginTop: spacing.md, opacity: doneItems >= totalItems ? 1 : 0.55 }}
                 />
                 <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
@@ -220,61 +227,59 @@ export default function HygieneScreen() {
   );
 }
 
-const StatBox = ({ value, label, color }) => (
-  <View style={styles.statBox}>
+const StatBox = ({ value, label, color, pal }) => (
+  <View style={[styles.statBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
     <Text style={[styles.statVal, { color }]}>{value}</Text>
-    <Text style={styles.statLbl}>{label}</Text>
+    <Text style={[styles.statLbl, { color: pal.t3 }]}>{label}</Text>
   </View>
 );
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1 },
   statRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md },
-  statBox: { flex: 1, backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, alignItems: 'center', ...shadow.sm },
+  statBox: { flex: 1, borderRadius: radius.md, borderWidth: 1, padding: spacing.md, alignItems: 'center', ...shadow.sm },
   statVal: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 3 },
-  statLbl: { fontSize: fontSize.xxs, color: colors.t3, fontWeight: '600', textAlign: 'center' },
+  statLbl: { fontSize: fontSize.xxs, fontWeight: '600', textAlign: 'center' },
 
   todayRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, marginBottom: spacing.md },
-  sessionCard: { flex: 1, backgroundColor: colors.s1, borderRadius: radius.sm, borderWidth: 1.5, padding: spacing.sm, alignItems: 'center', gap: 4 },
+  sessionCard: { flex: 1, borderRadius: radius.sm, borderWidth: 1.5, padding: spacing.sm, alignItems: 'center', gap: 4 },
   sessionLabel: { fontSize: fontSize.sm, fontWeight: '700' },
 
-  logCard: { backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
+  logCard: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
   logTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  logDate: { fontSize: fontSize.md, fontWeight: '700', color: colors.tx, marginBottom: 3 },
-  logMeta: { fontSize: fontSize.xs, color: colors.t3 },
+  logDate: { fontSize: fontSize.md, fontWeight: '700', marginBottom: 3 },
+  logMeta: { fontSize: fontSize.xs },
   badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   badgeText: { fontSize: fontSize.xs, fontWeight: '800' },
-  logItem: { fontSize: fontSize.xs, color: colors.t2 },
-  logMore: { fontSize: fontSize.xs, color: colors.t3, fontStyle: 'italic' },
+  logItem: { fontSize: fontSize.xs },
+  logMore: { fontSize: fontSize.xs, fontStyle: 'italic' },
 
-  modalWrap: { flex: 1, backgroundColor: colors.bg },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.bd, backgroundColor: colors.s1 },
-  modalTitle: { fontSize: fontSize.lg, fontWeight: '900', color: colors.tx },
-  closeBtn: { fontSize: 22, color: colors.t2, padding: 4 },
+  modalWrap: { flex: 1 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1 },
+  modalTitle: { fontSize: fontSize.lg, fontWeight: '900' },
+  closeBtn: { fontSize: 22, padding: 4 },
 
   stepWrap: { flex: 1, padding: spacing.lg },
-  stepTitle: { fontSize: fontSize.xxl, fontWeight: '900', color: colors.tx, lineHeight: 44, marginTop: spacing.lg },
-  sessionSelectBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 2, borderColor: colors.bd, padding: spacing.lg, ...shadow.sm },
-  sessionSelectBtnActive: { borderColor: colors.ac, backgroundColor: colors.ac + '15' },
-  sessionSelectText: { fontSize: fontSize.lg, fontWeight: '800', color: colors.t2 },
+  stepTitle: { fontSize: fontSize.xxl, fontWeight: '900', lineHeight: 44, marginTop: spacing.lg },
+  sessionSelectBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.md, borderWidth: 2, padding: spacing.lg, ...shadow.sm },
+  sessionSelectText: { fontSize: fontSize.lg, fontWeight: '800' },
 
-  progressWrap: { height: 6, backgroundColor: colors.bd, marginHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: 6, backgroundColor: colors.ac, borderRadius: 3 },
-  progressText: { fontSize: fontSize.xs, color: colors.t3, textAlign: 'right', paddingHorizontal: spacing.lg, marginTop: 4, marginBottom: spacing.sm },
+  progressWrap: { height: 6, marginHorizontal: spacing.lg, marginTop: spacing.md, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: 6, borderRadius: 3 },
+  progressText: { fontSize: fontSize.xs, textAlign: 'right', paddingHorizontal: spacing.lg, marginTop: 4, marginBottom: spacing.sm },
 
-  checkItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
+  checkItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
   checkLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, marginRight: spacing.sm },
-  checkLabel: { fontSize: fontSize.md, fontWeight: '800', color: colors.tx, marginBottom: 3 },
-  checkDesc: { fontSize: fontSize.xs, color: colors.t3 },
+  checkLabel: { fontSize: fontSize.md, fontWeight: '800', marginBottom: 3 },
+  checkDesc: { fontSize: fontSize.xs },
 
-  tempBox: { backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, marginBottom: spacing.sm },
-  tempTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.tx, marginBottom: spacing.sm },
+  tempBox: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm },
+  tempTitle: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: spacing.sm },
   tempBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  tempBtn: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: radius.sm, borderWidth: 1.5, borderColor: colors.bd, backgroundColor: colors.s2 },
-  tempBtnActive: { backgroundColor: colors.cyan, borderColor: colors.cyan },
-  tempBtnText: { fontSize: fontSize.sm, color: colors.t2, fontWeight: '700' },
+  tempBtn: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: radius.sm, borderWidth: 1.5 },
+  tempBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
 
-  inspectorBox: { backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.a2 + '60', padding: spacing.md, marginTop: spacing.md },
-  inspectorLabel: { fontSize: fontSize.sm, color: colors.a2, fontWeight: '800', marginBottom: spacing.sm },
-  inspectorInput: { backgroundColor: colors.s2, borderWidth: 1.5, borderColor: colors.bd, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: 14, fontSize: fontSize.md, color: colors.tx, minHeight: 52 },
+  inspectorBox: { borderRadius: radius.md, borderWidth: 1.5, padding: spacing.md, marginTop: spacing.md },
+  inspectorLabel: { fontSize: fontSize.sm, fontWeight: '800', marginBottom: spacing.sm },
+  inspectorInput: { borderWidth: 1.5, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: 14, fontSize: fontSize.md, minHeight: 52 },
 });
