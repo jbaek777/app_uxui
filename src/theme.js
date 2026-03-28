@@ -76,13 +76,13 @@ export function getShadow(isDark) {
 }
 
 export const fontSize = {
-  xxl: 36,
-  xl:  28,
-  lg:  22,
-  md:  18,
-  sm:  16,
-  xs:  14,
-  xxs: 12,
+  xxl: 38,
+  xl:  30,
+  lg:  24,
+  md:  20,
+  sm:  17,
+  xs:  15,
+  xxs: 13,
 };
 
 export const spacing = {

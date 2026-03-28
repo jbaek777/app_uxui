@@ -54,13 +54,13 @@ function HomeStack() {
   );
 }
 
-// ── Tab 2: 이력관리 (스캔 → 숙성) ───────────────────────
+// ── Tab 2: 이력관리 (숙성 → 스캔) ───────────────────────
 function TraceStack() {
   const headerOpts = useHeaderOpts();
   return (
     <Stack.Navigator screenOptions={headerOpts}>
-      <Stack.Screen name="Scan" component={ScanScreen} options={{ title: '🏷️ 이력번호 조회' }} />
       <Stack.Screen name="Aging" component={AgingScreen} options={{ title: '🥩 숙성 관리' }} />
+      <Stack.Screen name="Scan" component={ScanScreen} options={{ title: '🏷️ 이력번호 조회' }} />
     </Stack.Navigator>
   );
 }
@@ -103,14 +103,14 @@ function SettingsStack({ bizData }) {
 }
 
 // ── 탭 아이콘 + 레이블 ───────────────────────────────────
-function TabIcon({ emoji, label, focused, tabColor }) {
+function TabIcon({ emoji, label, focused, tabColor, pal }) {
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', gap: 3 }}>
       <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>
       <Text style={{
         fontSize: 13,
         fontWeight: focused ? '800' : '600',
-        color: focused ? tabColor : colors.t3,
+        color: focused ? tabColor : pal.t3,
         textAlign: 'center',
       }}>
         {label}
@@ -121,13 +121,15 @@ function TabIcon({ emoji, label, focused, tabColor }) {
 
 // ── 메인 탭 네비게이터 ───────────────────────────────────
 function MainTabs({ bizData }) {
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.s1,
-          borderTopColor: colors.bd,
+          backgroundColor: pal.s1,
+          borderTopColor: pal.bd,
           borderTopWidth: 1,
           height: Platform.OS === 'ios' ? 90 : 70,
           paddingBottom: Platform.OS === 'ios' ? 20 : 8,
@@ -139,26 +141,26 @@ function MainTabs({ bizData }) {
       <Tab.Screen
         name="HomeTab"
         component={HomeStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="홈" focused={focused} tabColor={colors.ac} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="홈" focused={focused} tabColor={pal.ac} pal={pal} /> }}
       />
       <Tab.Screen
         name="TraceTab"
         component={TraceStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏷️" label="조회" focused={focused} tabColor={colors.a2} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🥩" label="숙성" focused={focused} tabColor={pal.a2} pal={pal} /> }}
       />
       <Tab.Screen
         name="InventoryTab"
         component={InventoryStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📦" label="재고" focused={focused} tabColor={colors.gn} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📦" label="재고" focused={focused} tabColor={pal.gn} pal={pal} /> }}
       />
       <Tab.Screen
         name="DocsTab"
         component={DocsStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🖨️" label="서류" focused={focused} tabColor={colors.pu} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🖨️" label="서류" focused={focused} tabColor={pal.pu} pal={pal} /> }}
       />
       <Tab.Screen
         name="SettingsTab"
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" label="설정" focused={focused} tabColor={colors.cyan} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" label="설정" focused={focused} tabColor={pal.cyan} pal={pal} /> }}
       >
         {() => <SettingsStack bizData={bizData} />}
       </Tab.Screen>
