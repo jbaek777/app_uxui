@@ -15,6 +15,24 @@ const KEYS = {
   SALES:   '@meatbig_sales_history',
 };
 
+// ─── 매장 정보 헬퍼 ─────────────────────────────────────
+
+async function getStoreInfo() {
+  try {
+    const raw = await AsyncStorage.getItem('@meatbig_biz');
+    if (!raw) return {};
+    const data = JSON.parse(raw);
+    return {
+      store_id: (data.bizNo || '').replace(/-/g, ''),
+      store_name: data.bizName || '',
+      biz_type: data.bizType || '개인사업자',
+      region_si: data.addrSi || '',
+      region_gu: data.addrGu || '',
+      region_dong: data.addrDong || '',
+    };
+  } catch { return {}; }
+}
+
 // ─── 범용 헬퍼 ──────────────────────────────────────────
 
 async function loadLocal(key) {
@@ -69,12 +87,14 @@ export const meatStore = {
       // 전체 교체 방식 (베타용 — 추후 diff 방식으로 개선)
       await supabase.from('meat_inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       if (items.length > 0) {
+        const info = await getStoreInfo();
         const rows = items.map(m => ({
           cut: m.cut, origin: m.origin, qty: m.qty, unit: m.unit || 'kg',
           buy_price: m.buyPrice, sell_price: m.sellPrice,
           expire: m.expire, dday: m.dday, status: m.status,
           sold: m.sold, sold_date: m.soldDate,
           edit_count: m.editCount || 0, edit_log: m.editLog || [],
+          ...info,
         }));
         await supabase.from('meat_inventory').insert(rows);
       }
@@ -114,9 +134,11 @@ export const staffStore = {
     try {
       await supabase.from('employees').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       if (items.length > 0) {
+        const info = await getStoreInfo();
         const rows = items.map(s => ({
           name: s.name, role: s.role, pin: s.pin, hire: s.hire,
           health: s.health, edu: s.edu, status: s.status, color: s.color,
+          ...info,
         }));
         await supabase.from('employees').insert(rows);
       }
@@ -158,11 +180,13 @@ export const yieldStore = {
     await saveLocal(KEYS.YIELD, updated);
     // Supabase
     try {
+      const info = await getStoreInfo();
       await supabase.from('yield_history').insert({
         label: entry.label, calc_date: entry.date,
         init_weight: entry.initWeight, final_weight: entry.finalWeight,
         yield_pct: entry.yieldPct, loss_kg: entry.lossKg,
         real_cost: entry.realCost, recommend: entry.recommend,
+        ...info,
       });
     } catch {}
     return updated;
@@ -175,13 +199,30 @@ export const salesStore = {
   addSale: async (item) => {
     // Supabase에 판매 기록 추가
     try {
+      const info = await getStoreInfo();
       await supabase.from('sales_history').insert({
         cut: item.cut, origin: item.origin, qty: item.qty,
         buy_price: item.buyPrice, sell_price: item.sellPrice,
         total: item.qty * item.sellPrice,
         sold_date: new Date().toLocaleDateString('ko-KR'),
+        ...info,
       });
     } catch {}
+  },
+};
+
+// ─── 매장 등록 ──────────────────────────────────────────
+
+export const storeStore = {
+  register: async () => {
+    try {
+      const info = await getStoreInfo();
+      if (!info.store_id || info.store_id === 'unknown') return;
+      const { error } = await supabase
+        .from('stores')
+        .upsert({ ...info, registered_at: new Date().toISOString() }, { onConflict: 'store_id' });
+      if (error) console.log('storeStore.register error:', error.message);
+    } catch (e) { console.log('storeStore.register exception:', e.message); }
   },
 };
 
@@ -190,9 +231,11 @@ export const salesStore = {
 export const expiryLogStore = {
   log: async (meatId, cut, oldExpire, newExpire, editCount) => {
     try {
+      const info = await getStoreInfo();
       await supabase.from('expiry_edit_logs').insert({
         meat_id: meatId, cut, old_expire: oldExpire,
         new_expire: newExpire, edit_count: editCount,
+        ...info,
       });
     } catch {}
   },

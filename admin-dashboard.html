@@ -126,6 +126,16 @@
   .empty { text-align: center; padding: 60px; color: var(--t3); }
   .empty .icon { font-size: 48px; margin-bottom: 12px; }
 
+  /* ── 필터 바 ── */
+  .filter-bar {
+    display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .filter-bar select {
+    background: var(--s1); border: 1px solid var(--bd); color: var(--tx);
+    padding: 10px 16px; border-radius: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer; min-width: 160px;
+  }
+
   @media (max-width: 900px) {
     .chart-row { grid-template-columns: 1fr; }
     .main { padding: 16px; }
@@ -146,6 +156,23 @@
 <div id="errorBanner" class="error-banner" style="display:none"></div>
 
 <div class="main">
+  <div class="filter-bar">
+    <select id="filterStore" onchange="applyFilters()">
+      <option value="">🏪 전체 매장</option>
+    </select>
+    <select id="filterBizType" onchange="applyFilters()">
+      <option value="">📋 전체 사업자</option>
+      <option value="개인사업자">개인사업자</option>
+      <option value="법인사업자">법인사업자</option>
+    </select>
+    <select id="filterSi" onchange="applyFilters()">
+      <option value="">📍 전체 지역(시)</option>
+    </select>
+    <select id="filterGu" onchange="applyFilters()">
+      <option value="">전체(구)</option>
+    </select>
+  </div>
+
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('overview')">📊 전체 요약</button>
     <button class="tab-btn" onclick="switchTab('inventory')">📦 재고 현황</button>
@@ -318,13 +345,20 @@
 <script>
 // ─── Supabase 연결 ──────────────────────────────────────
 const SUPABASE_URL = 'https://qczxzqgbablcthxqrqfb.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_2AUna1zsKbMVLdk9Fc82eA_Ehcw59Ng';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjenh6cWdiYWJsY3RoeHFycWZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTk2MzUsImV4cCI6MjA5MDE3NTYzNX0.aBE8Cz-mQvgkSNDMFM85VyYq0kE7tbLvSPvOgFDPn3A';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── 데이터 캐시 ────────────────────────────────────────
 let DATA = {
+  inventory: [], sales: [], yield: [], staff: [],
+  expiryLogs: [], aging: [], hygiene: [], closing: [],
+  stores: [],
+};
+
+// ─── 원본 데이터 캐시 (필터링 전) ────────────────────────
+let RAW = {
   inventory: [], sales: [], yield: [], staff: [],
   expiryLogs: [], aging: [], hygiene: [], closing: [],
 };
@@ -357,7 +391,7 @@ function switchTab(id) {
 async function loadAll() {
   document.getElementById('errorBanner').style.display = 'none';
   try {
-    const [inv, sales, yld, staff, expLog, aging, hyg, closing] = await Promise.all([
+    const [inv, sales, yld, staff, expLog, aging, hyg, closing, stores] = await Promise.all([
       sb.from('meat_inventory').select('*').order('created_at', { ascending: true }),
       sb.from('sales_history').select('*').order('created_at', { ascending: false }),
       sb.from('yield_history').select('*').order('created_at', { ascending: false }),
@@ -366,24 +400,99 @@ async function loadAll() {
       sb.from('aging_items').select('*').order('created_at', { ascending: false }),
       sb.from('hygiene_logs').select('*').order('created_at', { ascending: false }),
       sb.from('closing_reports').select('*').order('created_at', { ascending: false }),
+      sb.from('stores').select('*').order('registered_at', { ascending: false }),
     ]);
 
-    DATA.inventory = inv.data || [];
-    DATA.sales = sales.data || [];
-    DATA.yield = yld.data || [];
-    DATA.staff = staff.data || [];
-    DATA.expiryLogs = expLog.data || [];
-    DATA.aging = aging.data || [];
-    DATA.hygiene = hyg.data || [];
-    DATA.closing = closing.data || [];
+    RAW.inventory = inv.data || [];
+    RAW.sales = sales.data || [];
+    RAW.yield = yld.data || [];
+    RAW.staff = staff.data || [];
+    RAW.expiryLogs = expLog.data || [];
+    RAW.aging = aging.data || [];
+    RAW.hygiene = hyg.data || [];
+    RAW.closing = closing.data || [];
+    DATA.stores = stores.data || [];
 
-    renderAll();
+    // 매장 드롭다운 재구성
+    const storeSelect = document.getElementById('filterStore');
+    storeSelect.innerHTML = '<option value="">🏪 전체 매장</option>';
+    DATA.stores.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.store_id;
+      opt.textContent = `${s.store_name} (${s.store_id})`;
+      storeSelect.appendChild(opt);
+    });
+
+    // 시 드롭다운 재구성
+    const siSelect = document.getElementById('filterSi');
+    siSelect.innerHTML = '<option value="">📍 전체 지역(시)</option>';
+    const sis = [...new Set(DATA.stores.map(s => s.region_si).filter(Boolean))];
+    sis.forEach(si => {
+      const opt = document.createElement('option');
+      opt.value = si; opt.textContent = si;
+      siSelect.appendChild(opt);
+    });
+
+    applyFilters();
     document.getElementById('lastSync').textContent =
       '마지막 동기화: ' + new Date().toLocaleTimeString('ko-KR');
   } catch (e) {
     document.getElementById('errorBanner').textContent = '⚠️ Supabase 연결 실패: ' + e.message;
     document.getElementById('errorBanner').style.display = 'block';
   }
+}
+
+// ─── 필터 적용 ───────────────────────────────────────────
+function applyFilters() {
+  const storeId = document.getElementById('filterStore').value;
+  const bizType = document.getElementById('filterBizType').value;
+  const si = document.getElementById('filterSi').value;
+  const gu = document.getElementById('filterGu').value;
+
+  // 구 드롭다운: 선택된 시에 맞게 갱신
+  const guSelect = document.getElementById('filterGu');
+  const prevGu = guSelect.value;
+  guSelect.innerHTML = '<option value="">전체(구)</option>';
+  const filteredStores = DATA.stores.filter(s =>
+    (!si || s.region_si === si) &&
+    (!bizType || s.biz_type === bizType)
+  );
+  const gus = [...new Set(filteredStores.map(s => s.region_gu).filter(Boolean))];
+  gus.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g; opt.textContent = g;
+    guSelect.appendChild(opt);
+  });
+  if (gus.includes(prevGu)) guSelect.value = prevGu;
+
+  // 필터 조건에 해당하는 store_id 목록
+  let matchedStoreIds = null;
+  if (storeId || bizType || si || gu) {
+    matchedStoreIds = DATA.stores
+      .filter(s =>
+        (!storeId || s.store_id === storeId) &&
+        (!bizType || s.biz_type === bizType) &&
+        (!si || s.region_si === si) &&
+        (!gu || s.region_gu === gu)
+      )
+      .map(s => s.store_id);
+  }
+
+  function filterByStore(arr) {
+    if (!matchedStoreIds) return arr;
+    return arr.filter(r => matchedStoreIds.includes(r.store_id));
+  }
+
+  DATA.inventory = filterByStore(RAW.inventory);
+  DATA.sales = filterByStore(RAW.sales);
+  DATA.yield = filterByStore(RAW.yield);
+  DATA.staff = filterByStore(RAW.staff);
+  DATA.expiryLogs = filterByStore(RAW.expiryLogs);
+  DATA.aging = filterByStore(RAW.aging);
+  DATA.hygiene = filterByStore(RAW.hygiene);
+  DATA.closing = filterByStore(RAW.closing);
+
+  renderAll();
 }
 
 // ─── 렌더링 ─────────────────────────────────────────────
@@ -409,6 +518,10 @@ function renderOverview() {
   const staffCount = DATA.staff.length;
   const expiredStaff = DATA.staff.filter(s => s.status === 'expired').length;
 
+  const totalStores = DATA.stores.length;
+  const bizCount = DATA.stores.filter(s => s.biz_type === '개인사업자').length;
+  const corpCount = DATA.stores.filter(s => s.biz_type === '법인사업자').length;
+
   document.getElementById('overviewStats').innerHTML = `
     <div class="stat-card blue"><div class="label">재고 품목 수</div><div class="value">${inv.length}건</div></div>
     <div class="stat-card green"><div class="label">재고 가치 (판매가 기준)</div><div class="value">${fmtWon(totalValue)}</div></div>
@@ -418,7 +531,49 @@ function renderOverview() {
     <div class="stat-card"><div class="label">직원 수</div><div class="value">${staffCount}명</div>${expiredStaff > 0 ? `<div class="sub" style="color:var(--rd)">⚠ 보건증 만료 ${expiredStaff}명</div>` : ''}</div>
     <div class="stat-card"><div class="label">수율 기록</div><div class="value">${DATA.yield.length}건</div></div>
     <div class="stat-card"><div class="label">소비기한 수정 로그</div><div class="value">${DATA.expiryLogs.length}건</div></div>
+    <div class="stat-card blue"><div class="label">총 등록 매장 수</div><div class="value">${totalStores}개</div></div>
+    <div class="stat-card"><div class="label">개인 / 법인사업자</div><div class="value">${bizCount} / ${corpCount}</div><div class="sub">개인 ${bizCount}개 · 법인 ${corpCount}개</div></div>
   `;
+
+  // 매장별 요약 테이블
+  const storeRows = DATA.stores.map(s => {
+    const invCount = RAW.inventory.filter(r => r.store_id === s.store_id).length;
+    const storeSales = RAW.sales.filter(r => r.store_id === s.store_id).reduce((acc, r) => acc + Number(r.total || 0), 0);
+    const staffCnt = RAW.staff.filter(r => r.store_id === s.store_id).length;
+    return `<tr>
+      <td><strong>${s.store_name || '-'}</strong></td>
+      <td>${s.store_id || '-'}</td>
+      <td>${s.biz_type || '-'}</td>
+      <td>${[s.region_si, s.region_gu, s.region_dong].filter(Boolean).join(' ')  || '-'}</td>
+      <td>${invCount}건</td>
+      <td>${fmtWon(storeSales)}</td>
+      <td>${staffCnt}명</td>
+    </tr>`;
+  }).join('');
+
+  const storeTableHtml = `
+    <div class="table-card" style="margin-bottom:24px">
+      <div class="card-header">
+        <h3>🏪 매장별 요약</h3>
+        <span class="count">총 ${DATA.stores.length}개 매장</span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>매장명</th><th>사업자번호</th><th>사업자유형</th><th>지역</th><th>재고건수</th><th>총매출</th><th>직원수</th>
+        </tr></thead>
+        <tbody>${storeRows || '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:40px">등록된 매장 없음</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+
+  // 기존 매장 테이블 제거 후 재삽입
+  const existingStoreTable = document.getElementById('storesSummaryTable');
+  if (existingStoreTable) existingStoreTable.remove();
+  const overviewPanel = document.getElementById('panel-overview');
+  const storeDiv = document.createElement('div');
+  storeDiv.id = 'storesSummaryTable';
+  storeDiv.innerHTML = storeTableHtml;
+  overviewPanel.insertBefore(storeDiv, overviewPanel.querySelector('.chart-row'));
 
   renderSalesChart();
   renderCutsChart();
