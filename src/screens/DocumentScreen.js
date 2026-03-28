@@ -90,7 +90,7 @@ export default function DocumentScreen({ navigation }) {
           <Shortcut pal={pal} icon="🧼" label="위생 일지" onPress={() => navigation.navigate('Hygiene')} color="#27AE60" />
           <Shortcut pal={pal} icon="🌡️" label="온도 기록" onPress={() => navigation.navigate('Temp')} color="#00ACC1" />
           <Shortcut pal={pal} icon="💰" label="마감 정산" onPress={() => navigation.navigate('Closing')} color="#E8950A" />
-          <Shortcut pal={pal} icon="🥩" label="숙성 관리" onPress={() => navigation.getParent()?.navigate('TraceTab', { screen: 'Aging' })} color="#C0392B" />
+          <Shortcut pal={pal} icon="🥩" label="숙성 관리" onPress={() => navigation.navigate('Aging')} color="#C0392B" />
         </View>
 
         {/* ── 출력하기 버튼 ── */}
@@ -112,13 +112,7 @@ export default function DocumentScreen({ navigation }) {
             key={doc.id}
             style={[styles.docCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}
             activeOpacity={0.8}
-            onPress={() => {
-              if (doc.id === 'aging') {
-                navigation.getParent()?.navigate('TraceTab', { screen: 'Aging' });
-              } else {
-                navigation.navigate(doc.screen);
-              }
-            }}
+            onPress={() => navigation.navigate(doc.screen)}
           >
             <View style={[styles.docIconBox, { backgroundColor: doc.color + '20' }]}>
               <Text style={{ fontSize: 30 }}>{doc.icon}</Text>

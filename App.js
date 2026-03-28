@@ -54,13 +54,13 @@ function HomeStack() {
   );
 }
 
-// ── Tab 2: 이력관리 (스캔 → 숙성) ───────────────────────
+// ── Tab 2: 이력조회 (스캔 전용) ──────────────────────────
+// AgingScreen은 DocsStack에서만 관리 — 두 스택 중복 등록 시 navigation 충돌 발생
 function TraceStack() {
   const headerOpts = useHeaderOpts();
   return (
     <Stack.Navigator screenOptions={headerOpts}>
       <Stack.Screen name="Scan" component={ScanScreen} options={{ title: '🏷️ 이력번호 조회' }} />
-      <Stack.Screen name="Aging" component={AgingScreen} options={{ title: '🥩 숙성 관리' }} />
     </Stack.Navigator>
   );
 }
