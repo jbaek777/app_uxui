@@ -58,21 +58,14 @@ export const radius = {
   xl: 28,
 };
 
-export const darkShadow = {
-  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 5 },
-  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 12, elevation: 10 },
-};
-
-export const lightShadow = {
-  sm: { shadowColor: '#1A1F36', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 3 },
-  md: { shadowColor: '#1A1F36', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6 },
-};
+export const darkShadow = { sm: {}, md: {} };
+export const lightShadow = { sm: {}, md: {} };
 
 // 기존 호환성
-export const shadow = darkShadow;
+export const shadow = { sm: {}, md: {} };
 
 export function getShadow(isDark) {
-  return isDark ? darkShadow : lightShadow;
+  return { sm: {}, md: {} };
 }
 
 export const fontSize = {

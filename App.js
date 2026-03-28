@@ -54,13 +54,13 @@ function HomeStack() {
   );
 }
 
-// ── Tab 2: 이력관리 (숙성 → 스캔) ───────────────────────
+// ── Tab 2: 이력관리 (스캔 → 숙성) ───────────────────────
 function TraceStack() {
   const headerOpts = useHeaderOpts();
   return (
     <Stack.Navigator screenOptions={headerOpts}>
-      <Stack.Screen name="Aging" component={AgingScreen} options={{ title: '🥩 숙성 관리' }} />
       <Stack.Screen name="Scan" component={ScanScreen} options={{ title: '🏷️ 이력번호 조회' }} />
+      <Stack.Screen name="Aging" component={AgingScreen} options={{ title: '🥩 숙성 관리' }} />
     </Stack.Navigator>
   );
 }
@@ -86,6 +86,7 @@ function DocsStack() {
       <Stack.Screen name="Closing" component={ClosingScreen} options={{ title: '💰 마감 정산' }} />
       <Stack.Screen name="Upload" component={UploadScreen} options={{ title: '📷 서류 스캔·AI OCR' }} />
       <Stack.Screen name="Staff" component={StaffScreen} options={{ title: '👥 직원 보건증 현황' }} />
+      <Stack.Screen name="Aging" component={AgingScreen} options={{ title: '🥩 숙성 관리' }} />
     </Stack.Navigator>
   );
 }
@@ -146,7 +147,7 @@ function MainTabs({ bizData }) {
       <Tab.Screen
         name="TraceTab"
         component={TraceStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🥩" label="숙성" focused={focused} tabColor={pal.a2} pal={pal} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏷️" label="조회" focused={focused} tabColor={pal.a2} pal={pal} /> }}
       />
       <Tab.Screen
         name="InventoryTab"

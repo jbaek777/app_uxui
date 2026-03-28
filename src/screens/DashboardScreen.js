@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, darkColors, lightColors, radius, shadow, fontSize, spacing } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
@@ -15,7 +16,7 @@ export default function DashboardScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
-  const owner = route?.params?.ownerName || '사장님';
+  const [bizName, setBizName] = useState('');
   const today = new Date();
   const todayStr = today.toLocaleDateString('ko-KR');
   const dateStr = today.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
@@ -23,6 +24,14 @@ export default function DashboardScreen({ navigation, route }) {
   const [meat, setMeat] = useState([]);
   const [hygieneLogs, setHygieneLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@meatbig_biz').then(raw => {
+      if (raw) {
+        try { setBizName(JSON.parse(raw).bizName || ''); } catch (_) {}
+      }
+    });
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -53,7 +62,7 @@ export default function DashboardScreen({ navigation, route }) {
   const QUICK_ACTIONS = [
     { icon: '🏷️', label: '이력\n스캔',  tab: 'TraceTab',    screen: 'Scan',     color: pal.ac,   initial: true  },
     { icon: '📋', label: '위생\n일지',  tab: 'DocsTab',     screen: 'Hygiene',  color: pal.gn,   initial: true  },
-    { icon: '🥩', label: '숙성\n관리',  tab: 'TraceTab',    screen: 'Aging',    color: pal.a2,   initial: false },
+    { icon: '🥩', label: '숙성\n관리',  tab: 'DocsTab',     screen: 'Aging',    color: pal.a2,   initial: false },
     { icon: '🖨️', label: '서류\n출력',  tab: 'DocsTab',     screen: 'Documents',color: pal.pu,   initial: true  },
     { icon: '💰', label: '마감\n정산',  tab: 'DocsTab',     screen: 'Closing',  color: pal.cyan, initial: true  },
     { icon: '📦', label: '재고\n확인',  tab: 'InventoryTab',screen: null,       color: pal.a2,   initial: true  },
@@ -90,7 +99,7 @@ export default function DashboardScreen({ navigation, route }) {
       {/* ── 헤더 ── */}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.greeting, { color: pal.tx }]}>{owner} 사장님 👋</Text>
+          <Text style={[styles.greeting, { color: pal.tx }]}>{bizName || '우리 매장'} 사장님 👋</Text>
           <Text style={[styles.date, { color: pal.t3 }]}>{dateStr}</Text>
         </View>
         <View style={[styles.scoreBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>

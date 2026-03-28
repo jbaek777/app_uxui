@@ -755,18 +755,29 @@ export function genStaffHTML(staff) {
 export async function printAndShare(html, fileName = 'MeatBig_문서') {
   try {
     const { uri } = await Print.printToFileAsync({ html });
-    const canShare = await Sharing.isAvailableAsync();
-    if (canShare) {
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: `${fileName}.pdf`,
-        UTI: 'com.adobe.pdf',
-      });
-    } else {
-      Alert.alert('저장 완료', `${fileName}.pdf 파일이 저장되었습니다.`);
+    let shared = false;
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `${fileName} 내보내기`,
+          UTI: 'com.adobe.pdf',
+        });
+        shared = true;
+      }
+    } catch (_) {}
+    if (!shared) {
+      // 공유 불가 시 네이티브 인쇄 다이얼로그 사용
+      await Print.printAsync({ html });
     }
   } catch (e) {
     console.error('PDF 오류:', e);
-    Alert.alert('오류', 'PDF 생성 중 문제가 발생했습니다.\n잠시 후 다시 시도해주세요.');
+    try {
+      // 최종 fallback: 인쇄 다이얼로그
+      await Print.printAsync({ html });
+    } catch (_) {
+      Alert.alert('오류', 'PDF 생성 중 문제가 발생했습니다.\n잠시 후 다시 시도해주세요.');
+    }
   }
 }
