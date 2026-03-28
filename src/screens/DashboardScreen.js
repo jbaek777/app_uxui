@@ -1,10 +1,15 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, darkColors, lightColors, radius, shadow, fontSize, spacing } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { GaugeBar } from '../components/GaugeBar';
-import { meatInventory } from '../data/mockData';
+import { meatInventory, hygieneData } from '../data/mockData';
+import { meatStore, hygieneStore } from '../lib/dataStore';
+
+// camelCase / snake_case 둘 다 지원
+const getBuyPrice = m => m.buyPrice || m.buy_price || 0;
+const getDday = m => m.dday != null ? m.dday : 99;
 
 export default function DashboardScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
@@ -12,16 +17,34 @@ export default function DashboardScreen({ navigation, route }) {
   const pal = isDark ? darkColors : lightColors;
   const owner = route?.params?.ownerName || '사장님';
   const today = new Date();
+  const todayStr = today.toLocaleDateString('ko-KR');
   const dateStr = today.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
 
-  const activeMeat = meatInventory.filter(m => !m.sold);
-  const urgent = activeMeat.filter(m => m.dday <= 1);
-  const nearExpiry3 = activeMeat.filter(m => m.dday <= 3);
-  const potentialLoss = nearExpiry3.reduce((s, m) => s + m.qty * m.buyPrice, 0);
-  const criticalLoss = urgent.reduce((s, m) => s + m.qty * m.buyPrice, 0);
-  const lossRiskPct = activeMeat.length > 0 ? Math.round((nearExpiry3.length / activeMeat.length) * 100) : 0;
-  const hygieneNeeded = true;
-  const tempNeeded = true;
+  const [meat, setMeat] = useState([]);
+  const [hygieneLogs, setHygieneLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      meatStore.load(meatInventory),
+      hygieneStore.load(hygieneData),
+    ]).then(([meatData, hygieneData]) => {
+      setMeat(meatData);
+      setHygieneLogs(hygieneData);
+      setLoading(false);
+    });
+  }, []);
+
+  const activeMeat = meat.filter(m => !m.sold);
+  const urgent = activeMeat.filter(m => getDday(m) <= 1);
+  const nearExpiry3 = activeMeat.filter(m => getDday(m) <= 3);
+  const potentialLoss = nearExpiry3.reduce((s, m) => s + (m.qty || 0) * getBuyPrice(m), 0);
+  const criticalLoss = urgent.reduce((s, m) => s + (m.qty || 0) * getBuyPrice(m), 0);
+
+  // 오늘 위생점검 완료 여부
+  const todayHygiene = hygieneLogs.filter(h => (h.log_date || h.date || '') === todayStr);
+  const hygieneNeeded = todayHygiene.length === 0;
+  const tempNeeded = true; // 온도 기록 화면 연동 시 교체
 
   const QUICK_ACTIONS = [
     { icon: '🏷️', label: '이력\n스캔',  tab: 'TraceTab',    screen: 'Scan',     color: pal.ac,   initial: true  },
@@ -35,6 +58,15 @@ export default function DashboardScreen({ navigation, route }) {
   const cardBg = isDark
     ? 'rgba(255,255,255,0.05)'
     : 'rgba(0,0,0,0.03)';
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: pal.bg, alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={pal.ac} />
+        <Text style={{ color: pal.t3, marginTop: 12, fontSize: fontSize.sm }}>데이터 불러오는 중...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -102,7 +134,11 @@ export default function DashboardScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
         <View style={styles.gaugeList}>
-          {meatInventory.slice(0, 4).map(item => (
+          {activeMeat.length === 0 ? (
+            <Text style={{ color: pal.t3, fontSize: fontSize.sm, textAlign: 'center', paddingVertical: 12 }}>
+              등록된 재고가 없습니다
+            </Text>
+          ) : activeMeat.slice(0, 4).map(item => (
             <GaugeBar
               key={item.id}
               label={item.cut}
@@ -110,7 +146,7 @@ export default function DashboardScreen({ navigation, route }) {
               value={item.qty}
               max={20}
               unit="kg"
-              dday={item.dday}
+              dday={getDday(item)}
               height={12}
             />
           ))}
@@ -149,11 +185,11 @@ export default function DashboardScreen({ navigation, route }) {
                 <Text style={[styles.lossItemName, { color: pal.tx }]}>{item.cut}</Text>
                 <Text style={[styles.lossItemQty, { color: pal.t2 }]}>{item.qty}kg</Text>
                 <View style={{ flex: 1 }} />
-                <Text style={[styles.lossItemVal, { color: item.dday <= 1 ? pal.rd : pal.yw }]}>
-                  {item.dday === 0 ? '오늘 만료' : `D-${item.dday}`}
+                <Text style={[styles.lossItemVal, { color: getDday(item) <= 1 ? pal.rd : pal.yw }]}>
+                  {getDday(item) === 0 ? '오늘 만료' : `D-${getDday(item)}`}
                 </Text>
                 <Text style={[styles.lossItemAmt, { color: pal.t3 }]}>
-                  {((item.qty * item.buyPrice) / 10000).toFixed(1)}만원
+                  {(((item.qty || 0) * getBuyPrice(item)) / 10000).toFixed(1)}만원
                 </Text>
               </View>
             ))}
@@ -176,14 +212,14 @@ export default function DashboardScreen({ navigation, route }) {
           <Text style={[styles.sectionTitle2, { color: pal.tx, marginBottom: spacing.sm }]}>⚠️ 소비기한 임박</Text>
           {urgent.map(item => (
             <View key={item.id} style={[styles.urgentRow, { borderBottomColor: pal.bd }]}>
-              <View style={[styles.urgentDot, { backgroundColor: item.dday === 0 ? pal.rd : pal.yw }]} />
+              <View style={[styles.urgentDot, { backgroundColor: getDday(item) === 0 ? pal.rd : pal.yw }]} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.urgentName, { color: pal.tx }]}>{item.cut} ({item.origin})</Text>
                 <Text style={[styles.urgentQty, { color: pal.t3 }]}>{item.qty}kg 남음</Text>
               </View>
-              <View style={[styles.urgentBadge, { backgroundColor: item.dday === 0 ? pal.rd + '25' : pal.yw + '20' }]}>
-                <Text style={[styles.urgentBadgeText, { color: item.dday === 0 ? pal.rd : pal.yw }]}>
-                  {item.dday === 0 ? '오늘 만료' : '내일 만료'}
+              <View style={[styles.urgentBadge, { backgroundColor: getDday(item) === 0 ? pal.rd + '25' : pal.yw + '20' }]}>
+                <Text style={[styles.urgentBadgeText, { color: getDday(item) === 0 ? pal.rd : pal.yw }]}>
+                  {getDday(item) === 0 ? '오늘 만료' : '내일 만료'}
                 </Text>
               </View>
             </View>
