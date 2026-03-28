@@ -10,7 +10,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 
-import { colors, fontSize, spacing, radius, shadow } from './src/theme';
+import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from './src/theme';
+import { ThemeProvider, useTheme } from './src/lib/ThemeContext';
 import SplashScreen from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
@@ -22,24 +23,32 @@ import HygieneScreen from './src/screens/HygieneScreen';
 import ClosingScreen from './src/screens/ClosingScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import UploadScreen from './src/screens/UploadScreen';
-import { TempScreen } from './src/screens/OtherScreens';
+import { TempScreen, StaffScreen } from './src/screens/OtherScreens';
 import { requestNotificationPermission, scheduleDailyHygieneReminder } from './src/utils/notifications';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-const HEADER_OPTS = {
-  headerStyle: { backgroundColor: colors.s1 },
-  headerShadowVisible: false,
-  headerTintColor: colors.tx,
-  headerTitleStyle: { fontWeight: '800', fontSize: fontSize.md },
-  contentStyle: { backgroundColor: colors.bg },
-};
+// 테마 반응형 헤더 옵션 — isDark state를 직접 읽어 색상 결정
+function useHeaderOpts() {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : lightColors;
+  return {
+    headerStyle: { backgroundColor: palette.s1 },
+    headerShadowVisible: false,
+    headerTintColor: palette.tx,
+    headerTitleStyle: { fontWeight: '800', fontSize: fontSize.md },
+    headerBackTitleVisible: false,
+    headerBackTitle: ' ',            // iOS @react-navigation/stack 뒤로가기 텍스트 제거
+    contentStyle: { backgroundColor: palette.bg },
+  };
+}
 
 // ── Tab 1: 홈 ────────────────────────────────────────────
 function HomeStack() {
+  const headerOpts = useHeaderOpts();
   return (
-    <Stack.Navigator screenOptions={HEADER_OPTS}>
+    <Stack.Navigator screenOptions={headerOpts}>
       <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
@@ -47,8 +56,9 @@ function HomeStack() {
 
 // ── Tab 2: 이력관리 (스캔 → 숙성) ───────────────────────
 function TraceStack() {
+  const headerOpts = useHeaderOpts();
   return (
-    <Stack.Navigator screenOptions={HEADER_OPTS}>
+    <Stack.Navigator screenOptions={headerOpts}>
       <Stack.Screen name="Scan" component={ScanScreen} options={{ title: '🏷️ 이력번호 조회' }} />
       <Stack.Screen name="Aging" component={AgingScreen} options={{ title: '🥩 숙성 관리' }} />
     </Stack.Navigator>
@@ -57,8 +67,9 @@ function TraceStack() {
 
 // ── Tab 3: 재고·수율 ─────────────────────────────────────
 function InventoryStack() {
+  const headerOpts = useHeaderOpts();
   return (
-    <Stack.Navigator screenOptions={HEADER_OPTS}>
+    <Stack.Navigator screenOptions={headerOpts}>
       <Stack.Screen name="Inventory" component={InventoryScreen} options={{ title: '📦 재고·수율' }} />
     </Stack.Navigator>
   );
@@ -66,21 +77,24 @@ function InventoryStack() {
 
 // ── Tab 4: 서류·출력 ─────────────────────────────────────
 function DocsStack() {
+  const headerOpts = useHeaderOpts();
   return (
-    <Stack.Navigator screenOptions={HEADER_OPTS}>
+    <Stack.Navigator screenOptions={headerOpts}>
       <Stack.Screen name="Documents" component={DocumentScreen} options={{ title: '🖨️ 서류·출력' }} />
       <Stack.Screen name="Hygiene" component={HygieneScreen} options={{ title: '🧼 위생 일지' }} />
       <Stack.Screen name="Temp" component={TempScreen} options={{ title: '🌡️ 온도·습도 기록' }} />
       <Stack.Screen name="Closing" component={ClosingScreen} options={{ title: '💰 마감 정산' }} />
       <Stack.Screen name="Upload" component={UploadScreen} options={{ title: '📷 서류 스캔·AI OCR' }} />
+      <Stack.Screen name="Staff" component={StaffScreen} options={{ title: '👥 직원 보건증 현황' }} />
     </Stack.Navigator>
   );
 }
 
 // ── Tab 5: 설정 ──────────────────────────────────────────
 function SettingsStack({ bizData }) {
+  const headerOpts = useHeaderOpts();
   return (
-    <Stack.Navigator screenOptions={HEADER_OPTS}>
+    <Stack.Navigator screenOptions={headerOpts}>
       <Stack.Screen name="Settings" options={{ title: '⚙️ 설정' }}>
         {() => <SettingsScreen route={{ params: { biz: bizData } }} />}
       </Stack.Screen>
@@ -88,19 +102,19 @@ function SettingsStack({ bizData }) {
   );
 }
 
-// ── 탭 아이콘 ────────────────────────────────────────────
-function TabIcon({ emoji, label, focused, badge }) {
+// ── 탭 아이콘 + 레이블 ───────────────────────────────────
+function TabIcon({ emoji, label, focused, tabColor }) {
   return (
-    <View style={{ alignItems: 'center', paddingTop: 4 }}>
-      <View>
-        <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.4 }}>{emoji}</Text>
-        {badge ? (
-          <View style={styles.tabBadge}>
-            <Text style={styles.tabBadgeText}>{badge}</Text>
-          </View>
-        ) : null}
-      </View>
-      <Text style={[styles.tabLabel, { color: focused ? colors.ac : colors.t3 }]}>{label}</Text>
+    <View style={{ alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+      <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>
+      <Text style={{
+        fontSize: 13,
+        fontWeight: focused ? '800' : '600',
+        color: focused ? tabColor : colors.t3,
+        textAlign: 'center',
+      }}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -115,8 +129,8 @@ function MainTabs({ bizData }) {
           backgroundColor: colors.s1,
           borderTopColor: colors.bd,
           borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 84 : 64,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+          height: Platform.OS === 'ios' ? 90 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
           paddingTop: 6,
         },
         tabBarShowLabel: false,
@@ -125,26 +139,26 @@ function MainTabs({ bizData }) {
       <Tab.Screen
         name="HomeTab"
         component={HomeStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="홈" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="홈" focused={focused} tabColor={colors.ac} /> }}
       />
       <Tab.Screen
         name="TraceTab"
         component={TraceStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📦" label="이력관리" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏷️" label="조회" focused={focused} tabColor={colors.a2} /> }}
       />
       <Tab.Screen
         name="InventoryTab"
         component={InventoryStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📊" label="재고·수율" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📦" label="재고" focused={focused} tabColor={colors.gn} /> }}
       />
       <Tab.Screen
         name="DocsTab"
         component={DocsStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🖨️" label="서류·출력" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🖨️" label="서류" focused={focused} tabColor={colors.pu} /> }}
       />
       <Tab.Screen
         name="SettingsTab"
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" label="설정" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" label="설정" focused={focused} tabColor={colors.cyan} /> }}
       >
         {() => <SettingsStack bizData={bizData} />}
       </Tab.Screen>
@@ -152,9 +166,10 @@ function MainTabs({ bizData }) {
   );
 }
 
-// ── 앱 루트 ──────────────────────────────────────────────
-function App() {
-  const [phase, setPhase] = useState('splash'); // 'splash' | 'onboarding' | 'main'
+// ── 앱 내부 (테마 컨텍스트 안에서 렌더링) ───────────────
+function AppInner() {
+  const { isDark } = useTheme();
+  const [phase, setPhase] = useState('splash');
   const [bizData, setBizData] = useState(null);
 
   useEffect(() => {
@@ -188,7 +203,7 @@ function App() {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <StatusBar style="light" />
+          <StatusBar style={isDark ? 'light' : 'dark'} />
           <SplashScreen onDone={handleSplashDone} />
         </SafeAreaProvider>
       </GestureHandlerRootView>
@@ -199,7 +214,7 @@ function App() {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <StatusBar style="light" />
+          <StatusBar style={isDark ? 'light' : 'dark'} />
           <OnboardingScreen onDone={handleOnboardingDone} />
         </SafeAreaProvider>
       </GestureHandlerRootView>
@@ -210,11 +225,20 @@ function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <NavigationContainer>
-          <StatusBar style="light" />
+          <StatusBar style={isDark ? 'light' : 'dark'} />
           <MainTabs bizData={bizData} />
         </NavigationContainer>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+// ── 앱 루트 ──────────────────────────────────────────────
+function App() {
+  return (
+    <ThemeProvider>
+      <AppInner />
+    </ThemeProvider>
   );
 }
 
@@ -227,5 +251,5 @@ const styles = StyleSheet.create({
     width: 17, height: 17, alignItems: 'center', justifyContent: 'center',
   },
   tabBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  tabLabel: { fontSize: fontSize.xxs, fontWeight: '700', marginTop: 2 },
+  tabLabel: { fontSize: 12, fontWeight: '700', marginTop: 2, textAlign: 'center' },
 });

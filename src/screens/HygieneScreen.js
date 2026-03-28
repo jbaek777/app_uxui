@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, TextInput,
 } from 'react-native';
 import { colors, fontSize, spacing, radius, shadow } from '../theme';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
@@ -24,6 +24,7 @@ export default function HygieneScreen() {
   const [checks, setChecks] = useState({});
   const [fridgeTemp, setFridgeTemp] = useState(null);
   const [step, setStep] = useState(0);
+  const [inspector, setInspector] = useState('');
 
   const totalItems = CHECKLIST.length;
   const doneItems = Object.keys(checks).filter(k => checks[k]).length;
@@ -32,10 +33,15 @@ export default function HygieneScreen() {
     setChecks({});
     setFridgeTemp(null);
     setStep(0);
+    setInspector('');
     setModal(true);
   };
 
   const handleSave = () => {
+    if (!inspector.trim()) {
+      Alert.alert('입력 오류', '점검자 이름을 입력해주세요.');
+      return;
+    }
     const items = CHECKLIST.map(c => `${c.label} ${checks[c.key] || '?'}`);
     if (fridgeTemp) items.push(`냉장고 온도: ${fridgeTemp}°C`);
     const hasX = Object.values(checks).includes('X');
@@ -46,12 +52,11 @@ export default function HygieneScreen() {
       session,
       items,
       status: hasX ? 'warning' : 'pass',
-      inspector: '홍길동',
-      signature: true,
+      inspector: inspector.trim(),
     };
     setLogs([newLog, ...logs]);
     setModal(false);
-    Alert.alert('점검 완료 ✓', `${session} 위생점검이 저장되었습니다.`);
+    Alert.alert('점검 완료 ✓', `${session} 위생점검이 저장되었습니다.\n점검자: ${inspector.trim()}`);
   };
 
   const pass = logs.filter(l => l.status === 'pass').length;
@@ -170,11 +175,23 @@ export default function HygieneScreen() {
                   </View>
                 </View>
 
+                {/* 점검자 이름 입력 */}
+                <View style={styles.inspectorBox}>
+                  <Text style={styles.inspectorLabel}>✍️ 점검자 이름</Text>
+                  <TextInput
+                    style={styles.inspectorInput}
+                    value={inspector}
+                    onChangeText={setInspector}
+                    placeholder="이름을 입력하세요"
+                    placeholderTextColor={colors.t3}
+                  />
+                </View>
+
                 <PrimaryBtn
                   label={doneItems >= totalItems ? '✓ 점검 완료 — 저장하기' : `${totalItems - doneItems}개 항목이 남았습니다`}
                   onPress={doneItems >= totalItems ? handleSave : undefined}
                   color={doneItems >= totalItems ? colors.gn : colors.t3}
-                  style={{ marginTop: spacing.lg, opacity: doneItems >= totalItems ? 1 : 0.55 }}
+                  style={{ marginTop: spacing.md, opacity: doneItems >= totalItems ? 1 : 0.55 }}
                 />
                 <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
               </ScrollView>
@@ -239,4 +256,8 @@ const styles = StyleSheet.create({
   tempBtn: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: radius.sm, borderWidth: 1.5, borderColor: colors.bd, backgroundColor: colors.s2 },
   tempBtnActive: { backgroundColor: colors.cyan, borderColor: colors.cyan },
   tempBtnText: { fontSize: fontSize.sm, color: colors.t2, fontWeight: '700' },
+
+  inspectorBox: { backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.a2 + '60', padding: spacing.md, marginTop: spacing.md },
+  inspectorLabel: { fontSize: fontSize.sm, color: colors.a2, fontWeight: '800', marginBottom: spacing.sm },
+  inspectorInput: { backgroundColor: colors.s2, borderWidth: 1.5, borderColor: colors.bd, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: 14, fontSize: fontSize.md, color: colors.tx, minHeight: 52 },
 });

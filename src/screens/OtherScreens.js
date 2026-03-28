@@ -3,41 +3,12 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Modal, TextInput, Alert,
 } from 'react-native';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import { colors, radius, shadow, fontSize, spacing } from '../theme';
+import { colors, darkColors, lightColors, radius, shadow, fontSize, spacing } from '../theme';
+import { useTheme } from '../lib/ThemeContext';
 import { StatusBadge, AlertBox, PrimaryBtn, OutlineBtn, ProgressBar, AddBtn } from '../components/UI';
 import { hygieneData as initHyg, tempData as initTemp, staffData, inventoryData } from '../data/mockData';
 import { hygieneApi, sensorApi, employeeApi, inventoryApi } from '../lib/supabase';
-
-// ─── PDF 생성 헬퍼 ──────────────────────────────────────
-const PDF_STYLE = `
-  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; padding: 32px; color: #1a1f36; }
-  h1 { font-size: 22px; border-bottom: 3px solid #e8950a; padding-bottom: 10px; margin-bottom: 6px; }
-  .meta { font-size: 12px; color: #9099b8; margin-bottom: 24px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-  th { background: #f5f6fa; padding: 10px 12px; text-align: left; font-size: 12px; color: #5a6480; border: 1px solid #dde1ef; }
-  td { padding: 10px 12px; font-size: 13px; border: 1px solid #dde1ef; }
-  tr:nth-child(even) td { background: #fafafa; }
-  .badge-ok { color: #12b87a; font-weight: bold; }
-  .badge-warn { color: #d4900a; font-weight: bold; }
-  .badge-fail { color: #e63946; font-weight: bold; }
-  .footer { margin-top: 40px; font-size: 11px; color: #9099b8; text-align: right; }
-`;
-
-async function exportPDF(html, filename) {
-  try {
-    const { uri } = await Print.printToFileAsync({ html });
-    const canShare = await Sharing.isAvailableAsync();
-    if (canShare) {
-      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: filename, UTI: 'com.adobe.pdf' });
-    } else {
-      Alert.alert('저장 완료', `PDF가 저장되었습니다.`);
-    }
-  } catch (e) {
-    Alert.alert('오류', 'PDF 생성 중 오류가 발생했습니다.');
-  }
-}
+import { genHygieneHTML, genTempHTML, printAndShare } from '../lib/pdfTemplate';
 
 // ═══ 위생 일지 ═══════════════════════════════════════════
 export function HygieneScreen() {
@@ -103,21 +74,12 @@ export function HygieneScreen() {
       <View style={styles.toolbar}>
         <Text style={styles.toolTitle}>📋 위생 일지 목록</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={styles.pdfBtn} onPress={() => {
-            const rows = logs.map(l => `
-              <tr>
-                <td>${l.date} ${l.time}</td>
-                <td>${l.inspector}</td>
-                <td>${l.items.join('<br/>')}</td>
-                <td class="${l.status === 'pass' ? 'badge-ok' : 'badge-warn'}">${l.status === 'pass' ? '✓ 적합' : '⚠ 주의'}</td>
-              </tr>`).join('');
-            exportPDF(`<html><head><style>${PDF_STYLE}</style></head><body>
-              <h1>🥩 위생 일지</h1>
-              <div class="meta">출력일: ${new Date().toLocaleDateString('ko-KR')} | 총 ${logs.length}건</div>
-              <table><thead><tr><th>일시</th><th>담당자</th><th>점검 내용</th><th>판정</th></tr></thead>
-              <tbody>${rows}</tbody></table>
-              <div class="footer">MeatManager — 자동 생성 문서</div>
-            </body></html>`, '위생일지.pdf');
+          <TouchableOpacity style={styles.pdfBtn} onPress={async () => {
+            try {
+              await printAndShare(genHygieneHTML(logs), '위생관리점검표');
+            } catch (e) {
+              Alert.alert('오류', 'PDF 생성 중 오류가 발생했습니다.');
+            }
           }}>
             <Text style={styles.pdfBtnText}>📄 PDF</Text>
           </TouchableOpacity>
@@ -209,16 +171,31 @@ export function TempScreen() {
     setForm({ temp: '', humidity: '', person: '홍길동', note: '' });
   };
 
+  const latest = records[0];
+  const warnCount = records.filter(r => r.status === 'warn').length;
+  const isTempOk = !latest || latest.temp <= 4;
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.statBar}>
-        <StatMini label="현재 온도" value="2.4°C" color={colors.gn} />
-        <StatMini label="현재 습도" value="82%" color={colors.gn} />
-        <StatMini label="이달 이상" value="1회" color={colors.yw} />
+        <StatMini label="현재 온도" value={latest ? `${latest.temp}°C` : '—'} color={isTempOk ? colors.gn : colors.yw} />
+        <StatMini label="현재 습도" value={latest ? `${latest.humidity}%` : '—'} color={colors.gn} />
+        <StatMini label="이달 이상" value={`${warnCount}회`} color={warnCount > 0 ? colors.yw : colors.gn} />
       </View>
       <View style={styles.toolbar}>
         <Text style={styles.toolTitle}>🌡️ 온도·습도 기록</Text>
-        <AddBtn label="+ 기록 추가" onPress={() => setModal(true)} />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity style={styles.pdfBtn} onPress={async () => {
+            try {
+              await printAndShare(genTempHTML(records), '온도관리기록부');
+            } catch (e) {
+              Alert.alert('오류', 'PDF 생성 중 오류가 발생했습니다.');
+            }
+          }}>
+            <Text style={styles.pdfBtnText}>📄 PDF</Text>
+          </TouchableOpacity>
+          <AddBtn label="+ 기록 추가" onPress={() => setModal(true)} />
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
@@ -328,37 +305,54 @@ const DocSection = ({ title, docs, checked, onToggle }) => (
 
 // ═══ 직원 서류 ════════════════════════════════════════════
 export function StaffScreen() {
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
   const [staff] = useState(staffData);
+  const expiredStaff = staff.filter(s => s.status === 'expired');
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
-      <AlertBox type="error" icon="🚨" title="보건증 만료" message="김○○ — 2026.02.10 만료. 즉시 갱신 후 재업로드 필요." />
+    <ScrollView style={{ flex: 1, backgroundColor: pal.bg }} contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+      {expiredStaff.length > 0 && (
+        <AlertBox type="error" icon="🚨" title="보건증 만료"
+          message={expiredStaff.map(s => `${s.name} — ${s.health} 만료`).join('\n')} />
+      )}
       {staff.map(s => {
         const expired = s.status === 'expired';
         return (
-          <View key={s.id} style={styles.staffCard}>
-            <View style={styles.staffTop}>
-              <View style={[styles.staffAvatar, { backgroundColor: s.color }]}>
-                <Text style={styles.staffAvatarText}>{s.name[0]}</Text>
+          <View key={s.id} style={{
+            backgroundColor: pal.s1, borderRadius: radius.md, borderWidth: 1,
+            borderColor: pal.bd, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm,
+          }}>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
+              <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#fff', fontSize: fontSize.lg, fontWeight: '900' }}>{s.name[0]}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <View style={styles.staffNameRow}>
-                  <Text style={styles.staffName}>{s.name}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: pal.tx }}>{s.name}</Text>
                   <StatusBadge status={expired ? 'expired' : 'ok'} />
                 </View>
-                <Text style={styles.staffRole}>{s.role} · 입사일 {s.hire}</Text>
-                <View style={styles.docBadgeRow}>
-                  <DocBadge icon="🏥" label="보건증" expiry={s.health} expired={expired} />
-                  <DocBadge icon="📚" label="위생교육" expiry={s.edu} expired={false} />
+                <Text style={{ fontSize: fontSize.xs, color: pal.t3, marginBottom: 6 }}>{s.role} · 입사일 {s.hire}</Text>
+                <View style={{ flexDirection: 'row', gap: 7, flexWrap: 'wrap' }}>
+                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, borderWidth: 1 },
+                    expired ? { backgroundColor: '#fee2e2', borderColor: '#fecaca' } : { backgroundColor: '#dcfce7', borderColor: '#bbf7d0' }]}>
+                    <Text style={{ fontSize: fontSize.xs }}>🏥</Text>
+                    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: expired ? colors.rd : colors.gn }}>보건증 ~{s.health}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, borderWidth: 1, backgroundColor: '#dcfce7', borderColor: '#bbf7d0' }}>
+                    <Text style={{ fontSize: fontSize.xs }}>📚</Text>
+                    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.gn }}>위생교육 ~{s.edu}</Text>
+                  </View>
                 </View>
               </View>
             </View>
-            <View style={styles.barRow}>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.barLabel}>보건증 유효기간 ~{s.health}</Text>
+                <Text style={{ fontSize: fontSize.xxs, color: pal.t3, marginBottom: 4, fontWeight: '600' }}>보건증 유효기간 ~{s.health}</Text>
                 <ProgressBar pct={expired ? 0 : 85} color={expired ? colors.rd : colors.gn} height={6} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.barLabel}>위생교육 ~{s.edu}</Text>
+                <Text style={{ fontSize: fontSize.xxs, color: pal.t3, marginBottom: 4, fontWeight: '600' }}>위생교육 ~{s.edu}</Text>
                 <ProgressBar pct={92} color={colors.gn} height={6} />
               </View>
             </View>
@@ -369,13 +363,6 @@ export function StaffScreen() {
     </ScrollView>
   );
 }
-
-const DocBadge = ({ icon, label, expiry, expired }) => (
-  <View style={[styles.docBadge, expired ? styles.docBadgeRed : styles.docBadgeGreen]}>
-    <Text style={{ fontSize: fontSize.xs }}>{icon}</Text>
-    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: expired ? colors.rd : colors.gn }}>{label} ~{expiry}</Text>
-  </View>
-);
 
 // ═══ 재고 관리 ════════════════════════════════════════════
 export function InventoryScreen() {
@@ -617,7 +604,7 @@ const styles = StyleSheet.create({
   invBarRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   invStatusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   invStatusText: { fontSize: fontSize.xs, fontWeight: '800' },
-  catBadge: { backgroundColor: colors.s3, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
+  catBadge: { backgroundColor: colors.s2, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
   catText: { fontSize: fontSize.xxs, color: colors.t2, fontWeight: '700' },
   orderBtn: { backgroundColor: colors.ac, borderRadius: 7, paddingHorizontal: 12, paddingVertical: 7 },
   orderBtnText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '800' },

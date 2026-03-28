@@ -5,6 +5,7 @@ import {
 import { colors, fontSize, spacing, radius, shadow } from '../theme';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { todaySales as initSales, meatInventory } from '../data/mockData';
+import { genClosingHTML, printAndShare } from '../lib/pdfTemplate';
 
 export default function ClosingScreen() {
   const [sales, setSales] = useState(initSales);
@@ -132,7 +133,15 @@ export default function ClosingScreen() {
           ))}
         </View>
 
-        <PrimaryBtn label="📊 정산 PDF 저장" onPress={() => Alert.alert('PDF', '정산서를 PDF로 저장합니다.')} color={colors.pu} style={{ marginTop: spacing.md }} />
+        <PrimaryBtn
+          label="📊 정산 PDF 저장"
+          color={colors.pu}
+          style={{ marginTop: spacing.md }}
+          onPress={async () => {
+            const html = genClosingHTML(sales, waste, meatInventory);
+            await printAndShare(html, '일일마감정산서');
+          }}
+        />
 
       </ScrollView>
 

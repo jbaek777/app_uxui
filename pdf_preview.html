@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MeatBig PDF 출력 미리보기</title>
+  <style>
+    /* ─ 탭 UI ─ */
+    body { font-family: "Apple SD Gothic Neo","Malgun Gothic",sans-serif; background:#f0f2f7; margin:0; }
+    .nav { display:flex; gap:8px; padding:16px 24px; background:#1a1f36; position:sticky; top:0; z-index:99; }
+    .nav button {
+      padding:8px 18px; border:none; border-radius:8px; cursor:pointer;
+      font-size:13px; font-weight:700; background:rgba(255,255,255,0.12); color:#e2e8f0;
+    }
+    .nav button.active { background:#C0392B; color:#fff; }
+    .page { display:none; padding:24px; max-width:900px; margin:0 auto; }
+    .page.active { display:block; }
+
+    /* ─ 공통 PDF CSS ─ */
+    * { box-sizing:border-box; }
+    .pdf-wrap {
+      background:#fff; padding:32px; border-radius:4px;
+      box-shadow:0 4px 24px rgba(0,0,0,0.12); margin-bottom:40px;
+      font-family:"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+      font-size:13px; color:#1a1f36;
+    }
+    .doc-header {
+      display:flex; justify-content:space-between; align-items:flex-start;
+      border-bottom:3px solid #C0392B; padding-bottom:12px; margin-bottom:16px;
+    }
+    .doc-header-left .brand { font-size:18px; font-weight:900; color:#C0392B; letter-spacing:-0.5px; }
+    .doc-header-left .biz-info { font-size:11px; color:#6b7280; margin-top:4px; line-height:1.6; }
+    .doc-header-right { text-align:right; }
+    .doc-header-right .doc-title { font-size:20px; font-weight:900; color:#1a1f36; line-height:1.2; }
+    .doc-header-right .doc-meta { font-size:11px; color:#6b7280; margin-top:6px; line-height:1.7; }
+    .doc-header-right .doc-no {
+      display:inline-block; background:#f3f4f6; border:1px solid #d1d5db;
+      border-radius:4px; padding:2px 8px; font-size:10px; font-family:monospace; color:#374151; margin-top:4px;
+    }
+    .summary-grid { display:flex; gap:10px; margin-bottom:20px; }
+    .summary-box { flex:1; border:1.5px solid #d1d5db; border-radius:8px; padding:12px; text-align:center; }
+    .summary-box .s-label { font-size:10px; color:#6b7280; font-weight:700; margin-bottom:4px; }
+    .summary-box .s-value { font-size:18px; font-weight:900; color:#1a1f36; }
+    .summary-box .s-value.accent { color:#C0392B; }
+    .summary-box .s-value.green  { color:#15803d; }
+    .summary-box .s-value.warn   { color:#92400e; }
+    .section-title {
+      font-size:12px; font-weight:900; color:#374151; text-transform:uppercase;
+      letter-spacing:0.5px; border-left:4px solid #C0392B; padding-left:8px; margin:20px 0 10px;
+    }
+    table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:4px; }
+    thead tr { background:#f3f4f6; }
+    th { padding:9px 10px; text-align:left; font-size:11px; font-weight:700; color:#4b5563; border:1px solid #d1d5db; white-space:nowrap; }
+    td { padding:9px 10px; border:1px solid #d1d5db; vertical-align:middle; line-height:1.5; }
+    tr:nth-child(even) td { background:#f9fafb; }
+    .status-ok   { font-weight:700; color:#15803d; }
+    .status-warn { font-weight:700; color:#92400e; background:#fef9c3; padding:1px 6px; border-radius:3px; }
+    .status-done { font-weight:700; color:#1d4ed8; }
+    .mono { font-family:"Courier New",monospace; font-size:11px; }
+    .bold { font-weight:700; }
+    .center { text-align:center; }
+    .right  { text-align:right; }
+    .prog-wrap { height:7px; background:#e5e7eb; border-radius:4px; overflow:hidden; margin-top:5px; }
+    .prog-fill { height:7px; background:#C0392B; border-radius:4px; }
+    .ox-table td.ox-o { font-weight:900; color:#15803d; font-size:15px; text-align:center; }
+    .ox-table td.ox-x { font-weight:900; color:#C0392B; font-size:15px; text-align:center; background:#fef2f2; }
+    .ox-table td.ox-dash { color:#9ca3af; text-align:center; }
+    .signature-section { margin-top:28px; border-top:2px solid #1a1f36; padding-top:16px; display:flex; gap:0; }
+    .sig-box { flex:1; border:1px solid #d1d5db; padding:10px 14px; min-height:64px; }
+    .sig-box:not(:last-child) { border-right:none; }
+    .sig-label { font-size:10px; font-weight:700; color:#6b7280; margin-bottom:4px; }
+    .sig-line { border-bottom:1px solid #9ca3af; height:28px; margin-bottom:4px; }
+    .sig-date { font-size:10px; color:#9ca3af; }
+    .legal-note { margin-top:12px; padding:8px 12px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:4px; font-size:10px; color:#6b7280; line-height:1.6; }
+    .doc-footer { margin-top:24px; padding-top:10px; border-top:1px solid #e5e7eb; display:flex; justify-content:space-between; font-size:10px; color:#9ca3af; }
+  </style>
+</head>
+<body>
+
+<div class="nav">
+  <span style="color:#e2e8f0;font-weight:900;margin-right:12px;font-size:15px;">MeatBig PDF 출력 미리보기</span>
+  <button class="active" onclick="show('hygiene',this)">🧼 위생점검표</button>
+  <button onclick="show('temp',this)">🌡️ 온도기록부</button>
+  <button onclick="show('aging',this)">🥩 숙성관리대장</button>
+  <button onclick="show('closing',this)">💰 마감정산서</button>
+  <button onclick="show('staff',this)">👥 직원보건증</button>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- 1. 위생관리 점검표                           -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="hygiene" class="page active">
+  <div class="pdf-wrap">
+    <div class="doc-header">
+      <div class="doc-header-left">
+        <div class="brand">MEATBIG</div>
+        <div class="biz-info">
+          ○○한우 직판점&nbsp;&nbsp;|&nbsp;&nbsp;사업자등록번호: 123-45-67890<br>
+          대표자: 홍길동&nbsp;&nbsp;|&nbsp;&nbsp;축종: 한우, 한돈
+        </div>
+      </div>
+      <div class="doc-header-right">
+        <div class="doc-title">위생관리 점검표</div>
+        <div class="doc-meta">
+          출력일시: 2026. 03. 28 오후 1:30<br>
+          대상 기간: 2026.03.25 ~ 2026.03.26
+        </div>
+        <div class="doc-no">MB-HG-2603-047</div>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-box"><div class="s-label">총 점검 횟수</div><div class="s-value">3건</div></div>
+      <div class="summary-box"><div class="s-label">적합 판정</div><div class="s-value green">2건</div></div>
+      <div class="summary-box"><div class="s-label">주의 판정</div><div class="s-value warn">1건</div></div>
+      <div class="summary-box"><div class="s-label">적합률</div><div class="s-value accent">67%</div></div>
+    </div>
+
+    <div class="section-title">일일 위생 점검 기록</div>
+    <table class="ox-table">
+      <thead>
+        <tr>
+          <th class="center">날짜</th>
+          <th class="center">시간</th>
+          <th class="center">구분</th>
+          <th class="center">점검자</th>
+          <th class="center">개인위생</th>
+          <th class="center">도마·칼</th>
+          <th class="center">냉장온도</th>
+          <th class="center">작업대</th>
+          <th class="center">방충·방서</th>
+          <th class="center">원산지표시</th>
+          <th class="center">판정</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="center">2026.03.26</td><td class="center">08:00</td><td class="center bold">오전</td>
+          <td class="center">홍길동</td>
+          <td class="ox-o">O</td><td class="ox-o">O</td>
+          <td class="center">2.4°C</td>
+          <td class="ox-o">O</td><td class="ox-o">O</td><td class="ox-o">O</td>
+          <td class="center status-ok">✓ 적합</td>
+        </tr>
+        <tr>
+          <td class="center">2026.03.25</td><td class="center">14:00</td><td class="center bold">오후</td>
+          <td class="center">이○○</td>
+          <td class="ox-o">O</td><td class="ox-o">O</td>
+          <td class="center">2.1°C</td>
+          <td class="ox-o">O</td><td class="ox-x">X</td><td class="ox-o">O</td>
+          <td class="center status-warn">⚠ 주의</td>
+        </tr>
+        <tr>
+          <td class="center">2026.03.25</td><td class="center">08:00</td><td class="center bold">오전</td>
+          <td class="center">홍길동</td>
+          <td class="ox-o">O</td><td class="ox-o">O</td>
+          <td class="center">2.0°C</td>
+          <td class="ox-o">O</td><td class="ox-o">O</td><td class="ox-o">O</td>
+          <td class="center status-ok">✓ 적합</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="signature-section">
+      <div class="sig-box"><div class="sig-label">작성자</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+      <div class="sig-box"><div class="sig-label">위생관리자</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+      <div class="sig-box"><div class="sig-label">점장</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+    </div>
+    <div class="legal-note">※ 본 위생관리 기록은 「식품위생법」 및 HACCP 기준에 따라 2년간 보관하여야 합니다.</div>
+    <div class="doc-footer">
+      <span>MeatBig — 축산물 이력 관리 시스템</span>
+      <span>1 / 1 페이지</span>
+      <span>© 2026 MeatBig. All rights reserved.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- 2. 온도관리 기록부                           -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="temp" class="page">
+  <div class="pdf-wrap">
+    <div class="doc-header">
+      <div class="doc-header-left">
+        <div class="brand">MEATBIG</div>
+        <div class="biz-info">
+          ○○한우 직판점&nbsp;&nbsp;|&nbsp;&nbsp;사업자등록번호: 123-45-67890<br>
+          대표자: 홍길동&nbsp;&nbsp;|&nbsp;&nbsp;축종: 한우, 한돈
+        </div>
+      </div>
+      <div class="doc-header-right">
+        <div class="doc-title">온도관리 기록부</div>
+        <div class="doc-meta">
+          출력일시: 2026. 03. 28 오후 1:30<br>
+          대상 기간: 2026.03.12 ~ 2026.03.26
+        </div>
+        <div class="doc-no">MB-TM-2603-023</div>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-box"><div class="s-label">총 기록 횟수</div><div class="s-value">4건</div></div>
+      <div class="summary-box"><div class="s-label">평균 온도</div><div class="s-value">3.1°C</div></div>
+      <div class="summary-box"><div class="s-label">이상 감지</div><div class="s-value warn">1건</div></div>
+      <div class="summary-box"><div class="s-label">관리 기준</div><div class="s-value" style="font-size:13px;">냉장 ≤ 4°C</div></div>
+    </div>
+
+    <div class="section-title">온도·습도 측정 기록</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="center">날짜</th><th class="center">시간</th><th class="center">측정자</th>
+          <th class="center">냉장 온도</th><th class="center">습도</th><th class="center">상태</th><th>비고·조치사항</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="center">2026.03.26</td><td class="center">09:00</td><td class="center">홍길동</td><td class="center status-ok">2.4°C</td><td class="center">82%</td><td class="center status-ok">✓ 정상</td><td>—</td></tr>
+        <tr><td class="center">2026.03.25</td><td class="center">09:00</td><td class="center">홍길동</td><td class="center status-ok">2.1°C</td><td class="center">81%</td><td class="center status-ok">✓ 정상</td><td>—</td></tr>
+        <tr><td class="center">2026.03.24</td><td class="center">09:00</td><td class="center">홍길동</td><td class="center status-ok">1.9°C</td><td class="center">83%</td><td class="center status-ok">✓ 정상</td><td>—</td></tr>
+        <tr><td class="center">2026.03.12</td><td class="center">09:00</td><td class="center">홍길동</td><td class="center status-warn">5.8°C</td><td class="center">79%</td><td class="center status-warn">⚠ 주의</td><td>냉장고 점검 후 정상화</td></tr>
+      </tbody>
+    </table>
+
+    <div class="signature-section">
+      <div class="sig-box"><div class="sig-label">측정자</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+      <div class="sig-box"><div class="sig-label">시설관리자</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+      <div class="sig-box"><div class="sig-label">점장</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+    </div>
+    <div class="legal-note">※ 냉장 보관 기준: 10°C 이하 (식품공전). 숙성실: 0~4°C. 이상 발생 시 즉시 점검 후 기록하여야 합니다.</div>
+    <div class="doc-footer">
+      <span>MeatBig — 축산물 이력 관리 시스템</span>
+      <span>1 / 1 페이지</span>
+      <span>© 2026 MeatBig. All rights reserved.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- 3. 숙성 관리 대장                           -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="aging" class="page">
+  <div class="pdf-wrap">
+    <div class="doc-header">
+      <div class="doc-header-left">
+        <div class="brand">MEATBIG</div>
+        <div class="biz-info">
+          ○○한우 직판점&nbsp;&nbsp;|&nbsp;&nbsp;사업자등록번호: 123-45-67890<br>
+          대표자: 홍길동&nbsp;&nbsp;|&nbsp;&nbsp;축종: 한우, 한돈
+        </div>
+      </div>
+      <div class="doc-header-right">
+        <div class="doc-title">숙성 관리 대장</div>
+        <div class="doc-meta">출력일시: 2026. 03. 28 오후 1:30</div>
+        <div class="doc-no">MB-AG-2603-011</div>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-box"><div class="s-label">총 관리 건수</div><div class="s-value">4건</div></div>
+      <div class="summary-box"><div class="s-label">숙성 진행 중</div><div class="s-value">3건</div></div>
+      <div class="summary-box"><div class="s-label">숙성 완료</div><div class="s-value green">1건</div></div>
+      <div class="summary-box"><div class="s-label">평균 수율</div><div class="s-value accent">91.2%</div></div>
+    </div>
+
+    <div class="section-title">숙성 진행 현황 (3건)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>이력번호</th><th>부위명</th><th class="center">등급</th><th class="center">원산지</th>
+          <th class="center">입고일</th><th class="center">숙성 경과</th><th class="center">진행률</th>
+          <th class="center">중량 변화</th><th class="center">수율</th><th class="center">온도/습도</th><th class="center">상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">HN-2602-1198</td><td class="bold">등심 (Striploin)</td>
+          <td class="center">1+등급</td><td class="center">국내산(한우)</td><td class="center">2026.03.08</td>
+          <td class="center">18일 / 28일<div class="prog-wrap"><div class="prog-fill" style="width:64%"></div></div></td>
+          <td class="center">64%</td><td class="center">9.3kg → 9.0kg</td>
+          <td class="center status-ok">96.8%</td><td class="center">1.2°C / 82%</td>
+          <td class="center status-ok">숙성 중</td>
+        </tr>
+        <tr>
+          <td class="mono">HN-2602-1142</td><td class="bold">채끝 (Ribeye)</td>
+          <td class="center">1++등급</td><td class="center">국내산(한우)</td><td class="center">2026.03.03</td>
+          <td class="center">23일 / 28일<div class="prog-wrap"><div class="prog-fill" style="width:82%"></div></div></td>
+          <td class="center bold">82%</td><td class="center">10.5kg → 9.8kg</td>
+          <td class="center">93.3%</td><td class="center">0.8°C / 80%</td>
+          <td class="center status-ok">숙성 중</td>
+        </tr>
+        <tr>
+          <td class="mono">HN-2603-0201</td><td class="bold">목심 (Chuck Roll)</td>
+          <td class="center">1등급</td><td class="center">국내산(한우)</td><td class="center">2026.03.20</td>
+          <td class="center">6일 / 21일<div class="prog-wrap"><div class="prog-fill" style="width:29%"></div></div></td>
+          <td class="center">29%</td><td class="center">8.0kg → 8.0kg</td>
+          <td class="center">100%</td><td class="center">1.5°C / 83%</td>
+          <td class="center">초기</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-title">숙성 완료 이력 (1건)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>이력번호</th><th>부위명</th><th class="center">등급</th><th class="center">원산지</th>
+          <th class="center">입고일</th><th class="center">숙성 경과</th><th class="center">진행률</th>
+          <th class="center">중량 변화</th><th class="center">수율</th><th class="center">온도/습도</th><th class="center">상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:#f0fdf4">
+          <td class="mono">HN-2602-0341</td><td class="bold">안심 (Tenderloin)</td>
+          <td class="center">1+등급</td><td class="center">국내산(한우)</td><td class="center">2026.02.25</td>
+          <td class="center">29일 / 28일<div class="prog-wrap"><div class="prog-fill" style="width:100%;background:#15803d"></div></div></td>
+          <td class="center bold status-done">100%</td><td class="center">15.0kg → 13.8kg</td>
+          <td class="center status-ok">92.0%</td><td class="center">1.0°C / 81%</td>
+          <td class="center status-done">완성</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="signature-section">
+      <div class="sig-box"><div class="sig-label">작성자</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+      <div class="sig-box"><div class="sig-label">품질관리자</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+      <div class="sig-box"><div class="sig-label">점장</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+    </div>
+    <div class="legal-note">※ 본 대장은 드라이에이징 이력 관리 목적으로 작성되었으며, 이력번호는 축산물 이력제 기준입니다.</div>
+    <div class="doc-footer">
+      <span>MeatBig — 축산물 이력 관리 시스템</span>
+      <span>1 / 1 페이지</span>
+      <span>© 2026 MeatBig. All rights reserved.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- 4. 일일 마감 정산서                         -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="closing" class="page">
+  <div class="pdf-wrap">
+    <div class="doc-header">
+      <div class="doc-header-left">
+        <div class="brand">MEATBIG</div>
+        <div class="biz-info">
+          ○○한우 직판점&nbsp;&nbsp;|&nbsp;&nbsp;사업자등록번호: 123-45-67890<br>
+          대표자: 홍길동&nbsp;&nbsp;|&nbsp;&nbsp;축종: 한우, 한돈
+        </div>
+      </div>
+      <div class="doc-header-right">
+        <div class="doc-title">일일 마감 정산서</div>
+        <div class="doc-meta">
+          출력일시: 2026. 03. 28 오후 6:00<br>
+          대상 기간: 2026. 03. 28
+        </div>
+        <div class="doc-no">MB-CL-2603-028</div>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-box"><div class="s-label">오늘 총매출</div><div class="s-value accent">1,464,400원</div></div>
+      <div class="summary-box"><div class="s-label">판매 건수</div><div class="s-value">4건</div></div>
+      <div class="summary-box"><div class="s-label">폐기 손실 추정</div><div class="s-value warn">-15,000원</div></div>
+      <div class="summary-box"><div class="s-label">추정 마진율</div><div class="s-value green">38.2%</div></div>
+    </div>
+
+    <div class="section-title">판매 내역 (4건)</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="center">시간</th><th>부위명</th><th class="center">원산지·등급</th>
+          <th class="center">판매량</th><th class="right">단가</th><th class="right">금액</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="center">11:20</td><td class="bold">등심</td><td class="center">한우 1+</td><td class="center">2.3kg</td><td class="right">158,000원/kg</td><td class="right bold">363,400원</td></tr>
+        <tr><td class="center">13:45</td><td class="bold">갈비</td><td class="center">한우 1</td><td class="center">4.5kg</td><td class="right">128,000원/kg</td><td class="right bold">576,000원</td></tr>
+        <tr><td class="center">15:10</td><td class="bold">삼겹살</td><td class="center">한돈</td><td class="center">6.0kg</td><td class="right">32,000원/kg</td><td class="right bold">192,000원</td></tr>
+        <tr><td class="center">17:30</td><td class="bold">채끝</td><td class="center">한우 1++</td><td class="center">1.8kg</td><td class="right">185,000원/kg</td><td class="right bold">333,000원</td></tr>
+        <tr style="background:#f3f4f6">
+          <td colspan="5" class="right bold">합계</td>
+          <td class="right bold" style="font-size:14px;">1,464,400원</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-title">폐기 내역</div>
+    <table>
+      <thead><tr><th>부위명</th><th class="center">폐기량</th><th>폐기 사유</th><th class="right">손실 추정액</th></tr></thead>
+      <tbody>
+        <tr><td class="bold">안심</td><td class="center">3.0kg</td><td>소비기한 경과</td><td class="right status-warn">-15,000원 추정</td></tr>
+      </tbody>
+    </table>
+
+    <div class="section-title">잔여 재고 현황</div>
+    <table>
+      <thead><tr><th>부위명</th><th>원산지·등급</th><th class="center">잔량</th><th class="center">소비기한</th><th class="center">D-day</th></tr></thead>
+      <tbody>
+        <tr><td class="bold">등심</td><td>한우 1+</td><td class="center status-warn">8.5kg</td><td class="center status-warn">2026.03.28</td><td class="center status-warn">D-2</td></tr>
+        <tr><td class="bold">채끝</td><td>한우 1++</td><td class="center">12.0kg</td><td class="center">2026.03.30</td><td class="center status-ok">D-4</td></tr>
+        <tr><td class="bold">갈비</td><td>한우 1</td><td class="center">18.0kg</td><td class="center">2026.04.02</td><td class="center status-ok">D-7</td></tr>
+        <tr><td class="bold">삼겹살</td><td>한돈</td><td class="center">22.5kg</td><td class="center">2026.04.05</td><td class="center status-ok">D-10</td></tr>
+      </tbody>
+    </table>
+
+    <div class="signature-section">
+      <div class="sig-box"><div class="sig-label">마감 담당자</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+      <div class="sig-box"><div class="sig-label">확인자</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+      <div class="sig-box"><div class="sig-label">점장</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+    </div>
+    <div class="legal-note">※ 본 정산서는 일일 매출·폐기 기록 목적으로 작성되었습니다. 실제 정산은 POS 데이터를 기준으로 하십시오.</div>
+    <div class="doc-footer">
+      <span>MeatBig — 축산물 이력 관리 시스템</span>
+      <span>1 / 1 페이지</span>
+      <span>© 2026 MeatBig. All rights reserved.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- 5. 직원 보건증 현황                         -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="staff" class="page">
+  <div class="pdf-wrap">
+    <div class="doc-header">
+      <div class="doc-header-left">
+        <div class="brand">MEATBIG</div>
+        <div class="biz-info">
+          ○○한우 직판점&nbsp;&nbsp;|&nbsp;&nbsp;사업자등록번호: 123-45-67890<br>
+          대표자: 홍길동&nbsp;&nbsp;|&nbsp;&nbsp;축종: 한우, 한돈
+        </div>
+      </div>
+      <div class="doc-header-right">
+        <div class="doc-title">직원 보건증 현황</div>
+        <div class="doc-meta">출력일시: 2026. 03. 28 오후 1:30</div>
+        <div class="doc-no">MB-ST-2603-005</div>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-box"><div class="s-label">총 직원 수</div><div class="s-value">3명</div></div>
+      <div class="summary-box"><div class="s-label">정상</div><div class="s-value green">2명</div></div>
+      <div class="summary-box"><div class="s-label">갱신 필요</div><div class="s-value warn">1명</div></div>
+      <div class="summary-box"><div class="s-label">관리 기준일</div><div class="s-value" style="font-size:13px;">2026.03.28</div></div>
+    </div>
+
+    <div class="section-title">직원별 위생 교육 이수 현황</div>
+    <table>
+      <thead>
+        <tr>
+          <th>이름</th><th class="center">역할</th><th class="center">입사일</th>
+          <th class="center">보건증 만료일</th><th class="center">보건증 상태</th>
+          <th class="center">위생교육 이수일</th><th class="center">종합 상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="bold">홍길동</td><td class="center">사장</td><td class="center">2022.03.01</td>
+          <td class="center status-ok">2027.01.15</td><td class="center status-ok">정상</td>
+          <td class="center">2027.02.20</td><td class="center status-ok">✓ 정상</td>
+        </tr>
+        <tr>
+          <td class="bold">김○○</td><td class="center">직원</td><td class="center">2023.06.15</td>
+          <td class="center status-warn">2026.02.10</td><td class="center status-warn">D-47</td>
+          <td class="center">2027.01.08</td><td class="center status-warn">⚠ 갱신 필요</td>
+        </tr>
+        <tr>
+          <td class="bold">이○○</td><td class="center">직원</td><td class="center">2025.01.10</td>
+          <td class="center status-ok">2027.03.05</td><td class="center status-ok">정상</td>
+          <td class="center">2027.01.10</td><td class="center status-ok">✓ 정상</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="signature-section">
+      <div class="sig-box"><div class="sig-label">작성자</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+      <div class="sig-box"><div class="sig-label">위생관리자</div><div class="sig-line"></div><div class="sig-date">2026. 03. 28</div></div>
+    </div>
+    <div class="legal-note">※ 보건증은 「식품위생법」 제40조에 따라 1년마다 갱신하여야 합니다. 만료 30일 전 사전 갱신을 권장합니다.</div>
+    <div class="doc-footer">
+      <span>MeatBig — 축산물 이력 관리 시스템</span>
+      <span>1 / 1 페이지</span>
+      <span>© 2026 MeatBig. All rights reserved.</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  function show(id, btn) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+</body>
+</html>

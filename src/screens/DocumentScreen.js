@@ -1,23 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import { colors, fontSize, spacing, radius, shadow } from '../theme';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
+import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn } from '../components/UI';
 import { hygieneData, agingData, tempData, staffData } from '../data/mockData';
-
-const PDF_STYLE = `
-  body { font-family: sans-serif; padding: 32px; color: #1a1f36; background: #fff; }
-  h1 { font-size: 22px; border-bottom: 3px solid #C0392B; padding-bottom: 10px; margin-bottom: 6px; }
-  .meta { font-size: 12px; color: #9099b8; margin-bottom: 24px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-  th { background: #f5f6fa; padding: 10px 12px; text-align: left; font-size: 12px; color: #5a6480; border: 1px solid #dde1ef; }
-  td { padding: 10px 12px; font-size: 13px; border: 1px solid #dde1ef; }
-  tr:nth-child(even) td { background: #fafafa; }
-  .ok { color: #27AE60; font-weight: bold; }
-  .warn { color: #F39C12; font-weight: bold; }
-  .footer { margin-top: 40px; font-size: 11px; color: #9099b8; text-align: right; }
-`;
+import {
+  genHygieneHTML, genTempHTML, genAgingHTML, genStaffHTML, printAndShare,
+} from '../lib/pdfTemplate';
 
 const DOCS = [
   {
@@ -25,193 +14,215 @@ const DOCS = [
     title: '위생관리 점검표',
     icon: '🧼',
     desc: '일일 위생·HACCP 점검 기록',
-    color: colors.gn,
-    getHTML: () => {
-      const rows = hygieneData.map(l => `<tr>
-        <td>${l.date} ${l.time}</td>
-        <td>${l.session || '오전'}</td>
-        <td>${l.inspector}</td>
-        <td>${l.items.join(', ')}</td>
-        <td class="${l.status === 'pass' ? 'ok' : 'warn'}">${l.status === 'pass' ? '✓ 적합' : '⚠ 주의'}</td>
-      </tr>`).join('');
-      return `<html><head><style>${PDF_STYLE}</style></head><body>
-        <h1>🧼 위생관리 점검표</h1>
-        <div class="meta">출력일: ${new Date().toLocaleDateString('ko-KR')} | 총 ${hygieneData.length}건</div>
-        <table><thead><tr><th>일시</th><th>구분</th><th>담당자</th><th>점검내용</th><th>판정</th></tr></thead>
-        <tbody>${rows}</tbody></table>
-        <div class="footer">MeatBig — 자동 생성 문서</div>
-      </body></html>`;
-    },
+    color: '#27AE60',
+    screen: 'Hygiene',
+    getHTML: () => genHygieneHTML(hygieneData),
   },
   {
     id: 'temp',
     title: '온도관리 기록부',
     icon: '🌡️',
     desc: '냉장·숙성실 온도·습도 기록',
-    color: colors.cyan,
-    getHTML: () => {
-      const rows = tempData.map(r => `<tr>
-        <td>${r.date} ${r.time}</td>
-        <td>${r.person}</td>
-        <td class="${r.temp > 4 ? 'warn' : 'ok'}">${r.temp}°C</td>
-        <td>${r.humidity}%</td>
-        <td class="${r.status === 'warn' ? 'warn' : 'ok'}">${r.status === 'warn' ? '⚠ 주의' : '✓ 정상'}</td>
-        <td>${r.note}</td>
-      </tr>`).join('');
-      return `<html><head><style>${PDF_STYLE}</style></head><body>
-        <h1>🌡️ 온도관리 기록부</h1>
-        <div class="meta">출력일: ${new Date().toLocaleDateString('ko-KR')}</div>
-        <table><thead><tr><th>일시</th><th>측정자</th><th>온도</th><th>습도</th><th>상태</th><th>비고</th></tr></thead>
-        <tbody>${rows}</tbody></table>
-        <div class="footer">MeatBig — 자동 생성 문서</div>
-      </body></html>`;
-    },
+    color: '#00ACC1',
+    screen: 'Temp',
+    getHTML: () => genTempHTML(tempData),
   },
   {
     id: 'aging',
     title: '숙성 관리 대장',
     icon: '🥩',
     desc: '드라이에이징 이력 및 수율 기록',
-    color: colors.a2,
-    getHTML: () => {
-      const rows = agingData.map(i => {
-        const pct = Math.min(100, Math.round((i.day / i.targetDay) * 100));
-        const yld = (i.weight / i.initWeight * 100).toFixed(1);
-        return `<tr>
-          <td style="font-family:monospace;font-size:11px">${i.trace}</td>
-          <td><strong>${i.cut}</strong></td>
-          <td>${i.grade}등급</td>
-          <td>${i.origin}</td>
-          <td>${i.day}일 / ${i.targetDay}일 (${pct}%)</td>
-          <td>${yld}%</td>
-          <td>${i.temp}°C / ${i.humidity}%</td>
-          <td class="${i.status === 'done' ? 'ok' : 'warn'}">${i.status === 'done' ? '✓ 완성' : '숙성 중'}</td>
-        </tr>`;
-      }).join('');
-      return `<html><head><style>${PDF_STYLE}</style></head><body>
-        <h1>🥩 숙성 관리 대장</h1>
-        <div class="meta">출력일: ${new Date().toLocaleDateString('ko-KR')} | 총 ${agingData.length}건</div>
-        <table><thead><tr><th>이력번호</th><th>부위</th><th>등급</th><th>원산지</th><th>숙성진행</th><th>수율</th><th>온도/습도</th><th>상태</th></tr></thead>
-        <tbody>${rows}</tbody></table>
-        <div class="footer">MeatBig — 자동 생성 문서</div>
-      </body></html>`;
-    },
+    color: '#E8950A',
+    screen: 'Aging',
+    getHTML: () => genAgingHTML(agingData),
   },
   {
     id: 'staff',
     title: '직원 보건증 현황',
     icon: '👥',
     desc: '보건증·위생교육 이수증 만료일',
-    color: colors.pu,
-    getHTML: () => {
-      const rows = staffData.map(s => `<tr>
-        <td>${s.name}</td>
-        <td>${s.role}</td>
-        <td class="${s.status === 'expired' ? 'warn' : 'ok'}">${s.health}</td>
-        <td class="ok">${s.edu}</td>
-        <td class="${s.status === 'expired' ? 'warn' : 'ok'}">${s.status === 'expired' ? '⚠ 갱신 필요' : '✓ 정상'}</td>
-      </tr>`).join('');
-      return `<html><head><style>${PDF_STYLE}</style></head><body>
-        <h1>👥 직원 보건증 현황</h1>
-        <div class="meta">출력일: ${new Date().toLocaleDateString('ko-KR')}</div>
-        <table><thead><tr><th>이름</th><th>역할</th><th>보건증 만료</th><th>위생교육 만료</th><th>상태</th></tr></thead>
-        <tbody>${rows}</tbody></table>
-        <div class="footer">MeatBig — 자동 생성 문서</div>
-      </body></html>`;
-    },
+    color: '#8E44AD',
+    screen: 'Staff',
+    getHTML: () => genStaffHTML(staffData),
   },
 ];
 
-const PERIODS = ['이번 주', '이번 달', '전체'];
-
 async function printDoc(doc) {
-  try {
-    const html = doc.getHTML();
-    const { uri } = await Print.printToFileAsync({ html });
-    const canShare = await Sharing.isAvailableAsync();
-    if (canShare) {
-      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `${doc.title}.pdf` });
-    } else {
-      Alert.alert('저장 완료', 'PDF가 저장되었습니다.');
-    }
-  } catch (e) {
-    Alert.alert('오류', 'PDF 생성 중 오류가 발생했습니다.');
-  }
+  await printAndShare(doc.getHTML(), doc.title);
 }
 
 export default function DocumentScreen({ navigation }) {
-  const [period, setPeriod] = useState('이번 달');
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
+
+  const [printModal, setPrintModal] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  const handlePrint = async (doc) => {
+    setPrinting(true);
+    setPrintModal(false);
+    await printDoc(doc);
+    setPrinting(false);
+  };
 
   return (
-    <View style={styles.container}>
-      {/* 기간 필터 */}
-      <View style={styles.periodRow}>
-        {PERIODS.map(p => (
-          <TouchableOpacity key={p}
-            style={[styles.periodBtn, period === p && styles.periodBtnActive]}
-            onPress={() => setPeriod(p)}>
-            <Text style={[styles.periodText, period === p && styles.periodTextActive]}>{p}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
+    <View style={[styles.container, { backgroundColor: pal.bg }]}>
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
-        <Text style={styles.hint}>아래 서류를 PDF로 출력·공유할 수 있습니다</Text>
 
+        {/* ── 점검 입력 바로가기 ── */}
+        <Text style={[styles.sectionLabel, { color: pal.t2 }]}>점검 입력 바로가기</Text>
+        <View style={styles.shortcutGrid}>
+          <Shortcut pal={pal} icon="🧼" label="위생 일지" onPress={() => navigation.navigate('Hygiene')} color="#27AE60" />
+          <Shortcut pal={pal} icon="🌡️" label="온도 기록" onPress={() => navigation.navigate('Temp')} color="#00ACC1" />
+          <Shortcut pal={pal} icon="💰" label="마감 정산" onPress={() => navigation.navigate('Closing')} color="#E8950A" />
+          <Shortcut pal={pal} icon="🥩" label="숙성 관리" onPress={() => navigation.getParent()?.navigate('TraceTab', { screen: 'Aging' })} color="#C0392B" />
+        </View>
+
+        {/* ── 출력하기 버튼 ── */}
+        <TouchableOpacity style={styles.printBigBtn} onPress={() => setPrintModal(true)} activeOpacity={0.85}>
+          <Text style={{ fontSize: 32 }}>🖨️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.printBigLabel}>출력하기</Text>
+            <Text style={styles.printBigDesc}>위생·온도·숙성·보건증 서류를 PDF로 출력</Text>
+          </View>
+          <View style={styles.printBigBadge}>
+            <Text style={styles.printBigBadgeText}>PDF</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* ── 서류 목록 ── */}
+        <Text style={[styles.sectionLabel, { color: pal.t2 }]}>관리 서류 현황</Text>
         {DOCS.map(doc => (
-          <View key={doc.id} style={styles.docCard}>
+          <TouchableOpacity
+            key={doc.id}
+            style={[styles.docCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}
+            activeOpacity={0.8}
+            onPress={() => {
+              if (doc.id === 'aging') {
+                navigation.getParent()?.navigate('TraceTab', { screen: 'Aging' });
+              } else {
+                navigation.navigate(doc.screen);
+              }
+            }}
+          >
             <View style={[styles.docIconBox, { backgroundColor: doc.color + '20' }]}>
-              <Text style={{ fontSize: 34 }}>{doc.icon}</Text>
+              <Text style={{ fontSize: 30 }}>{doc.icon}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.docTitle}>{doc.title}</Text>
-              <Text style={styles.docDesc}>{doc.desc}</Text>
+              <Text style={[styles.docTitle, { color: pal.tx }]}>{doc.title}</Text>
+              <Text style={[styles.docDesc, { color: pal.t3 }]}>{doc.desc}</Text>
             </View>
-            <TouchableOpacity style={[styles.printBtn, { backgroundColor: doc.color }]}
-              onPress={() => printDoc(doc)}>
-              <Text style={styles.printBtnText}>PDF</Text>
+            <View style={[styles.docBadge, { backgroundColor: doc.color + '20' }]}>
+              <Text style={[styles.docBadgeText, { color: doc.color }]}>보기 →</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* ── 출력 선택 모달 ── */}
+      <Modal visible={printModal} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: pal.bg }}>
+          <View style={[styles.modalHeader, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
+            <Text style={[styles.modalTitle, { color: pal.tx }]}>🖨️ 어떤 서류를 출력할까요?</Text>
+            <TouchableOpacity onPress={() => setPrintModal(false)}>
+              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
             </TouchableOpacity>
           </View>
-        ))}
-
-        {/* 바로가기 */}
-        <Text style={styles.sectionLabel}>점검 입력 바로가기</Text>
-        <View style={styles.shortcutRow}>
-          <Shortcut icon="🧼" label="위생 일지" onPress={() => navigation.navigate('Hygiene')} />
-          <Shortcut icon="🌡️" label="온도 기록" onPress={() => navigation.navigate('Temp')} />
-          <Shortcut icon="💰" label="마감 정산" onPress={() => navigation.navigate('Closing')} />
+          <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
+            <Text style={{ fontSize: fontSize.sm, color: pal.t3, marginBottom: spacing.lg }}>
+              선택한 서류를 PDF로 생성하여 공유하거나 저장합니다
+            </Text>
+            {DOCS.map(doc => (
+              <TouchableOpacity
+                key={doc.id}
+                style={[styles.printSelectCard, { backgroundColor: pal.s1, borderColor: doc.color + '40' }]}
+                onPress={() => handlePrint(doc)}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.printSelectIcon, { backgroundColor: doc.color + '20' }]}>
+                  <Text style={{ fontSize: 36 }}>{doc.icon}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.printSelectTitle, { color: pal.tx }]}>{doc.title}</Text>
+                  <Text style={[styles.printSelectDesc, { color: pal.t3 }]}>{doc.desc}</Text>
+                </View>
+                <View style={[styles.printBtn, { backgroundColor: doc.color }]}>
+                  <Text style={styles.printBtnText}>출력</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
-      </ScrollView>
+      </Modal>
     </View>
   );
 }
 
-const Shortcut = ({ icon, label, onPress }) => (
-  <TouchableOpacity style={styles.shortcut} onPress={onPress} activeOpacity={0.8}>
-    <Text style={{ fontSize: 30 }}>{icon}</Text>
-    <Text style={styles.shortcutLabel}>{label}</Text>
+const Shortcut = ({ icon, label, onPress, color, pal }) => (
+  <TouchableOpacity
+    style={[styles.shortcut, { backgroundColor: pal.s1, borderColor: color + '40' }]}
+    onPress={onPress}
+    activeOpacity={0.8}
+  >
+    <View style={[styles.shortcutIcon, { backgroundColor: color + '20' }]}>
+      <Text style={{ fontSize: 34 }}>{icon}</Text>
+    </View>
+    <Text style={[styles.shortcutLabel, { color: pal.tx }]}>{label}</Text>
   </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  periodRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md },
-  periodBtn: { flex: 1, paddingVertical: 12, borderRadius: radius.sm, borderWidth: 1.5, borderColor: colors.bd, alignItems: 'center', backgroundColor: colors.s1 },
-  periodBtnActive: { backgroundColor: colors.ac, borderColor: colors.ac },
-  periodText: { fontSize: fontSize.sm, color: colors.t2, fontWeight: '700' },
-  periodTextActive: { color: '#fff', fontWeight: '900' },
+  container: { flex: 1 },
 
-  hint: { fontSize: fontSize.xs, color: colors.t3, marginBottom: spacing.md },
+  sectionLabel: {
+    fontSize: fontSize.sm, fontWeight: '800',
+    marginBottom: spacing.md, marginTop: spacing.sm, letterSpacing: 0.5,
+  },
 
-  docCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
-  docIconBox: { width: 64, height: 64, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  docTitle: { fontSize: fontSize.md, fontWeight: '800', color: colors.tx, marginBottom: 4 },
-  docDesc: { fontSize: fontSize.xs, color: colors.t3 },
-  printBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', minWidth: 56 },
+  shortcutGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+  shortcut: {
+    width: '47%', borderRadius: radius.lg,
+    borderWidth: 1.5, padding: spacing.md, alignItems: 'center', gap: spacing.sm, ...shadow.sm,
+  },
+  shortcutIcon: { width: 64, height: 64, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  shortcutLabel: { fontSize: fontSize.md, fontWeight: '800', textAlign: 'center' },
+
+  printBigBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: '#C0392B', borderRadius: radius.lg, padding: spacing.lg,
+    marginBottom: spacing.lg, ...shadow.md,
+  },
+  printBigLabel: { fontSize: fontSize.lg, fontWeight: '900', color: '#fff', marginBottom: 4 },
+  printBigDesc: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.8)' },
+  printBigBadge: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 8 },
+  printBigBadgeText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '900' },
+
+  docCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    borderRadius: radius.md, borderWidth: 1,
+    padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm,
+  },
+  docIconBox: { width: 54, height: 54, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  docTitle: { fontSize: fontSize.md, fontWeight: '800', marginBottom: 3 },
+  docDesc: { fontSize: fontSize.xs },
+  docBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  docBadgeText: { fontSize: fontSize.xs, fontWeight: '800' },
+
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: spacing.lg, borderBottomWidth: 1,
+  },
+  modalTitle: { fontSize: fontSize.lg, fontWeight: '900' },
+  closeBtn: { fontSize: 22, padding: 4 },
+
+  printSelectCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    borderRadius: radius.lg, borderWidth: 1.5,
+    padding: spacing.md, marginBottom: spacing.md, ...shadow.sm,
+  },
+  printSelectIcon: { width: 72, height: 72, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  printSelectTitle: { fontSize: fontSize.md, fontWeight: '800', marginBottom: 4 },
+  printSelectDesc: { fontSize: fontSize.xs },
+  printBtn: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: radius.sm, alignItems: 'center', minWidth: 60 },
   printBtnText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '900' },
-
-  sectionLabel: { fontSize: fontSize.xs, color: colors.t3, fontWeight: '700', marginTop: spacing.lg, marginBottom: spacing.sm, letterSpacing: 1 },
-  shortcutRow: { flexDirection: 'row', gap: spacing.sm },
-  shortcut: { flex: 1, backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, alignItems: 'center', gap: 8, ...shadow.sm },
-  shortcutLabel: { fontSize: fontSize.xs, color: colors.t2, fontWeight: '700', textAlign: 'center' },
 });

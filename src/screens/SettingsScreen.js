@@ -1,73 +1,175 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Switch, Alert, Modal, TextInput,
 } from 'react-native';
 import { colors, fontSize, spacing, radius, shadow } from '../theme';
+import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { staffData } from '../data/mockData';
+import { staffStore } from '../lib/dataStore';
 
 export default function SettingsScreen({ route }) {
+  const { isDark, toggleTheme } = useTheme();
   const biz = route?.params?.biz || { bizName: 'MeatBig 매장', owner: '사장님', bizNo: '000-00-00000', species: ['한우'] };
   const [notifications, setNotifications] = useState({ hygiene: true, expiry: true, temp: false });
-  const [staff, setStaff] = useState(staffData);
+  const [staff, setStaff] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const isFirst = useRef(true);
   const [staffModal, setStaffModal] = useState(false);
   const [isPro, setIsPro] = useState(false);
+  const [newStaff, setNewStaff] = useState({ name: '', role: '직원', pin: '', health: '', edu: '' });
+  const [editModal, setEditModal] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [editForm, setEditForm] = useState({ health: '', edu: '' });
+
+  // ── 데이터 로드 (Supabase → AsyncStorage → mockData) ──
+  useEffect(() => {
+    staffStore.load(staffData).then(data => {
+      setStaff(data);
+      setLoaded(true);
+    });
+  }, []);
+
+  // ── 데이터 자동 저장 ──
+  useEffect(() => {
+    if (isFirst.current) { isFirst.current = false; return; }
+    if (loaded && staff.length >= 0) { staffStore.save(staff); }
+  }, [staff]);
+
+  const COLORS = ['#3d7ef5', '#27AE60', '#8E44AD', '#E74C3C', '#00ACC1', '#E8950A'];
+  const [selectedColor, setSelectedColor] = useState('#3d7ef5');
+
+  const openEditStaff = (s) => {
+    setEditTarget(s);
+    setEditForm({ health: s.health || '', edu: s.edu || '' });
+    setEditModal(true);
+  };
+
+  const handleEditStaff = () => {
+    if (!editTarget) return;
+    setStaff(prev => prev.map(s =>
+      s.id !== editTarget.id ? s : {
+        ...s,
+        health: editForm.health || s.health,
+        edu: editForm.edu || s.edu,
+        status: editForm.health && new Date(editForm.health.replace(/\./g, '-')) < new Date() ? 'expired' : 'ok',
+      }
+    ));
+    setEditModal(false);
+  };
+
+  const handleAddStaff = () => {
+    if (!newStaff.name.trim()) {
+      Alert.alert('입력 오류', '이름을 입력해주세요.');
+      return;
+    }
+    const id = Date.now().toString();
+    setStaff([...staff, {
+      id, name: newStaff.name.trim(), role: newStaff.role,
+      pin: newStaff.pin || '0000',
+      hire: new Date().toLocaleDateString('ko-KR').replace(/\. /g, '.').replace('.', ''),
+      health: newStaff.health || '미등록',
+      edu: newStaff.edu || '미등록',
+      status: 'ok', color: selectedColor,
+    }]);
+    setNewStaff({ name: '', role: '직원', pin: '', health: '', edu: '' });
+    setSelectedColor('#3d7ef5');
+    setStaffModal(false);
+  };
 
   const toggleNotif = (key) => setNotifications(p => ({ ...p, [key]: !p[key] }));
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.bg }]}
+      contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}
+    >
 
       {/* 사업장 정보 */}
       <SectionTitle icon="🏪" label="사업장 정보" />
-      <View style={styles.infoCard}>
+      <View style={[styles.card, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
         <InfoRow label="상호명" value={biz.bizName} />
         <InfoRow label="대표자" value={biz.owner} />
         <InfoRow label="사업자번호" value={biz.bizNo} />
-        <InfoRow label="취급 축종" value={(biz.species || []).join(', ')} />
+        <InfoRow label="취급 축종" value={(biz.species || []).join(', ')} last />
+      </View>
+
+      {/* 화면 설정 */}
+      <SectionTitle icon="🎨" label="화면 설정" />
+      <View style={[styles.card, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
+        <View style={[styles.notifRow, { borderBottomWidth: 0 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.notifLabel, { color: colors.tx }]}>
+              {isDark ? '🌙 다크 모드' : '☀️ 라이트 모드'}
+            </Text>
+            <Text style={[styles.notifSubLabel, { color: colors.t3 }]}>
+              {isDark ? '어두운 배경 사용 중' : '밝은 배경 사용 중'}
+            </Text>
+          </View>
+          <Switch
+            value={isDark}
+            onValueChange={toggleTheme}
+            trackColor={{ false: colors.bd2, true: colors.ac + '99' }}
+            thumbColor={isDark ? colors.ac : colors.t3}
+          />
+        </View>
       </View>
 
       {/* 직원 관리 */}
       <SectionTitle icon="👥" label="직원 관리" />
-      <View style={styles.card}>
-        {staff.map(s => (
-          <View key={s.id} style={styles.staffRow}>
+      <View style={[styles.card, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
+        {staff.map((s, idx) => (
+          <TouchableOpacity
+            key={s.id}
+            activeOpacity={0.7}
+            onPress={() => openEditStaff(s)}
+            style={[
+              styles.staffRow,
+              { borderBottomColor: colors.bd + '50' },
+              idx === staff.length - 1 && { borderBottomWidth: 0 },
+            ]}
+          >
             <View style={[styles.avatar, { backgroundColor: s.color + '30' }]}>
               <Text style={[styles.avatarText, { color: s.color }]}>{s.name[0]}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={styles.staffName}>{s.name}</Text>
+                <Text style={[styles.staffName, { color: colors.tx }]}>{s.name}</Text>
                 <View style={[styles.roleBadge, { backgroundColor: s.role === '사장' ? colors.ac + '25' : colors.a2 + '20' }]}>
                   <Text style={[styles.roleBadgeText, { color: s.role === '사장' ? colors.ac : colors.a2 }]}>{s.role}</Text>
                 </View>
               </View>
-              <Text style={styles.staffMeta}>보건증 만료: {s.health}</Text>
+              <Text style={[styles.staffMeta, { color: colors.t3 }]}>보건증: {s.health}  ·  위생교육: {s.edu}</Text>
             </View>
-            <View style={[styles.statusDot, { backgroundColor: s.status === 'ok' ? colors.gn : colors.rd }]} />
-          </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <View style={[styles.statusDot, { backgroundColor: s.status === 'ok' ? colors.gn : colors.rd }]} />
+              <Text style={{ fontSize: fontSize.xxs, color: colors.t3, marginTop: 4 }}>수정 ›</Text>
+            </View>
+          </TouchableOpacity>
         ))}
         <TouchableOpacity style={styles.addStaffRow} onPress={() => setStaffModal(true)}>
-          <Text style={styles.addStaffText}>+ 직원 추가</Text>
+          <Text style={[styles.addStaffText, { color: colors.a2 }]}>+ 직원 추가</Text>
         </TouchableOpacity>
       </View>
 
       {/* 알림 설정 */}
       <SectionTitle icon="🔔" label="알림 설정" />
-      <View style={styles.card}>
-        <NotifRow label="위생점검 매일 09시 알림" value={notifications.hygiene} onChange={() => toggleNotif('hygiene')} />
-        <NotifRow label="소비기한 임박 알림 (D-2)" value={notifications.expiry} onChange={() => toggleNotif('expiry')} />
-        <NotifRow label="온도 이상 알림" value={notifications.temp} onChange={() => toggleNotif('temp')} />
+      <View style={[styles.card, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
+        <NotifRow label="위생점검 매일 09시 알림" value={notifications.hygiene} onChange={() => toggleNotif('hygiene')} last={false} />
+        <NotifRow label="소비기한 임박 알림 (D-2)" value={notifications.expiry} onChange={() => toggleNotif('expiry')} last={false} />
+        <NotifRow label="온도 이상 알림" value={notifications.temp} onChange={() => toggleNotif('temp')} last />
       </View>
 
       {/* 구독 관리 */}
       <SectionTitle icon="💎" label="구독 관리" />
-      <View style={[styles.card, { overflow: 'hidden' }]}>
+      <View style={[styles.card, { backgroundColor: colors.s1, borderColor: colors.bd, overflow: 'hidden' }]}>
         <View style={styles.planRow}>
-          <View>
-            <Text style={styles.planTitle}>{isPro ? '🌟 프로 플랜' : '🆓 무료 플랜'}</Text>
-            <Text style={styles.planDesc}>{isPro ? '수율계산기, 마감정산, 무제한 이력 저장' : '기본 위생 점검, 이력 50건 저장'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.planTitle, { color: colors.tx }]}>{isPro ? '🌟 프로 플랜' : '🆓 무료 플랜'}</Text>
+            <Text style={[styles.planDesc, { color: colors.t3 }]}>
+              {isPro ? '수율계산기, 마감정산, 무제한 이력 저장' : '기본 위생 점검, 이력 50건 저장'}
+            </Text>
           </View>
           <View style={[styles.planBadge, { backgroundColor: isPro ? colors.a2 + '25' : colors.t3 + '20' }]}>
             <Text style={[styles.planBadgeText, { color: isPro ? colors.a2 : colors.t3 }]}>
@@ -76,19 +178,26 @@ export default function SettingsScreen({ route }) {
           </View>
         </View>
         {!isPro && (
-          <PrimaryBtn label="프로로 업그레이드 →" color={colors.a2} style={{ marginTop: spacing.md }}
-            onPress={() => Alert.alert('프로 플랜', '구독 페이지로 이동합니다.\n(월 9,900원 / 연 79,000원)')} />
+          <PrimaryBtn
+            label="프로로 업그레이드 →"
+            color={colors.a2}
+            style={{ margin: spacing.md, marginTop: 0 }}
+            onPress={() => Alert.alert('프로 플랜', '구독 페이지로 이동합니다.\n(월 9,900원 / 연 79,000원)')}
+          />
         )}
       </View>
 
       {/* 라벨 프린터 */}
       <SectionTitle icon="🖨️" label="라벨 프린터" />
-      <View style={styles.card}>
-        <TouchableOpacity style={styles.printerRow} onPress={() => Alert.alert('프린터 연결', 'Bluetooth 프린터를 검색합니다.')}>
+      <View style={[styles.card, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
+        <TouchableOpacity
+          style={styles.printerRow}
+          onPress={() => Alert.alert('프린터 연결', 'Bluetooth 프린터를 검색합니다.')}
+        >
           <Text style={{ fontSize: 28 }}>🔍</Text>
           <View style={{ flex: 1 }}>
-            <Text style={styles.printerLabel}>프린터 검색</Text>
-            <Text style={styles.printerDesc}>Bluetooth 라벨 프린터 연결</Text>
+            <Text style={[styles.printerLabel, { color: colors.tx }]}>프린터 검색</Text>
+            <Text style={[styles.printerDesc, { color: colors.t3 }]}>Bluetooth 라벨 프린터 연결</Text>
           </View>
           <Text style={{ color: colors.t3, fontSize: fontSize.lg }}>›</Text>
         </TouchableOpacity>
@@ -96,23 +205,118 @@ export default function SettingsScreen({ route }) {
 
       {/* 앱 정보 */}
       <SectionTitle icon="ℹ️" label="앱 정보" />
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
         <InfoRow label="앱 이름" value="MeatBig (미트빅)" />
         <InfoRow label="슬로건" value='"사장님은 고기만 써세요"' />
-        <InfoRow label="버전" value="v1.0.0" />
+        <InfoRow label="버전" value="v1.0.0" last />
       </View>
 
       {/* 직원 추가 모달 */}
       <Modal visible={staffModal} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>직원 추가</Text>
-            <TouchableOpacity onPress={() => setStaffModal(false)}><Text style={styles.closeBtn}>✕</Text></TouchableOpacity>
+          <View style={[styles.modalHeader, { backgroundColor: colors.s1, borderBottomColor: colors.bd }]}>
+            <Text style={[styles.modalTitle, { color: colors.tx }]}>👤 직원 추가</Text>
+            <TouchableOpacity onPress={() => setStaffModal(false)}>
+              <Text style={[styles.closeBtn, { color: colors.t2 }]}>✕</Text>
+            </TouchableOpacity>
           </View>
-          <View style={{ padding: spacing.lg }}>
-            <Text style={{ color: colors.t2, fontSize: fontSize.sm, marginBottom: spacing.md }}>직원 정보를 입력하세요</Text>
-            <PrimaryBtn label="저장" onPress={() => setStaffModal(false)} />
+          <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+            {/* 이름 */}
+            <Text style={[styles.fieldLabel, { color: colors.t2 }]}>이름 *</Text>
+            <TextInput
+              style={[styles.fieldInput, { backgroundColor: colors.s1, borderColor: colors.bd, color: colors.tx }]}
+              placeholder="예: 홍길동"
+              placeholderTextColor={colors.t3}
+              value={newStaff.name}
+              onChangeText={t => setNewStaff({ ...newStaff, name: t })}
+            />
+            {/* 역할 */}
+            <Text style={[styles.fieldLabel, { color: colors.t2 }]}>역할</Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+              {['직원', '사장', '파트타임'].map(r => (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.roleChip, { borderColor: newStaff.role === r ? colors.ac : colors.bd, backgroundColor: newStaff.role === r ? colors.ac + '20' : colors.s1 }]}
+                  onPress={() => setNewStaff({ ...newStaff, role: r })}
+                >
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: newStaff.role === r ? colors.ac : colors.t2 }}>{r}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {/* 아바타 색상 */}
+            <Text style={[styles.fieldLabel, { color: colors.t2 }]}>아바타 색상</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: spacing.md }}>
+              {COLORS.map(c => (
+                <TouchableOpacity key={c} onPress={() => setSelectedColor(c)}
+                  style={[styles.colorDot, { backgroundColor: c, borderColor: selectedColor === c ? colors.tx : 'transparent' }]} />
+              ))}
+            </View>
+            {/* PIN */}
+            <Text style={[styles.fieldLabel, { color: colors.t2 }]}>PIN (4자리)</Text>
+            <TextInput
+              style={[styles.fieldInput, { backgroundColor: colors.s1, borderColor: colors.bd, color: colors.tx }]}
+              placeholder="예: 5678"
+              placeholderTextColor={colors.t3}
+              keyboardType="numeric"
+              maxLength={4}
+              secureTextEntry
+              value={newStaff.pin}
+              onChangeText={t => setNewStaff({ ...newStaff, pin: t })}
+            />
+            {/* 보건증 만료일 */}
+            <Text style={[styles.fieldLabel, { color: colors.t2 }]}>보건증 만료일</Text>
+            <TextInput
+              style={[styles.fieldInput, { backgroundColor: colors.s1, borderColor: colors.bd, color: colors.tx }]}
+              placeholder="예: 2027.03.01"
+              placeholderTextColor={colors.t3}
+              value={newStaff.health}
+              onChangeText={t => setNewStaff({ ...newStaff, health: t })}
+            />
+            {/* 위생교육 만료일 */}
+            <Text style={[styles.fieldLabel, { color: colors.t2 }]}>위생교육 만료일</Text>
+            <TextInput
+              style={[styles.fieldInput, { backgroundColor: colors.s1, borderColor: colors.bd, color: colors.tx }]}
+              placeholder="예: 2027.06.01"
+              placeholderTextColor={colors.t3}
+              value={newStaff.edu}
+              onChangeText={t => setNewStaff({ ...newStaff, edu: t })}
+            />
+            <PrimaryBtn label="✓ 직원 등록" onPress={handleAddStaff} style={{ marginTop: spacing.md }} />
             <OutlineBtn label="취소" onPress={() => setStaffModal(false)} style={{ marginTop: spacing.sm }} />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* 직원 수정 모달 */}
+      <Modal visible={editModal} animationType="fade" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing.lg }}>
+          <View style={[styles.card, { backgroundColor: colors.s1, borderColor: colors.bd, padding: spacing.lg }]}>
+            <Text style={[styles.modalTitle, { color: colors.tx, marginBottom: spacing.md }]}>
+              ✏️ {editTarget?.name} 정보 수정
+            </Text>
+
+            <Text style={[styles.fieldLabel, { color: colors.t2 }]}>🏥 보건증 만료일</Text>
+            <TextInput
+              style={[styles.fieldInput, { backgroundColor: colors.bg, borderColor: colors.bd, color: colors.tx }]}
+              value={editForm.health}
+              onChangeText={t => setEditForm({ ...editForm, health: t })}
+              placeholder="예: 2027.06.01"
+              placeholderTextColor={colors.t3}
+            />
+
+            <Text style={[styles.fieldLabel, { color: colors.t2 }]}>📚 위생교육 만료일</Text>
+            <TextInput
+              style={[styles.fieldInput, { backgroundColor: colors.bg, borderColor: colors.bd, color: colors.tx }]}
+              value={editForm.edu}
+              onChangeText={t => setEditForm({ ...editForm, edu: t })}
+              placeholder="예: 2027.09.01"
+              placeholderTextColor={colors.t3}
+            />
+
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+              <OutlineBtn label="취소" onPress={() => setEditModal(false)} style={{ flex: 1 }} />
+              <PrimaryBtn label="저장" onPress={handleEditStaff} style={{ flex: 1 }} />
+            </View>
           </View>
         </View>
       </Modal>
@@ -120,20 +324,22 @@ export default function SettingsScreen({ route }) {
   );
 }
 
+// ── 서브 컴포넌트 ─────────────────────────────────────────
+
 const SectionTitle = ({ icon, label }) => (
-  <Text style={styles.sectionTitle}>{icon} {label}</Text>
+  <Text style={[styles.sectionTitle, { color: colors.t3 }]}>{icon} {label}</Text>
 );
 
-const InfoRow = ({ label, value }) => (
-  <View style={styles.infoRow}>
-    <Text style={styles.infoLabel}>{label}</Text>
-    <Text style={styles.infoValue}>{value}</Text>
+const InfoRow = ({ label, value, last }) => (
+  <View style={[styles.infoRow, !last && { borderBottomWidth: 1, borderBottomColor: colors.bd + '50' }]}>
+    <Text style={[styles.infoLabel, { color: colors.t2 }]}>{label}</Text>
+    <Text style={[styles.infoValue, { color: colors.tx }]}>{value}</Text>
   </View>
 );
 
-const NotifRow = ({ label, value, onChange }) => (
-  <View style={styles.notifRow}>
-    <Text style={styles.notifLabel}>{label}</Text>
+const NotifRow = ({ label, value, onChange, last }) => (
+  <View style={[styles.notifRow, !last && { borderBottomWidth: 1, borderBottomColor: colors.bd + '50' }]}>
+    <Text style={[styles.notifLabel, { color: colors.tx }]}>{label}</Text>
     <Switch
       value={value}
       onValueChange={onChange}
@@ -144,40 +350,103 @@ const NotifRow = ({ label, value, onChange }) => (
 );
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  sectionTitle: { fontSize: fontSize.sm, fontWeight: '800', color: colors.t3, marginTop: spacing.lg, marginBottom: spacing.sm, letterSpacing: 0.5 },
+  container: { flex: 1 },
+  sectionTitle: {
+    fontSize: fontSize.xs,
+    fontWeight: '800',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
 
-  card: { backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, marginBottom: spacing.sm, ...shadow.sm },
-  infoCard: { backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, ...shadow.sm },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.bd + '50' },
-  infoLabel: { fontSize: fontSize.sm, color: colors.t2, fontWeight: '600' },
-  infoValue: { fontSize: fontSize.sm, color: colors.tx, fontWeight: '700', flex: 1, textAlign: 'right' },
+  card: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+    ...shadow.sm,
+    overflow: 'hidden',
+  },
 
-  staffRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.bd + '50' },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
+  },
+  infoLabel: { fontSize: fontSize.sm, fontWeight: '600' },
+  infoValue: { fontSize: fontSize.sm, fontWeight: '700', flex: 1, textAlign: 'right' },
+
+  staffRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+  },
   avatar: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: fontSize.md, fontWeight: '900' },
-  staffName: { fontSize: fontSize.sm, fontWeight: '700', color: colors.tx },
-  staffMeta: { fontSize: fontSize.xxs, color: colors.t3, marginTop: 2 },
+  staffName: { fontSize: fontSize.sm, fontWeight: '700' },
+  staffMeta: { fontSize: fontSize.xxs, marginTop: 2 },
   roleBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   roleBadgeText: { fontSize: fontSize.xxs, fontWeight: '800' },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   addStaffRow: { paddingVertical: 16, alignItems: 'center' },
-  addStaffText: { fontSize: fontSize.sm, color: colors.a2, fontWeight: '700' },
+  addStaffText: { fontSize: fontSize.sm, fontWeight: '700' },
 
-  notifRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.bd + '50' },
-  notifLabel: { fontSize: fontSize.sm, color: colors.tx, fontWeight: '600', flex: 1, marginRight: spacing.sm },
+  notifRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
+  },
+  notifLabel: { fontSize: fontSize.sm, fontWeight: '600', flex: 1, marginRight: spacing.sm },
+  notifSubLabel: { fontSize: fontSize.xxs, marginTop: 2 },
 
-  planRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },
-  planTitle: { fontSize: fontSize.md, fontWeight: '900', color: colors.tx, marginBottom: 4 },
-  planDesc: { fontSize: fontSize.xs, color: colors.t3 },
+  planRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+  },
+  planTitle: { fontSize: fontSize.md, fontWeight: '900', marginBottom: 4 },
+  planDesc: { fontSize: fontSize.xs },
   planBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   planBadgeText: { fontSize: fontSize.xs, fontWeight: '800' },
 
-  printerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
-  printerLabel: { fontSize: fontSize.sm, fontWeight: '700', color: colors.tx, marginBottom: 3 },
-  printerDesc: { fontSize: fontSize.xs, color: colors.t3 },
+  printerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  printerLabel: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 3 },
+  printerDesc: { fontSize: fontSize.xs },
 
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.bd, backgroundColor: colors.s1 },
-  modalTitle: { fontSize: fontSize.lg, fontWeight: '900', color: colors.tx },
-  closeBtn: { fontSize: 22, color: colors.t2, padding: 4 },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+  },
+  modalTitle: { fontSize: fontSize.lg, fontWeight: '900' },
+  closeBtn: { fontSize: 22, padding: 4 },
+
+  fieldLabel: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 7, marginTop: 4 },
+  fieldInput: {
+    borderWidth: 1.5, borderRadius: radius.sm,
+    padding: 13, fontSize: fontSize.sm,
+    marginBottom: spacing.md,
+  },
+  roleChip: {
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 20, borderWidth: 1.5,
+  },
+  colorDot: {
+    width: 32, height: 32, borderRadius: 16, borderWidth: 3,
+  },
 });

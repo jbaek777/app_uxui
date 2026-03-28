@@ -1,21 +1,49 @@
-// MeatBig 다크 테마
-export const colors = {
-  bg:   '#1A1A2E',   // 앱 배경
-  s1:   '#16213E',   // 카드/서피스
-  s2:   '#0F3460',   // 높은 레이어
-  bd:   '#253A5E',   // 테두리
-  bd2:  '#344F7A',   // 테두리2
-  ac:   '#C0392B',   // Deep Red (메인)
-  a2:   '#E8950A',   // Amber (포인트)
-  gn:   '#27AE60',   // 초록
-  rd:   '#E74C3C',   // 빨강
-  yw:   '#F39C12',   // 노랑
-  pu:   '#8E44AD',   // 보라
-  cyan: '#00ACC1',   // 청록
-  tx:   '#F0F4F8',   // 본문
-  t2:   '#94A3B8',   // 서브텍스트
-  t3:   '#64748B',   // 연한 텍스트
+// ── 다크 테마 ─────────────────────────────────────────────
+export const darkColors = {
+  bg:   '#1A1A2E',
+  s1:   '#16213E',
+  s2:   '#0F3460',
+  bd:   '#253A5E',
+  bd2:  '#344F7A',
+  ac:   '#C0392B',
+  a2:   '#E8950A',
+  gn:   '#27AE60',
+  rd:   '#E74C3C',
+  yw:   '#F39C12',
+  pu:   '#8E44AD',
+  cyan: '#00ACC1',
+  tx:   '#F0F4F8',
+  t2:   '#94A3B8',
+  t3:   '#64748B',
 };
+
+// ── 라이트 테마 ───────────────────────────────────────────
+export const lightColors = {
+  bg:   '#F5F6FA',
+  s1:   '#FFFFFF',
+  s2:   '#EEF0F7',
+  bd:   '#DDE1EF',
+  bd2:  '#C5CAE0',
+  ac:   '#C0392B',
+  a2:   '#E8950A',
+  gn:   '#27AE60',
+  rd:   '#E74C3C',
+  yw:   '#F39C12',
+  pu:   '#8E44AD',
+  cyan: '#00ACC1',
+  tx:   '#1A1F36',
+  t2:   '#4A5568',
+  t3:   '#94A3B8',
+};
+
+// 기존 호환성 유지 (다크 기본)
+export const colors = { ...darkColors };
+
+// 테마 변경 시 호출 — colors 객체를 직접 업데이트
+export function setTheme(isDark) {
+  const src = isDark ? darkColors : lightColors;
+  Object.assign(colors, src);
+}
 
 export const fonts = {
   regular: 'System',
@@ -30,24 +58,19 @@ export const radius = {
   xl: 28,
 };
 
-export const shadow = {
-  sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 10,
-  },
+export const darkShadow = {
+  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 5 },
+  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 12, elevation: 10 },
 };
 
-// 큰 버튼 기준 (장갑 낀 손)
+export const lightShadow = {
+  sm: { shadowColor: '#1A1F36', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 3 },
+  md: { shadowColor: '#1A1F36', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6 },
+};
+
+// 기존 호환성
+export const shadow = darkShadow;
+
 export const fontSize = {
   xxl: 36,
   xl:  28,

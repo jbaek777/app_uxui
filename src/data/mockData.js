@@ -19,12 +19,12 @@ export const staffData = [
 
 // 부위별 재고 (실제 고기 재고)
 export const meatInventory = [
-  { id: 'm1', cut: '등심', origin: '한우 1+', qty: 8.5, unit: 'kg', buyPrice: 98000, sellPrice: 158000, expire: '2026.03.28', dday: 2, status: 'low' },
-  { id: 'm2', cut: '채끝', origin: '한우 1++', qty: 12.0, unit: 'kg', buyPrice: 112000, sellPrice: 185000, expire: '2026.03.30', dday: 4, status: 'ok' },
-  { id: 'm3', cut: '안심', origin: '한우 1+', qty: 4.2, unit: 'kg', buyPrice: 125000, sellPrice: 198000, expire: '2026.03.27', dday: 1, status: 'critical' },
-  { id: 'm4', cut: '갈비', origin: '한우 1', qty: 18.0, unit: 'kg', buyPrice: 72000, sellPrice: 128000, expire: '2026.04.02', dday: 7, status: 'ok' },
-  { id: 'm5', cut: '목심', origin: '한우 1', qty: 6.8, unit: 'kg', buyPrice: 58000, sellPrice: 98000, expire: '2026.03.31', dday: 5, status: 'ok' },
-  { id: 'm6', cut: '삼겹살', origin: '한돈', qty: 22.5, unit: 'kg', buyPrice: 18000, sellPrice: 32000, expire: '2026.04.05', dday: 10, status: 'ok' },
+  { id: 'm1', cut: '등심', origin: '한우 1+',  qty: 8.5,  unit: 'kg', buyPrice: 98000,  sellPrice: 158000, expire: '2026.03.28', dday: 2,  status: 'low',      sold: false, soldDate: null },
+  { id: 'm2', cut: '채끝', origin: '한우 1++', qty: 12.0, unit: 'kg', buyPrice: 112000, sellPrice: 185000, expire: '2026.03.30', dday: 4,  status: 'ok',       sold: false, soldDate: null },
+  { id: 'm3', cut: '안심', origin: '한우 1+',  qty: 4.2,  unit: 'kg', buyPrice: 125000, sellPrice: 198000, expire: '2026.03.27', dday: 1,  status: 'critical',  sold: false, soldDate: null },
+  { id: 'm4', cut: '갈비', origin: '한우 1',   qty: 18.0, unit: 'kg', buyPrice: 72000,  sellPrice: 128000, expire: '2026.04.02', dday: 7,  status: 'ok',       sold: false, soldDate: null },
+  { id: 'm5', cut: '목심', origin: '한우 1',   qty: 6.8,  unit: 'kg', buyPrice: 58000,  sellPrice: 98000,  expire: '2026.03.31', dday: 5,  status: 'ok',       sold: false, soldDate: null },
+  { id: 'm6', cut: '삼겹살', origin: '한돈',   qty: 22.5, unit: 'kg', buyPrice: 18000,  sellPrice: 32000,  expire: '2026.04.05', dday: 10, status: 'ok',       sold: false, soldDate: null },
 ];
 
 // 소모품 재고

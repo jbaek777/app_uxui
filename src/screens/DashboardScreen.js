@@ -1,97 +1,103 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, fontSize, spacing } from '../theme';
-import { AlertBox } from '../components/UI';
+import { useTheme } from '../lib/ThemeContext';
 import { GaugeBar } from '../components/GaugeBar';
 import { meatInventory } from '../data/mockData';
 
 export default function DashboardScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
+  const { isDark } = useTheme();
   const owner = route?.params?.ownerName || '사장님';
   const today = new Date();
   const dateStr = today.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
 
-  const urgent = meatInventory.filter(m => m.dday <= 1);
+  const activeMeat = meatInventory.filter(m => !m.sold);
+  const urgent = activeMeat.filter(m => m.dday <= 1);
+  const nearExpiry3 = activeMeat.filter(m => m.dday <= 3);
+  const potentialLoss = nearExpiry3.reduce((s, m) => s + m.qty * m.buyPrice, 0);
+  const criticalLoss = urgent.reduce((s, m) => s + m.qty * m.buyPrice, 0);
+  const lossRiskPct = activeMeat.length > 0 ? Math.round((nearExpiry3.length / activeMeat.length) * 100) : 0;
   const hygieneNeeded = true;
   const tempNeeded = true;
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 60 }}>
+  const QUICK_ACTIONS = [
+    { icon: '🏷️', label: '이력\n스캔',  tab: 'TraceTab',    screen: 'Scan',     color: colors.ac,   initial: true  },
+    { icon: '📋', label: '위생\n일지',  tab: 'DocsTab',     screen: 'Hygiene',  color: colors.gn,   initial: true  },
+    { icon: '🥩', label: '숙성\n관리',  tab: 'TraceTab',    screen: 'Aging',    color: colors.a2,   initial: false },
+    { icon: '🖨️', label: '서류\n출력',  tab: 'DocsTab',     screen: 'Documents',color: colors.pu,   initial: true  },
+    { icon: '💰', label: '마감\n정산',  tab: 'DocsTab',     screen: 'Closing',  color: colors.cyan, initial: true  },
+    { icon: '📦', label: '재고\n확인',  tab: 'InventoryTab',screen: null,       color: colors.a2,   initial: true  },
+  ];
 
-      {/* ── 인사말 ── */}
+  const cardBg = isDark
+    ? 'rgba(255,255,255,0.05)'
+    : 'rgba(0,0,0,0.03)';
+
+  return (
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.bg }]}
+      contentContainerStyle={{ paddingBottom: 80, paddingTop: insets.top + spacing.md }}
+      showsVerticalScrollIndicator={false}
+    >
+
+      {/* ── 헤더 ── */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>{owner}, 안녕하세요 👋</Text>
-          <Text style={styles.date}>{dateStr}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.greeting, { color: colors.tx }]}>{owner} 사장님 👋</Text>
+          <Text style={[styles.date, { color: colors.t3 }]}>{dateStr}</Text>
         </View>
-        <View style={styles.scoreBox}>
-          <Text style={styles.scoreNum}>94</Text>
-          <Text style={styles.scoreLabel}>위생점수</Text>
+        <View style={[styles.scoreBox, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
+          <Text style={[styles.scoreNum, { color: colors.gn }]}>94</Text>
+          <Text style={[styles.scoreLabel, { color: colors.t3 }]}>위생점수</Text>
         </View>
       </View>
 
-      {/* ── 오늘의 필수 점검 3카드 ── */}
-      <Text style={styles.sectionTitle}>🔔 오늘의 필수 점검</Text>
+      {/* ── 오늘의 필수 점검 ── */}
+      <SectionTitle label="🔔 오늘의 필수 점검" isDark={isDark} />
       <View style={styles.actionCards}>
 
-        {/* 이력번호 */}
-        <TouchableOpacity
-          style={[styles.actionCard, { borderColor: colors.rd + '60', backgroundColor: colors.rd + '10' }]}
-          onPress={() => navigation.navigate('TraceTab', { screen: 'ScanMain' })}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.actionIcon}>📦</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.actionLabel}>이력번호 미등록</Text>
-            <Text style={[styles.actionBadge, { color: colors.rd }]}>2건 미처리</Text>
-          </View>
-          <View style={[styles.actionBtn, { backgroundColor: colors.rd }]}>
-            <Text style={styles.actionBtnText}>스캔</Text>
-          </View>
-        </TouchableOpacity>
+        <CheckCard
+          icon="📦"
+          label="이력번호 미등록"
+          badge="2건 미처리"
+          badgeColor={colors.rd}
+          btnLabel="스캔"
+          borderColor={colors.rd}
+          isDark={isDark}
+          onPress={() => navigation.navigate('TraceTab', { screen: 'Scan' })}
+        />
 
-        {/* 위생점검 */}
-        <TouchableOpacity
-          style={[styles.actionCard, { borderColor: hygieneNeeded ? colors.yw + '60' : colors.gn + '60', backgroundColor: hygieneNeeded ? colors.yw + '10' : colors.gn + '10' }]}
+        <CheckCard
+          icon="🧼"
+          label="오전 위생점검"
+          badge={hygieneNeeded ? '미완료' : '완료'}
+          badgeColor={hygieneNeeded ? colors.yw : colors.gn}
+          btnLabel="점검"
+          borderColor={hygieneNeeded ? colors.yw : colors.gn}
+          isDark={isDark}
           onPress={() => navigation.navigate('DocsTab', { screen: 'Hygiene' })}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.actionIcon}>🧼</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.actionLabel}>오전 위생점검</Text>
-            <Text style={[styles.actionBadge, { color: hygieneNeeded ? colors.yw : colors.gn }]}>
-              {hygieneNeeded ? '미완료' : '완료'}
-            </Text>
-          </View>
-          <View style={[styles.actionBtn, { backgroundColor: hygieneNeeded ? colors.yw : colors.gn }]}>
-            <Text style={styles.actionBtnText}>점검</Text>
-          </View>
-        </TouchableOpacity>
+        />
 
-        {/* 온도 기록 */}
-        <TouchableOpacity
-          style={[styles.actionCard, { borderColor: tempNeeded ? colors.cyan + '60' : colors.gn + '60', backgroundColor: tempNeeded ? colors.cyan + '10' : colors.gn + '10' }]}
+        <CheckCard
+          icon="🌡️"
+          label="냉장고 온도 기록"
+          badge={tempNeeded ? '기록 필요' : '완료'}
+          badgeColor={tempNeeded ? colors.cyan : colors.gn}
+          btnLabel="기록"
+          borderColor={tempNeeded ? colors.cyan : colors.gn}
+          isDark={isDark}
           onPress={() => navigation.navigate('DocsTab', { screen: 'Temp' })}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.actionIcon}>🌡️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.actionLabel}>냉장고 온도 기록</Text>
-            <Text style={[styles.actionBadge, { color: tempNeeded ? colors.cyan : colors.gn }]}>
-              {tempNeeded ? '기록 필요' : '완료'}
-            </Text>
-          </View>
-          <View style={[styles.actionBtn, { backgroundColor: colors.cyan }]}>
-            <Text style={styles.actionBtnText}>기록</Text>
-          </View>
-        </TouchableOpacity>
+        />
       </View>
 
-      {/* ── 재고 요약 ── */}
-      <View style={styles.section}>
+      {/* ── 재고 현황 ── */}
+      <View style={[styles.section, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
         <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle2}>📊 재고 현황</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('StockTab')}>
-            <Text style={styles.moreBtn}>전체보기 →</Text>
+          <Text style={[styles.sectionTitle2, { color: colors.tx }]}>📊 재고 현황</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('InventoryTab')}>
+            <Text style={[styles.moreBtn, { color: colors.a2 }]}>전체보기 →</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.gaugeList}>
@@ -110,16 +116,69 @@ export default function DashboardScreen({ navigation, route }) {
         </View>
       </View>
 
+      {/* ── 손실 방어 현황 ── */}
+      <SectionTitle label="🛡️ 손실 방어 현황" isDark={isDark} />
+      <TouchableOpacity
+        style={[styles.lossCard, { backgroundColor: criticalLoss > 0 ? colors.rd + '12' : colors.s1, borderColor: criticalLoss > 0 ? colors.rd + '50' : colors.bd }]}
+        onPress={() => navigation.navigate('InventoryTab')}
+        activeOpacity={0.85}
+      >
+        <View style={styles.lossHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.lossTitle, { color: colors.tx }]}>예상 손실 위험액</Text>
+            <Text style={[styles.lossSub, { color: colors.t3 }]}>소비기한 3일 이내 재고 기준</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={[styles.lossAmount, { color: potentialLoss > 0 ? colors.rd : colors.gn }]}>
+              {potentialLoss > 0 ? `-${(potentialLoss / 10000).toFixed(0)}만원` : '손실 위험 없음'}
+            </Text>
+            {potentialLoss > 0 && (
+              <Text style={[styles.lossAmountSub, { color: colors.t3 }]}>재고가치 기준</Text>
+            )}
+          </View>
+        </View>
+
+        {nearExpiry3.length > 0 && (
+          <View style={[styles.lossDivider, { borderTopColor: colors.bd + '60' }]}>
+            {nearExpiry3.slice(0, 3).map(item => (
+              <View key={item.id} style={styles.lossRow}>
+                <View style={[styles.lossDot, {
+                  backgroundColor: item.dday === 0 ? colors.rd : item.dday === 1 ? colors.yw : colors.a2,
+                }]} />
+                <Text style={[styles.lossItemName, { color: colors.tx }]}>{item.cut}</Text>
+                <Text style={[styles.lossItemQty, { color: colors.t2 }]}>{item.qty}kg</Text>
+                <View style={{ flex: 1 }} />
+                <Text style={[styles.lossItemVal, { color: item.dday <= 1 ? colors.rd : colors.yw }]}>
+                  {item.dday === 0 ? '오늘 만료' : `D-${item.dday}`}
+                </Text>
+                <Text style={[styles.lossItemAmt, { color: colors.t3 }]}>
+                  {((item.qty * item.buyPrice) / 10000).toFixed(1)}만원
+                </Text>
+              </View>
+            ))}
+            {nearExpiry3.length > 3 && (
+              <Text style={[styles.lossMore, { color: colors.a2 }]}>+ {nearExpiry3.length - 3}개 더 보기 →</Text>
+            )}
+          </View>
+        )}
+
+        {potentialLoss === 0 && (
+          <View style={[styles.lossDivider, { borderTopColor: colors.bd + '60' }]}>
+            <Text style={[styles.lossOkText, { color: colors.gn }]}>✓ 3일 이내 만료 재고 없음 — 현황 양호</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
       {/* ── 소비기한 임박 ── */}
       {urgent.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle2}>⚠️ 소비기한 임박</Text>
+        <View style={[styles.section, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
+          <Text style={[styles.sectionTitle2, { color: colors.tx, marginBottom: spacing.sm }]}>⚠️ 소비기한 임박</Text>
           {urgent.map(item => (
-            <View key={item.id} style={styles.urgentRow}>
+            <View key={item.id} style={[styles.urgentRow, { borderBottomColor: colors.bd }]}>
               <View style={[styles.urgentDot, { backgroundColor: item.dday === 0 ? colors.rd : colors.yw }]} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.urgentName}>{item.cut} ({item.origin})</Text>
-                <Text style={styles.urgentQty}>{item.qty}kg 남음</Text>
+                <Text style={[styles.urgentName, { color: colors.tx }]}>{item.cut} ({item.origin})</Text>
+                <Text style={[styles.urgentQty, { color: colors.t3 }]}>{item.qty}kg 남음</Text>
               </View>
               <View style={[styles.urgentBadge, { backgroundColor: item.dday === 0 ? colors.rd + '25' : colors.yw + '20' }]}>
                 <Text style={[styles.urgentBadgeText, { color: item.dday === 0 ? colors.rd : colors.yw }]}>
@@ -131,30 +190,23 @@ export default function DashboardScreen({ navigation, route }) {
         </View>
       )}
 
-      {/* ── 빠른 액션 ── */}
-      <Text style={styles.sectionTitle}>⚡ 빠른 실행</Text>
+      {/* ── 빠른 실행 ── */}
+      <SectionTitle label="⚡ 빠른 실행" isDark={isDark} />
       <View style={styles.quickGrid}>
-        {[
-          { icon: '🏷️', label: '이력\n스캔', tab: 'TraceTab', screen: 'ScanMain', color: colors.ac },
-          { icon: '📋', label: '위생\n일지', tab: 'DocsTab', screen: 'Hygiene', color: colors.gn },
-          { icon: '🥩', label: '숙성\n관리', tab: 'TraceTab', screen: 'Aging', color: colors.a2 },
-          { icon: '🖨️', label: '서류\n출력', tab: 'DocsTab', screen: 'DocHub', color: colors.pu },
-          { icon: '💰', label: '마감\n정산', tab: 'DocsTab', screen: 'Closing', color: colors.cyan },
-          { icon: '📦', label: '재고\n확인', tab: 'StockTab', screen: null, color: colors.a2 },
-        ].map((q, i) => (
+        {QUICK_ACTIONS.map((q, i) => (
           <TouchableOpacity
             key={i}
             style={styles.quickBtn}
             onPress={() => {
-              if (q.screen) navigation.navigate(q.tab, { screen: q.screen });
+              if (q.screen) navigation.navigate(q.tab, { screen: q.screen, initial: q.initial });
               else navigation.navigate(q.tab);
             }}
-            activeOpacity={0.8}
+            activeOpacity={0.75}
           >
-            <View style={[styles.quickIcon, { backgroundColor: q.color + '22' }]}>
-              <Text style={{ fontSize: 28 }}>{q.icon}</Text>
+            <View style={[styles.quickIconWrap, { backgroundColor: q.color + '22', borderColor: q.color + '40' }]}>
+              <Text style={{ fontSize: 30 }}>{q.icon}</Text>
             </View>
-            <Text style={styles.quickLabel}>{q.label}</Text>
+            <Text style={[styles.quickLabel, { color: colors.tx }]}>{q.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -163,80 +215,150 @@ export default function DashboardScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
+// ── 서브 컴포넌트 ─────────────────────────────────────────
 
+function SectionTitle({ label, isDark }) {
+  return (
+    <Text style={[styles.sectionTitle, { color: isDark ? colors.t2 : colors.t2 }]}>
+      {label}
+    </Text>
+  );
+}
+
+function CheckCard({ icon, label, badge, badgeColor, btnLabel, borderColor, isDark, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.actionCard,
+        {
+          backgroundColor: colors.s1,
+          borderColor: borderColor + '50',
+          borderLeftColor: borderColor,
+          borderLeftWidth: 4,
+        },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <Text style={styles.actionIcon}>{icon}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.actionLabel, { color: colors.tx }]}>{label}</Text>
+        <Text style={[styles.actionBadge, { color: badgeColor }]}>{badge}</Text>
+      </View>
+      <View style={[styles.actionBtn, { backgroundColor: badgeColor }]}>
+        <Text style={styles.actionBtnText}>{btnLabel}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+
+  // 헤더
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     paddingBottom: spacing.md,
+    gap: spacing.md,
   },
-  greeting: { fontSize: fontSize.lg, fontWeight: '900', color: colors.tx, marginBottom: 4 },
-  date: { fontSize: fontSize.xs, color: colors.t3, fontWeight: '600' },
+  greeting: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 4 },
+  date: { fontSize: fontSize.xs, fontWeight: '600' },
   scoreBox: {
     alignItems: 'center',
-    backgroundColor: colors.s1,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.bd,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    minWidth: 72,
     ...shadow.sm,
   },
-  scoreNum: { fontSize: fontSize.xl, fontWeight: '900', color: colors.gn },
-  scoreLabel: { fontSize: fontSize.xxs, color: colors.t3, fontWeight: '600' },
+  scoreNum: { fontSize: fontSize.xl, fontWeight: '900' },
+  scoreLabel: { fontSize: 11, fontWeight: '700', marginTop: 1 },
 
-  sectionTitle: { fontSize: fontSize.sm, fontWeight: '800', color: colors.t2, paddingHorizontal: spacing.lg, marginTop: spacing.lg, marginBottom: spacing.sm, letterSpacing: 0.5 },
+  // 섹션 타이틀
+  sectionTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    letterSpacing: 0.3,
+  },
 
+  // 점검 카드
   actionCards: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.s1,
     borderRadius: radius.md,
     borderWidth: 1.5,
     padding: spacing.md,
     ...shadow.sm,
   },
   actionIcon: { fontSize: 32 },
-  actionLabel: { fontSize: fontSize.sm, fontWeight: '700', color: colors.tx, marginBottom: 3 },
+  actionLabel: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 3 },
   actionBadge: { fontSize: fontSize.xs, fontWeight: '800' },
-  actionBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: radius.sm, minWidth: 60, alignItems: 'center' },
+  actionBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radius.sm,
+    minWidth: 56,
+    alignItems: 'center',
+  },
   actionBtnText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '900' },
 
+  // 섹션 카드
   section: {
-    backgroundColor: colors.s1,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.bd,
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
     padding: spacing.md,
     ...shadow.sm,
   },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
-  sectionTitle2: { fontSize: fontSize.md, fontWeight: '800', color: colors.tx },
-  moreBtn: { fontSize: fontSize.xs, color: colors.a2, fontWeight: '700' },
+  sectionTitle2: { fontSize: fontSize.md, fontWeight: '800' },
+  moreBtn: { fontSize: fontSize.xs, fontWeight: '700' },
   gaugeList: { gap: 4 },
 
+  // 손실 방어
+  lossCard: {
+    borderRadius: radius.lg, borderWidth: 1.5,
+    marginHorizontal: spacing.lg, marginTop: spacing.sm, ...shadow.sm,
+  },
+  lossHeader: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, paddingBottom: spacing.sm },
+  lossTitle: { fontSize: fontSize.md, fontWeight: '800', marginBottom: 3 },
+  lossSub: { fontSize: fontSize.xxs },
+  lossAmount: { fontSize: fontSize.xl, fontWeight: '900' },
+  lossAmountSub: { fontSize: fontSize.xxs, marginTop: 2 },
+  lossDivider: { borderTopWidth: 1, padding: spacing.md, paddingTop: spacing.sm, gap: 8 },
+  lossRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  lossDot: { width: 9, height: 9, borderRadius: 5 },
+  lossItemName: { fontSize: fontSize.sm, fontWeight: '700' },
+  lossItemQty: { fontSize: fontSize.xs },
+  lossItemVal: { fontSize: fontSize.xs, fontWeight: '800' },
+  lossItemAmt: { fontSize: fontSize.xs, fontWeight: '600', marginLeft: spacing.sm },
+  lossMore: { fontSize: fontSize.xs, fontWeight: '700', textAlign: 'right', marginTop: 4 },
+  lossOkText: { fontSize: fontSize.sm, fontWeight: '700', textAlign: 'center', paddingVertical: 4 },
+
+  // 소비기한 임박
   urgentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.bd,
   },
   urgentDot: { width: 10, height: 10, borderRadius: 5 },
-  urgentName: { fontSize: fontSize.sm, fontWeight: '700', color: colors.tx },
-  urgentQty: { fontSize: fontSize.xs, color: colors.t3, marginTop: 2 },
+  urgentName: { fontSize: fontSize.sm, fontWeight: '700' },
+  urgentQty: { fontSize: fontSize.xs, marginTop: 2 },
   urgentBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   urgentBadgeText: { fontSize: fontSize.xs, fontWeight: '800' },
 
+  // 빠른 실행
   quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -244,7 +366,24 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
-  quickBtn: { width: '30%', alignItems: 'center', gap: 7 },
-  quickIcon: { width: 64, height: 64, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  quickLabel: { fontSize: fontSize.xxs, color: colors.t2, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
+  quickBtn: {
+    width: '30%',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: spacing.sm,
+  },
+  quickIconWrap: {
+    width: 68,
+    height: 68,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  quickLabel: {
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
 });

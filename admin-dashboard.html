@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MeatBig 관리자 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --s1: #1a1d27; --s2: #242836;
+    --tx: #f0f0f5; --t2: #b0b3c0; --t3: #6b6f80;
+    --ac: #3d7ef5; --gn: #27AE60; --rd: #E74C3C;
+    --a2: #00ACC1; --yl: #E8950A; --bd: #2a2e3a;
+    --radius: 14px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--tx);
+    min-height: 100vh;
+  }
+
+  /* ── 헤더 ── */
+  .header {
+    background: var(--s1); border-bottom: 1px solid var(--bd);
+    padding: 16px 32px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 100;
+  }
+  .header h1 { font-size: 22px; font-weight: 900; }
+  .header h1 span { color: var(--ac); }
+  .header-right { display: flex; gap: 12px; align-items: center; }
+  .refresh-btn {
+    background: var(--ac); color: #fff; border: none;
+    padding: 8px 20px; border-radius: 8px; font-weight: 700;
+    cursor: pointer; font-size: 14px; transition: opacity .2s;
+  }
+  .refresh-btn:hover { opacity: .85; }
+  .last-sync { font-size: 12px; color: var(--t3); }
+
+  /* ── 로딩 / 에러 ── */
+  .loading { text-align: center; padding: 100px; color: var(--t3); font-size: 18px; }
+  .error-banner {
+    background: var(--rd); color: #fff; padding: 12px 24px;
+    text-align: center; font-weight: 700; font-size: 14px;
+  }
+
+  /* ── 메인 레이아웃 ── */
+  .main { max-width: 1440px; margin: 0 auto; padding: 24px 32px 60px; }
+
+  /* ── 탭 ── */
+  .tabs { display: flex; gap: 6px; margin-bottom: 24px; flex-wrap: wrap; }
+  .tab-btn {
+    background: var(--s1); border: 1px solid var(--bd); color: var(--t2);
+    padding: 10px 22px; border-radius: 10px; font-weight: 700;
+    cursor: pointer; font-size: 14px; transition: all .2s;
+  }
+  .tab-btn.active { background: var(--ac); color: #fff; border-color: var(--ac); }
+  .tab-btn:hover:not(.active) { background: var(--s2); }
+
+  /* ── 카드 그리드 ── */
+  .stat-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px; margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--s1); border: 1px solid var(--bd);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .stat-card .label { font-size: 12px; color: var(--t3); font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
+  .stat-card .value { font-size: 28px; font-weight: 900; }
+  .stat-card .sub { font-size: 12px; color: var(--t3); margin-top: 4px; }
+  .stat-card.green .value { color: var(--gn); }
+  .stat-card.red .value { color: var(--rd); }
+  .stat-card.blue .value { color: var(--ac); }
+  .stat-card.yellow .value { color: var(--yl); }
+  .stat-card.cyan .value { color: var(--a2); }
+
+  /* ── 테이블 ── */
+  .table-card {
+    background: var(--s1); border: 1px solid var(--bd);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 24px;
+  }
+  .table-card .card-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--bd);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .table-card .card-header h3 { font-size: 16px; font-weight: 800; }
+  .table-card .card-header .count { font-size: 13px; color: var(--t3); }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left; padding: 12px 16px; font-size: 12px;
+    color: var(--t3); font-weight: 700; text-transform: uppercase;
+    border-bottom: 1px solid var(--bd); background: var(--s2);
+  }
+  tbody td {
+    padding: 12px 16px; font-size: 14px; border-bottom: 1px solid var(--bd);
+    color: var(--t2);
+  }
+  tbody tr:hover { background: var(--s2); }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 11px; font-weight: 800;
+  }
+  .badge-ok { background: rgba(39,174,96,.15); color: var(--gn); }
+  .badge-warn { background: rgba(232,149,10,.15); color: var(--yl); }
+  .badge-danger { background: rgba(231,76,60,.15); color: var(--rd); }
+  .badge-sold { background: rgba(0,172,193,.15); color: var(--a2); }
+
+  /* ── 차트 ── */
+  .chart-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+  }
+  .chart-card {
+    background: var(--s1); border: 1px solid var(--bd);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .chart-card h3 { font-size: 15px; font-weight: 800; margin-bottom: 16px; }
+  .chart-card canvas { max-height: 280px; }
+
+  /* ── 탭 패널 ── */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── 빈 상태 ── */
+  .empty { text-align: center; padding: 60px; color: var(--t3); }
+  .empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+  @media (max-width: 900px) {
+    .chart-row { grid-template-columns: 1fr; }
+    .main { padding: 16px; }
+    .header { padding: 12px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🥩 <span>MeatBig</span> 관리자 대시보드</h1>
+  <div class="header-right">
+    <span class="last-sync" id="lastSync">-</span>
+    <button class="refresh-btn" onclick="loadAll()">🔄 새로고침</button>
+  </div>
+</div>
+
+<div id="errorBanner" class="error-banner" style="display:none"></div>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('overview')">📊 전체 요약</button>
+    <button class="tab-btn" onclick="switchTab('inventory')">📦 재고 현황</button>
+    <button class="tab-btn" onclick="switchTab('sales')">💰 판매 이력</button>
+    <button class="tab-btn" onclick="switchTab('yield')">📐 수율 이력</button>
+    <button class="tab-btn" onclick="switchTab('staff')">👥 직원 관리</button>
+    <button class="tab-btn" onclick="switchTab('expiry')">⏰ 소비기한 수정로그</button>
+    <button class="tab-btn" onclick="switchTab('aging')">🧊 숙성 관리</button>
+    <button class="tab-btn" onclick="switchTab('hygiene')">🧹 위생일지</button>
+    <button class="tab-btn" onclick="switchTab('closing')">📋 마감정산</button>
+  </div>
+
+  <!-- ══════ 전체 요약 ══════ -->
+  <div class="tab-panel active" id="panel-overview">
+    <div class="stat-grid" id="overviewStats"></div>
+    <div class="chart-row">
+      <div class="chart-card">
+        <h3>📈 일별 판매 추이</h3>
+        <canvas id="chartSales"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>🥩 부위별 재고 분포</h3>
+        <canvas id="chartCuts"></canvas>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-card">
+        <h3>📐 수율 추이</h3>
+        <canvas id="chartYield"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>⏰ 소비기한 D-Day 분포</h3>
+        <canvas id="chartExpiry"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ 재고 현황 ══════ -->
+  <div class="tab-panel" id="panel-inventory">
+    <div class="stat-grid" id="invStats"></div>
+    <div class="table-card">
+      <div class="card-header">
+        <h3>📦 전체 재고 목록</h3>
+        <span class="count" id="invCount"></span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>부위</th><th>원산지</th><th>수량</th><th>매입가</th><th>판매가</th><th>소비기한</th><th>D-Day</th><th>상태</th>
+        </tr></thead>
+        <tbody id="invBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════ 판매 이력 ══════ -->
+  <div class="tab-panel" id="panel-sales">
+    <div class="stat-grid" id="salesStats"></div>
+    <div class="table-card">
+      <div class="card-header">
+        <h3>💰 판매 내역</h3>
+        <span class="count" id="salesCount"></span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>부위</th><th>원산지</th><th>수량</th><th>매입가</th><th>판매가</th><th>매출액</th><th>판매일</th>
+        </tr></thead>
+        <tbody id="salesBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════ 수율 이력 ══════ -->
+  <div class="tab-panel" id="panel-yield">
+    <div class="table-card">
+      <div class="card-header">
+        <h3>📐 수율 계산 이력</h3>
+        <span class="count" id="yieldCount"></span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>라벨</th><th>계산일</th><th>초기 중량</th><th>최종 중량</th><th>수율(%)</th><th>감량</th><th>실 원가</th><th>권장 판매가</th>
+        </tr></thead>
+        <tbody id="yieldBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════ 직원 관리 ══════ -->
+  <div class="tab-panel" id="panel-staff">
+    <div class="stat-grid" id="staffStats"></div>
+    <div class="table-card">
+      <div class="card-header">
+        <h3>👥 직원 목록</h3>
+        <span class="count" id="staffCount"></span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>이름</th><th>역할</th><th>입사일</th><th>보건증</th><th>위생교육</th><th>상태</th>
+        </tr></thead>
+        <tbody id="staffBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════ 소비기한 수정로그 ══════ -->
+  <div class="tab-panel" id="panel-expiry">
+    <div class="table-card">
+      <div class="card-header">
+        <h3>⏰ 소비기한 수정 로그</h3>
+        <span class="count" id="expiryCount"></span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>부위</th><th>수정 전</th><th>수정 후</th><th>수정 횟수</th><th>수정일시</th>
+        </tr></thead>
+        <tbody id="expiryBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════ 숙성 관리 ══════ -->
+  <div class="tab-panel" id="panel-aging">
+    <div class="table-card">
+      <div class="card-header">
+        <h3>🧊 숙성 항목</h3>
+        <span class="count" id="agingCount"></span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>부위</th><th>등급</th><th>원산지</th><th>시작일</th><th>경과</th><th>목표</th><th>온도</th><th>습도</th><th>중량</th><th>상태</th>
+        </tr></thead>
+        <tbody id="agingBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════ 위생일지 ══════ -->
+  <div class="tab-panel" id="panel-hygiene">
+    <div class="table-card">
+      <div class="card-header">
+        <h3>🧹 위생일지</h3>
+        <span class="count" id="hygieneCount"></span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>날짜</th><th>시간</th><th>구분</th><th>점검자</th><th>결과</th>
+        </tr></thead>
+        <tbody id="hygieneBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════ 마감정산 ══════ -->
+  <div class="tab-panel" id="panel-closing">
+    <div class="table-card">
+      <div class="card-header">
+        <h3>📋 마감 정산 보고서</h3>
+        <span class="count" id="closingCount"></span>
+      </div>
+      <table>
+        <thead><tr>
+          <th>날짜</th><th>총 매출</th><th>총 원가</th><th>폐기 손실</th><th>순이익</th>
+        </tr></thead>
+        <tbody id="closingBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Supabase 연결 ──────────────────────────────────────
+const SUPABASE_URL = 'https://qczxzqgbablcthxqrqfb.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_2AUna1zsKbMVLdk9Fc82eA_Ehcw59Ng';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ─── 데이터 캐시 ────────────────────────────────────────
+let DATA = {
+  inventory: [], sales: [], yield: [], staff: [],
+  expiryLogs: [], aging: [], hygiene: [], closing: [],
+};
+
+// ─── 유틸 ───────────────────────────────────────────────
+const fmt = n => n != null ? Number(n).toLocaleString('ko-KR') : '-';
+const fmtWon = n => n != null ? '₩' + Number(n).toLocaleString('ko-KR') : '-';
+
+function statusBadge(status) {
+  if (status === 'ok' || status === 'pass' || status === 'aging')
+    return `<span class="badge badge-ok">${status}</span>`;
+  if (status === 'warning' || status === 'warn')
+    return `<span class="badge badge-warn">${status}</span>`;
+  if (status === 'expired' || status === 'danger' || status === 'done')
+    return `<span class="badge badge-danger">${status}</span>`;
+  if (status === 'sold')
+    return `<span class="badge badge-sold">판매완료</span>`;
+  return `<span class="badge">${status || '-'}</span>`;
+}
+
+// ─── 탭 전환 ────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + id)?.classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ─── 데이터 로드 ────────────────────────────────────────
+async function loadAll() {
+  document.getElementById('errorBanner').style.display = 'none';
+  try {
+    const [inv, sales, yld, staff, expLog, aging, hyg, closing] = await Promise.all([
+      sb.from('meat_inventory').select('*').order('created_at', { ascending: true }),
+      sb.from('sales_history').select('*').order('created_at', { ascending: false }),
+      sb.from('yield_history').select('*').order('created_at', { ascending: false }),
+      sb.from('employees').select('*').order('name'),
+      sb.from('expiry_edit_logs').select('*').order('edited_at', { ascending: false }),
+      sb.from('aging_items').select('*').order('created_at', { ascending: false }),
+      sb.from('hygiene_logs').select('*').order('created_at', { ascending: false }),
+      sb.from('closing_reports').select('*').order('created_at', { ascending: false }),
+    ]);
+
+    DATA.inventory = inv.data || [];
+    DATA.sales = sales.data || [];
+    DATA.yield = yld.data || [];
+    DATA.staff = staff.data || [];
+    DATA.expiryLogs = expLog.data || [];
+    DATA.aging = aging.data || [];
+    DATA.hygiene = hyg.data || [];
+    DATA.closing = closing.data || [];
+
+    renderAll();
+    document.getElementById('lastSync').textContent =
+      '마지막 동기화: ' + new Date().toLocaleTimeString('ko-KR');
+  } catch (e) {
+    document.getElementById('errorBanner').textContent = '⚠️ Supabase 연결 실패: ' + e.message;
+    document.getElementById('errorBanner').style.display = 'block';
+  }
+}
+
+// ─── 렌더링 ─────────────────────────────────────────────
+function renderAll() {
+  renderOverview();
+  renderInventory();
+  renderSales();
+  renderYield();
+  renderStaff();
+  renderExpiryLogs();
+  renderAging();
+  renderHygiene();
+  renderClosing();
+}
+
+// ── 전체 요약 ──
+function renderOverview() {
+  const inv = DATA.inventory.filter(i => !i.sold);
+  const totalValue = inv.reduce((s, i) => s + (Number(i.qty) * Number(i.sell_price || 0)), 0);
+  const totalCost = inv.reduce((s, i) => s + (Number(i.qty) * Number(i.buy_price || 0)), 0);
+  const danger = inv.filter(i => i.dday != null && i.dday <= 2).length;
+  const totalSalesRev = DATA.sales.reduce((s, i) => s + Number(i.total || 0), 0);
+  const staffCount = DATA.staff.length;
+  const expiredStaff = DATA.staff.filter(s => s.status === 'expired').length;
+
+  document.getElementById('overviewStats').innerHTML = `
+    <div class="stat-card blue"><div class="label">재고 품목 수</div><div class="value">${inv.length}건</div></div>
+    <div class="stat-card green"><div class="label">재고 가치 (판매가 기준)</div><div class="value">${fmtWon(totalValue)}</div></div>
+    <div class="stat-card yellow"><div class="label">재고 원가</div><div class="value">${fmtWon(totalCost)}</div></div>
+    <div class="stat-card red"><div class="label">소비기한 임박 (D-2 이하)</div><div class="value">${danger}건</div></div>
+    <div class="stat-card cyan"><div class="label">누적 매출</div><div class="value">${fmtWon(totalSalesRev)}</div><div class="sub">총 ${DATA.sales.length}건 판매</div></div>
+    <div class="stat-card"><div class="label">직원 수</div><div class="value">${staffCount}명</div>${expiredStaff > 0 ? `<div class="sub" style="color:var(--rd)">⚠ 보건증 만료 ${expiredStaff}명</div>` : ''}</div>
+    <div class="stat-card"><div class="label">수율 기록</div><div class="value">${DATA.yield.length}건</div></div>
+    <div class="stat-card"><div class="label">소비기한 수정 로그</div><div class="value">${DATA.expiryLogs.length}건</div></div>
+  `;
+
+  renderSalesChart();
+  renderCutsChart();
+  renderYieldChart();
+  renderExpiryChart();
+}
+
+// ── 차트 ──
+let chartInstances = {};
+function destroyChart(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+
+function renderSalesChart() {
+  destroyChart('chartSales');
+  const byDate = {};
+  DATA.sales.forEach(s => {
+    const d = s.sold_date || '미정';
+    byDate[d] = (byDate[d] || 0) + Number(s.total || 0);
+  });
+  const labels = Object.keys(byDate).slice(-14);
+  const values = labels.map(l => byDate[l]);
+  const ctx = document.getElementById('chartSales');
+  chartInstances['chartSales'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: '매출 (원)', data: values, backgroundColor: 'rgba(61,126,245,.6)', borderRadius: 6 }]
+    },
+    options: {
+      responsive: true, plugins: { legend: { display: false } },
+      scales: { y: { ticks: { color: '#6b6f80' }, grid: { color: '#2a2e3a' } }, x: { ticks: { color: '#6b6f80' }, grid: { display: false } } }
+    }
+  });
+}
+
+function renderCutsChart() {
+  destroyChart('chartCuts');
+  const inv = DATA.inventory.filter(i => !i.sold);
+  const byCut = {};
+  inv.forEach(i => { byCut[i.cut] = (byCut[i.cut] || 0) + Number(i.qty); });
+  const labels = Object.keys(byCut);
+  const values = labels.map(l => byCut[l]);
+  const bgColors = ['#3d7ef5','#27AE60','#E74C3C','#00ACC1','#E8950A','#8E44AD','#2ECC71','#F39C12'];
+  const ctx = document.getElementById('chartCuts');
+  chartInstances['chartCuts'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: bgColors.slice(0, labels.length), borderWidth: 0 }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'right', labels: { color: '#b0b3c0', font: { size: 12 } } } }
+    }
+  });
+}
+
+function renderYieldChart() {
+  destroyChart('chartYield');
+  const items = [...DATA.yield].reverse().slice(-20);
+  const labels = items.map(i => i.label || i.calc_date || '-');
+  const values = items.map(i => parseFloat(i.yield_pct) || 0);
+  const ctx = document.getElementById('chartYield');
+  chartInstances['chartYield'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '수율 (%)', data: values,
+        borderColor: '#00ACC1', backgroundColor: 'rgba(0,172,193,.15)',
+        fill: true, tension: .3, pointRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, plugins: { legend: { display: false } },
+      scales: { y: { ticks: { color: '#6b6f80' }, grid: { color: '#2a2e3a' } }, x: { ticks: { color: '#6b6f80' }, grid: { display: false } } }
+    }
+  });
+}
+
+function renderExpiryChart() {
+  destroyChart('chartExpiry');
+  const inv = DATA.inventory.filter(i => !i.sold);
+  const buckets = { '만료': 0, 'D-1~2': 0, 'D-3~5': 0, 'D-6~10': 0, 'D-10+': 0 };
+  inv.forEach(i => {
+    const d = i.dday;
+    if (d <= 0) buckets['만료']++;
+    else if (d <= 2) buckets['D-1~2']++;
+    else if (d <= 5) buckets['D-3~5']++;
+    else if (d <= 10) buckets['D-6~10']++;
+    else buckets['D-10+']++;
+  });
+  const ctx = document.getElementById('chartExpiry');
+  chartInstances['chartExpiry'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(buckets),
+      datasets: [{
+        label: '품목 수', data: Object.values(buckets),
+        backgroundColor: ['#E74C3C','#E8950A','#F39C12','#3d7ef5','#27AE60'],
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, plugins: { legend: { display: false } },
+      scales: { y: { ticks: { color: '#6b6f80' }, grid: { color: '#2a2e3a' } }, x: { ticks: { color: '#6b6f80' }, grid: { display: false } } }
+    }
+  });
+}
+
+// ── 재고 ──
+function renderInventory() {
+  const inv = DATA.inventory;
+  const active = inv.filter(i => !i.sold);
+  const totalVal = active.reduce((s, i) => s + (Number(i.qty) * Number(i.sell_price || 0)), 0);
+  const riskVal = active.filter(i => i.dday != null && i.dday <= 2)
+    .reduce((s, i) => s + (Number(i.qty) * Number(i.buy_price || 0)), 0);
+
+  document.getElementById('invStats').innerHTML = `
+    <div class="stat-card blue"><div class="label">보유 품목</div><div class="value">${active.length}건</div></div>
+    <div class="stat-card green"><div class="label">재고 가치</div><div class="value">${fmtWon(totalVal)}</div></div>
+    <div class="stat-card red"><div class="label">손실 위험 금액</div><div class="value">${fmtWon(riskVal)}</div></div>
+    <div class="stat-card yellow"><div class="label">판매 완료</div><div class="value">${inv.filter(i => i.sold).length}건</div></div>
+  `;
+  document.getElementById('invCount').textContent = `총 ${inv.length}건`;
+  document.getElementById('invBody').innerHTML = inv.map(i => `
+    <tr>
+      <td><strong>${i.cut}</strong></td>
+      <td>${i.origin || '-'}</td>
+      <td>${fmt(i.qty)} ${i.unit || 'kg'}</td>
+      <td>${fmtWon(i.buy_price)}</td>
+      <td>${fmtWon(i.sell_price)}</td>
+      <td>${i.expire || '-'}</td>
+      <td>${i.sold ? '-' : (i.dday != null ? 'D-' + i.dday : '-')}</td>
+      <td>${i.sold ? statusBadge('sold') : statusBadge(i.status)}</td>
+    </tr>
+  `).join('');
+}
+
+// ── 판매 ──
+function renderSales() {
+  const totalRev = DATA.sales.reduce((s, i) => s + Number(i.total || 0), 0);
+  const totalCost = DATA.sales.reduce((s, i) => s + (Number(i.qty) * Number(i.buy_price || 0)), 0);
+  const margin = totalRev - totalCost;
+
+  document.getElementById('salesStats').innerHTML = `
+    <div class="stat-card cyan"><div class="label">총 매출</div><div class="value">${fmtWon(totalRev)}</div></div>
+    <div class="stat-card yellow"><div class="label">총 원가</div><div class="value">${fmtWon(totalCost)}</div></div>
+    <div class="stat-card ${margin >= 0 ? 'green' : 'red'}"><div class="label">순이익</div><div class="value">${fmtWon(margin)}</div></div>
+    <div class="stat-card blue"><div class="label">판매 건수</div><div class="value">${DATA.sales.length}건</div></div>
+  `;
+  document.getElementById('salesCount').textContent = `총 ${DATA.sales.length}건`;
+  document.getElementById('salesBody').innerHTML = DATA.sales.map(s => `
+    <tr>
+      <td><strong>${s.cut}</strong></td>
+      <td>${s.origin || '-'}</td>
+      <td>${fmt(s.qty)}</td>
+      <td>${fmtWon(s.buy_price)}</td>
+      <td>${fmtWon(s.sell_price)}</td>
+      <td><strong>${fmtWon(s.total)}</strong></td>
+      <td>${s.sold_date || '-'}</td>
+    </tr>
+  `).join('');
+}
+
+// ── 수율 ──
+function renderYield() {
+  document.getElementById('yieldCount').textContent = `총 ${DATA.yield.length}건`;
+  document.getElementById('yieldBody').innerHTML = DATA.yield.map(y => `
+    <tr>
+      <td><strong>${y.label || '-'}</strong></td>
+      <td>${y.calc_date || '-'}</td>
+      <td>${fmt(y.init_weight)} kg</td>
+      <td>${fmt(y.final_weight)} kg</td>
+      <td><strong>${y.yield_pct || '-'}</strong></td>
+      <td>${y.loss_kg || '-'}</td>
+      <td>${fmtWon(y.real_cost)}</td>
+      <td>${fmtWon(y.recommend)}</td>
+    </tr>
+  `).join('');
+}
+
+// ── 직원 ──
+function renderStaff() {
+  const expired = DATA.staff.filter(s => s.status === 'expired').length;
+  document.getElementById('staffStats').innerHTML = `
+    <div class="stat-card blue"><div class="label">전체 직원</div><div class="value">${DATA.staff.length}명</div></div>
+    <div class="stat-card green"><div class="label">정상</div><div class="value">${DATA.staff.length - expired}명</div></div>
+    <div class="stat-card red"><div class="label">보건증 만료</div><div class="value">${expired}명</div></div>
+  `;
+  document.getElementById('staffCount').textContent = `총 ${DATA.staff.length}명`;
+  document.getElementById('staffBody').innerHTML = DATA.staff.map(s => `
+    <tr>
+      <td><strong>${s.name}</strong></td>
+      <td>${s.role || '-'}</td>
+      <td>${s.hire || '-'}</td>
+      <td>${s.health || '-'}</td>
+      <td>${s.edu || '-'}</td>
+      <td>${statusBadge(s.status)}</td>
+    </tr>
+  `).join('');
+}
+
+// ── 소비기한 수정로그 ──
+function renderExpiryLogs() {
+  document.getElementById('expiryCount').textContent = `총 ${DATA.expiryLogs.length}건`;
+  document.getElementById('expiryBody').innerHTML = DATA.expiryLogs.map(e => `
+    <tr>
+      <td><strong>${e.cut || '-'}</strong></td>
+      <td>${e.old_expire || '-'}</td>
+      <td>${e.new_expire || '-'}</td>
+      <td>${e.edit_count || '-'}회</td>
+      <td>${e.edited_at ? new Date(e.edited_at).toLocaleString('ko-KR') : '-'}</td>
+    </tr>
+  `).join('');
+}
+
+// ── 숙성 ──
+function renderAging() {
+  document.getElementById('agingCount').textContent = `총 ${DATA.aging.length}건`;
+  document.getElementById('agingBody').innerHTML = DATA.aging.map(a => `
+    <tr>
+      <td><strong>${a.cut || '-'}</strong></td>
+      <td>${a.grade || '-'}</td>
+      <td>${a.origin || '-'}</td>
+      <td>${a.start_date || '-'}</td>
+      <td>${a.day || 0}일</td>
+      <td>${a.target_day || 28}일</td>
+      <td>${a.temp != null ? a.temp + '°C' : '-'}</td>
+      <td>${a.humidity != null ? a.humidity + '%' : '-'}</td>
+      <td>${a.weight != null ? fmt(a.weight) + ' kg' : '-'}</td>
+      <td>${statusBadge(a.status)}</td>
+    </tr>
+  `).join('');
+}
+
+// ── 위생일지 ──
+function renderHygiene() {
+  document.getElementById('hygieneCount').textContent = `총 ${DATA.hygiene.length}건`;
+  document.getElementById('hygieneBody').innerHTML = DATA.hygiene.map(h => `
+    <tr>
+      <td>${h.log_date || '-'}</td>
+      <td>${h.log_time || '-'}</td>
+      <td>${h.session || '-'}</td>
+      <td>${h.inspector || '-'}</td>
+      <td>${statusBadge(h.status)}</td>
+    </tr>
+  `).join('');
+}
+
+// ── 마감정산 ──
+function renderClosing() {
+  document.getElementById('closingCount').textContent = `총 ${DATA.closing.length}건`;
+  document.getElementById('closingBody').innerHTML = DATA.closing.map(c => {
+    const profit = (c.total_revenue || 0) - (c.total_cost || 0) - (c.total_waste || 0);
+    return `
+    <tr>
+      <td>${c.report_date || '-'}</td>
+      <td>${fmtWon(c.total_revenue)}</td>
+      <td>${fmtWon(c.total_cost)}</td>
+      <td>${fmtWon(c.total_waste)}</td>
+      <td style="color:${profit >= 0 ? 'var(--gn)' : 'var(--rd)'}; font-weight:800">${fmtWon(profit)}</td>
+    </tr>
+  `}).join('');
+}
+
+// ─── 초기 로드 ──────────────────────────────────────────
+loadAll();
+
+// 60초마다 자동 새로고침
+setInterval(loadAll, 60000);
+</script>
+
+</body>
+</html>
