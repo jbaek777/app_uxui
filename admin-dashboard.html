@@ -21,6 +21,41 @@
     min-height: 100vh;
   }
 
+  /* ── 로그인 오버레이 ── */
+  #loginOverlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+  }
+  .login-box {
+    background: var(--s1); border: 1px solid var(--bd);
+    border-radius: 20px; padding: 48px 40px; width: 100%; max-width: 420px;
+    box-shadow: 0 24px 64px rgba(0,0,0,.5);
+    display: flex; flex-direction: column; align-items: center; gap: 20px;
+  }
+  .login-logo { font-size: 52px; }
+  .login-title { font-size: 24px; font-weight: 900; }
+  .login-sub { font-size: 13px; color: var(--t3); }
+  .login-input {
+    width: 100%; padding: 14px 18px; background: var(--s2);
+    border: 1.5px solid var(--bd); border-radius: 10px;
+    color: var(--tx); font-size: 16px; letter-spacing: 4px;
+    outline: none; text-align: center;
+    transition: border-color .2s;
+  }
+  .login-input:focus { border-color: var(--ac); }
+  .login-btn {
+    width: 100%; padding: 14px; background: var(--ac); color: #fff;
+    border: none; border-radius: 10px; font-size: 16px; font-weight: 800;
+    cursor: pointer; transition: opacity .2s;
+  }
+  .login-btn:hover { opacity: .85; }
+  .login-error {
+    color: var(--rd); font-size: 13px; font-weight: 700;
+    display: none; text-align: center;
+  }
+  #dashContent { display: none; }
+
   /* ── 헤더 ── */
   .header {
     background: var(--s1); border-bottom: 1px solid var(--bd);
@@ -144,6 +179,26 @@
 </style>
 </head>
 <body>
+
+<!-- ── 로그인 오버레이 ── -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">🥩</div>
+    <div class="login-title">MeatBig 관리자</div>
+    <div class="login-sub">관리자 비밀번호를 입력하세요</div>
+    <input
+      id="pwInput" type="password" class="login-input"
+      placeholder="••••••••"
+      onkeydown="if(event.key==='Enter') tryLogin()"
+      autofocus
+    />
+    <div id="loginError" class="login-error">⚠ 비밀번호가 올바르지 않습니다</div>
+    <button class="login-btn" onclick="tryLogin()">로그인 →</button>
+  </div>
+</div>
+
+<!-- ── 대시보드 본문 ── -->
+<div id="dashContent">
 
 <div class="header">
   <h1>🥩 <span>MeatBig</span> 관리자 대시보드</h1>
@@ -841,12 +896,39 @@ function renderClosing() {
   `}).join('');
 }
 
-// ─── 초기 로드 ──────────────────────────────────────────
-loadAll();
+// ─── 로그인 ─────────────────────────────────────────────
+const ADMIN_PW = 'MeatBig2026!';
 
-// 60초마다 자동 새로고침
-setInterval(loadAll, 60000);
+function tryLogin() {
+  const input = document.getElementById('pwInput').value;
+  const errEl = document.getElementById('loginError');
+  if (input === ADMIN_PW) {
+    sessionStorage.setItem('mb_admin_auth', '1');
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('dashContent').style.display = 'block';
+    loadAll();
+  } else {
+    errEl.style.display = 'block';
+    document.getElementById('pwInput').value = '';
+    document.getElementById('pwInput').focus();
+    setTimeout(() => { errEl.style.display = 'none'; }, 3000);
+  }
+}
+
+// ─── 초기 로드 ──────────────────────────────────────────
+// 세션 인증 유지 (새로고침 시 재로그인 불필요)
+if (sessionStorage.getItem('mb_admin_auth') === '1') {
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('dashContent').style.display = 'block';
+  loadAll();
+}
+
+// 60초마다 자동 새로고침 (로그인 후에만)
+setInterval(() => {
+  if (sessionStorage.getItem('mb_admin_auth') === '1') loadAll();
+}, 60000);
 </script>
 
+</div> <!-- #dashContent 닫기 -->
 </body>
 </html>
