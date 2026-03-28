@@ -17,7 +17,7 @@ const KEYS = {
 
 // ─── 매장 정보 헬퍼 ─────────────────────────────────────
 
-async function getStoreInfo() {
+export async function getStoreInfo() {
   try {
     const raw = await AsyncStorage.getItem('@meatbig_biz');
     if (!raw) return {};
@@ -238,5 +238,58 @@ export const expiryLogStore = {
         ...info,
       });
     } catch {}
+  },
+};
+
+// ─── 위생 점검 로그 ─────────────────────────────────────
+
+export const hygieneStore = {
+  load: async (fallback = []) => {
+    try {
+      const { data, error } = await supabase
+        .from('hygiene_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (!error && data && data.length > 0) return data;
+    } catch {}
+    try {
+      const raw = await AsyncStorage.getItem('@meatbig_hygiene');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return fallback;
+  },
+  save: async (logs) => {
+    try {
+      await AsyncStorage.setItem('@meatbig_hygiene', JSON.stringify(logs));
+    } catch {}
+    try {
+      const info = await getStoreInfo();
+      const rows = logs.map(l => ({ ...l, ...info }));
+      await supabase.from('hygiene_logs').delete().eq('store_id', info.store_id || '');
+      if (rows.length > 0) await supabase.from('hygiene_logs').insert(rows);
+    } catch (e) { console.log('hygieneStore.save error:', e.message); }
+  },
+  addLog: async (log) => {
+    try {
+      const info = await getStoreInfo();
+      await supabase.from('hygiene_logs').insert({ ...log, ...info });
+    } catch (e) { console.log('hygieneStore.addLog error:', e.message); }
+  },
+};
+
+// ─── 일일 마감 리포트 ────────────────────────────────────
+
+export const closingStore = {
+  save: async (report) => {
+    try {
+      const info = await getStoreInfo();
+      await supabase.from('closing_reports').insert({
+        ...report,
+        ...info,
+        report_date: new Date().toLocaleDateString('ko-KR'),
+        created_at: new Date().toISOString(),
+      });
+    } catch (e) { console.log('closingStore.save error:', e.message); }
   },
 };

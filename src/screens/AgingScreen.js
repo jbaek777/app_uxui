@@ -5,6 +5,7 @@ import { useTheme } from '../lib/ThemeContext';
 import { Badge, StatusBadge, ProgressBar, PrimaryBtn, OutlineBtn, AddBtn } from '../components/UI';
 import { agingData as initialData } from '../data/mockData';
 import { agingApi } from '../lib/supabase';
+import { getStoreInfo } from '../lib/dataStore';
 import { genAgingHTML, printAndShare } from '../lib/pdfTemplate';
 
 async function exportAgingPDF(items) {
@@ -58,7 +59,8 @@ export default function AgingScreen() {
     setModal(false);
     setForm({ cut: '', grade: '1+', origin: '국내산(한우)', weight: '', targetDay: '28', temp: '', humidity: '', notes: '' });
     try {
-      await agingApi.create({ cut: newItem.cut, grade: newItem.grade, origin: newItem.origin, trace: newItem.trace, start_date: newItem.startDate, day: 0, target_day: newItem.targetDay, temp: newItem.temp, humidity: newItem.humidity, weight: newItem.weight, init_weight: newItem.initWeight, status: 'early', notes: newItem.notes });
+      const info = await getStoreInfo();
+      await agingApi.create({ cut: newItem.cut, grade: newItem.grade, origin: newItem.origin, trace: newItem.trace, start_date: newItem.startDate, day: 0, target_day: newItem.targetDay, temp: newItem.temp, humidity: newItem.humidity, weight: newItem.weight, init_weight: newItem.initWeight, status: 'early', notes: newItem.notes, store_id: info.store_id || '', store_name: info.store_name || '' });
     } catch (_) {}
   };
 

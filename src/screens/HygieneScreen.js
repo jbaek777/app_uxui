@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, TextInput,
 } from 'react-native';
@@ -6,6 +6,7 @@ import { colors, fontSize, spacing, radius, shadow } from '../theme';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { OXPair } from '../components/OXButton';
 import { hygieneData as initData } from '../data/mockData';
+import { hygieneStore } from '../lib/dataStore';
 
 const SESSIONS = ['오전', '오후', '마감'];
 const CHECKLIST = [
@@ -19,6 +20,21 @@ const CHECKLIST = [
 
 export default function HygieneScreen() {
   const [logs, setLogs] = useState(initData);
+  const [loaded, setLoaded] = useState(false);
+  const isFirst = useRef(true);
+
+  useEffect(() => {
+    hygieneStore.load(initData).then(data => {
+      setLogs(data);
+      setLoaded(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (isFirst.current) { isFirst.current = false; return; }
+    if (loaded) hygieneStore.save(logs);
+  }, [logs]);
+
   const [modal, setModal] = useState(false);
   const [session, setSession] = useState('오전');
   const [checks, setChecks] = useState({});
@@ -55,6 +71,7 @@ export default function HygieneScreen() {
       inspector: inspector.trim(),
     };
     setLogs([newLog, ...logs]);
+    hygieneStore.addLog(newLog);
     setModal(false);
     Alert.alert('점검 완료 ✓', `${session} 위생점검이 저장되었습니다.\n점검자: ${inspector.trim()}`);
   };

@@ -7,6 +7,7 @@ import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { todaySales as initSales, meatInventory } from '../data/mockData';
 import { genClosingHTML, printAndShare } from '../lib/pdfTemplate';
+import { closingStore } from '../lib/dataStore';
 
 export default function ClosingScreen() {
   const { isDark } = useTheme();
@@ -141,6 +142,13 @@ export default function ClosingScreen() {
           color={pal.pu}
           style={{ marginTop: spacing.md }}
           onPress={async () => {
+            await closingStore.save({
+              sales: sales,
+              waste: waste,
+              total_revenue: totalSales,
+              total_cost: totalCost,
+              total_waste: wasteTotal,
+            });
             const html = genClosingHTML(sales, waste, meatInventory);
             await printAndShare(html, '일일마감정산서');
           }}
