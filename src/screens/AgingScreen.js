@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert } from 'react-native';
-import { colors, radius, shadow, fontSize, spacing } from '../theme';
+import { colors, darkColors, lightColors, radius, shadow, fontSize, spacing } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { Badge, StatusBadge, ProgressBar, PrimaryBtn, OutlineBtn, AddBtn } from '../components/UI';
 import { agingData as initialData } from '../data/mockData';
@@ -17,6 +17,7 @@ const TARGET_DAYS = ['14', '21', '28', '35', '45', '60'];
 
 export default function AgingScreen() {
   const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
   const [items, setItems] = useState(initialData);
   const [expanded, setExpanded] = useState(null);
   const [modal, setModal] = useState(false);
@@ -83,53 +84,53 @@ export default function AgingScreen() {
   const displayItems = listTab === 'active' ? activeItems : doneItems;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: pal.bg }}>
       {/* 상단 통계 */}
-      <View style={[styles.statBar, { backgroundColor: colors.s1, borderBottomColor: colors.bd }]}>
-        <StatMini label="숙성 중" value={`${activeItems.length}건`} color={colors.a2} />
-        <StatMini label="완료됨" value={`${doneItems.length}건`} color={colors.gn} />
-        <StatMini label="평균 수율" value="86.2%" color={colors.yw} />
+      <View style={[styles.statBar, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
+        <StatMini label="숙성 중" value={`${activeItems.length}건`} color={pal.a2} pal={pal} />
+        <StatMini label="완료됨" value={`${doneItems.length}건`} color={pal.gn} pal={pal} />
+        <StatMini label="평균 수율" value="86.2%" color={pal.yw} pal={pal} />
       </View>
 
       {/* 활성/완료 세그먼트 */}
-      <View style={[styles.segBar, { backgroundColor: colors.s1, borderBottomColor: colors.bd }]}>
+      <View style={[styles.segBar, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
         <TouchableOpacity
-          style={[styles.segBtn, listTab === 'active' && { borderBottomColor: colors.a2, borderBottomWidth: 3 }]}
+          style={[styles.segBtn, listTab === 'active' && { borderBottomColor: pal.a2, borderBottomWidth: 3 }]}
           onPress={() => setListTab('active')}
         >
-          <Text style={[styles.segText, { color: listTab === 'active' ? colors.a2 : colors.t3 }]}>
+          <Text style={[styles.segText, { color: listTab === 'active' ? pal.a2 : pal.t3 }]}>
             숙성 중 ({activeItems.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.segBtn, listTab === 'done' && { borderBottomColor: colors.gn, borderBottomWidth: 3 }]}
+          style={[styles.segBtn, listTab === 'done' && { borderBottomColor: pal.gn, borderBottomWidth: 3 }]}
           onPress={() => setListTab('done')}
         >
-          <Text style={[styles.segText, { color: listTab === 'done' ? colors.gn : colors.t3 }]}>
+          <Text style={[styles.segText, { color: listTab === 'done' ? pal.gn : pal.t3 }]}>
             완료됨 ({doneItems.length})
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* 툴바 */}
-      <View style={[styles.toolbar, { backgroundColor: colors.s1, borderBottomColor: colors.bd }]}>
-        <View style={[styles.viewSwitch, { backgroundColor: colors.bg }]}>
+      <View style={[styles.toolbar, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
+        <View style={[styles.viewSwitch, { backgroundColor: pal.bg }]}>
           {['cards', 'table'].map(mode => (
             <TouchableOpacity key={mode}
-              style={[styles.viewBtn, viewMode === mode && { backgroundColor: colors.s2, ...shadow.sm }]}
+              style={[styles.viewBtn, viewMode === mode && { backgroundColor: pal.s2, ...shadow.sm }]}
               onPress={() => setViewMode(mode)}>
-              <Text style={[styles.viewBtnText, { color: viewMode === mode ? colors.tx : colors.t3 }, viewMode === mode && styles.viewBtnTextActive]}>
+              <Text style={[styles.viewBtnText, { color: viewMode === mode ? pal.tx : pal.t3 }, viewMode === mode && styles.viewBtnTextActive]}>
                 {mode === 'cards' ? '🃏 카드' : '📋 대장'}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={[styles.pdfBtn, { borderColor: colors.a2 }]} onPress={() => exportAgingPDF(items)}>
-            <Text style={[styles.pdfBtnText, { color: colors.a2 }]}>📄 PDF</Text>
+          <TouchableOpacity style={[styles.pdfBtn, { borderColor: pal.a2 }]} onPress={() => exportAgingPDF(items)}>
+            <Text style={[styles.pdfBtnText, { color: pal.a2 }]}>📄 PDF</Text>
           </TouchableOpacity>
           {listTab === 'active' && (
-            <AddBtn label="+ 등록" onPress={() => setModal(true)} color={colors.ac} />
+            <AddBtn label="+ 등록" onPress={() => setModal(true)} color={pal.ac} />
           )}
         </View>
       </View>
@@ -137,7 +138,7 @@ export default function AgingScreen() {
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
         {displayItems.length === 0 && (
           <View style={styles.emptyBox}>
-            <Text style={[styles.emptyText, { color: colors.t3 }]}>
+            <Text style={[styles.emptyText, { color: pal.t3 }]}>
               {listTab === 'active' ? '숙성 중인 항목이 없습니다' : '완료된 항목이 없습니다'}
             </Text>
           </View>
@@ -147,66 +148,66 @@ export default function AgingScreen() {
           displayItems.map(item => {
             const p = pct(item);
             const isOpen = expanded === item.id;
-            const barColor = p >= 100 ? colors.gn : p >= 70 ? colors.ac : colors.a2;
+            const barColor = p >= 100 ? pal.gn : p >= 70 ? pal.ac : pal.a2;
             const isDone = item.completed;
             return (
               <TouchableOpacity key={item.id}
                 style={[
                   styles.agingCard,
-                  { backgroundColor: colors.s1, borderColor: isOpen ? colors.ac : colors.bd },
+                  { backgroundColor: pal.s1, borderColor: isOpen ? pal.ac : pal.bd },
                   isOpen && { borderWidth: 2 },
-                  isDone && { borderColor: colors.gn, borderWidth: 1.5, opacity: 0.85 },
+                  isDone && { borderColor: pal.gn, borderWidth: 1.5, opacity: 0.85 },
                 ]}
                 onPress={() => setExpanded(isOpen ? null : item.id)}
                 activeOpacity={0.85}>
 
                 <View style={styles.cardHeader}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.cardCut, { color: colors.tx }]}>{item.cut}</Text>
+                    <Text style={[styles.cardCut, { color: pal.tx }]}>{item.cut}</Text>
                     <View style={styles.cardBadgeRow}>
-                      <Badge label={`${item.grade}등급`} color={colors.yw} bg={colors.yw + '20'} />
-                      <Badge label={item.origin} color={colors.t3} bg={colors.s2} />
+                      <Badge label={`${item.grade}등급`} color={pal.yw} bg={pal.yw + '20'} />
+                      <Badge label={item.origin} color={pal.t3} bg={pal.s2} />
                       {isDone
-                        ? <Badge label="✓ 완료" color={colors.gn} bg={colors.gn + '20'} />
+                        ? <Badge label="✓ 완료" color={pal.gn} bg={pal.gn + '20'} />
                         : <StatusBadge status={item.status} />
                       }
                     </View>
                   </View>
-                  <View style={[styles.dayBlock, { backgroundColor: (p >= 100 ? colors.gn : colors.ac) + '18' }]}>
-                    <Text style={[styles.dayNum, { color: p >= 100 ? colors.gn : colors.ac }]}>{item.day}</Text>
-                    <Text style={[styles.dayLabel, { color: colors.t2 }]}>일째</Text>
-                    <Text style={[styles.dayTarget, { color: colors.t3 }]}>/{item.targetDay}일</Text>
+                  <View style={[styles.dayBlock, { backgroundColor: (p >= 100 ? pal.gn : pal.ac) + '18' }]}>
+                    <Text style={[styles.dayNum, { color: p >= 100 ? pal.gn : pal.ac }]}>{item.day}</Text>
+                    <Text style={[styles.dayLabel, { color: pal.t2 }]}>일째</Text>
+                    <Text style={[styles.dayTarget, { color: pal.t3 }]}>/{item.targetDay}일</Text>
                   </View>
                 </View>
 
                 <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.sm }}>
                   <ProgressBar pct={p} color={barColor} height={12} />
                   <View style={styles.progressMeta}>
-                    <Text style={[styles.progressLabel, { color: colors.t3 }]}>진행률 {p}%</Text>
-                    <Text style={[styles.progressLabel, { color: colors.t3 }]}>수율 {yieldPct(item)}%</Text>
+                    <Text style={[styles.progressLabel, { color: pal.t3 }]}>진행률 {p}%</Text>
+                    <Text style={[styles.progressLabel, { color: pal.t3 }]}>수율 {yieldPct(item)}%</Text>
                   </View>
-                  <Text style={[styles.traceText, { color: colors.t3 }]}>📌 {item.trace}</Text>
+                  <Text style={[styles.traceText, { color: pal.t3 }]}>📌 {item.trace}</Text>
                   {isDone && item.completedDate && (
-                    <Text style={[styles.traceText, { color: colors.gn, marginTop: 2 }]}>✓ 완료일: {item.completedDate}</Text>
+                    <Text style={[styles.traceText, { color: pal.gn, marginTop: 2 }]}>✓ 완료일: {item.completedDate}</Text>
                   )}
                 </View>
 
                 {isOpen && (
-                  <View style={[styles.expandArea, { borderTopColor: colors.bd }]}>
+                  <View style={[styles.expandArea, { borderTopColor: pal.bd }]}>
                     <View style={styles.envRow}>
-                      <EnvBox label="🌡️ 온도" value={`${item.temp}°C`} color={colors.cyan} />
-                      <EnvBox label="💧 습도" value={`${item.humidity}%`} color={colors.pu} />
-                      <EnvBox label="📈 수율" value={`${yieldPct(item)}%`} color={colors.yw} />
+                      <EnvBox label="🌡️ 온도" value={`${item.temp}°C`} color={pal.cyan} pal={pal} />
+                      <EnvBox label="💧 습도" value={`${item.humidity}%`} color={pal.pu} pal={pal} />
+                      <EnvBox label="📈 수율" value={`${yieldPct(item)}%`} color={pal.yw} pal={pal} />
                     </View>
-                    <View style={[styles.noteArea, { backgroundColor: colors.s2 }]}>
-                      <Text style={[styles.noteText, { color: colors.t2 }]}>📝 {item.notes}</Text>
+                    <View style={[styles.noteArea, { backgroundColor: pal.s2 }]}>
+                      <Text style={[styles.noteText, { color: pal.t2 }]}>📝 {item.notes}</Text>
                     </View>
-                    <Text style={[styles.infoText, { color: colors.t3 }]}>입고일: {item.startDate}</Text>
+                    <Text style={[styles.infoText, { color: pal.t3 }]}>입고일: {item.startDate}</Text>
 
                     {/* 완료 처리 버튼 — 목표 달성 & 아직 완료 안 된 경우 */}
                     {!isDone && p >= 100 && (
                       <TouchableOpacity
-                        style={[styles.completeBtn, { backgroundColor: colors.gn }]}
+                        style={[styles.completeBtn, { backgroundColor: pal.gn }]}
                         onPress={() => handleComplete(item.id)}
                         activeOpacity={0.8}
                       >
@@ -215,7 +216,7 @@ export default function AgingScreen() {
                     )}
                     {!isDone && p < 100 && (
                       <TouchableOpacity
-                        style={[styles.completeBtn, { backgroundColor: colors.a2 + 'DD' }]}
+                        style={[styles.completeBtn, { backgroundColor: pal.a2 + 'DD' }]}
                         onPress={() => Alert.alert('조기 완료', '아직 목표 숙성일에 도달하지 않았습니다.\n그래도 완료 처리할까요?', [
                           { text: '취소', style: 'cancel' },
                           { text: '완료', onPress: () => handleComplete(item.id) },
@@ -231,20 +232,20 @@ export default function AgingScreen() {
             );
           })
         ) : (
-          <View style={[styles.tableWrap, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
-            <View style={[styles.tableHead, { backgroundColor: colors.s2, borderBottomColor: colors.bd }]}>
+          <View style={[styles.tableWrap, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+            <View style={[styles.tableHead, { backgroundColor: pal.s2, borderBottomColor: pal.bd }]}>
               {['이력번호', '부위', '등급', '숙성일', '상태'].map(h => (
-                <Text key={h} style={[styles.thText, { color: colors.t3 }]}>{h}</Text>
+                <Text key={h} style={[styles.thText, { color: pal.t3 }]}>{h}</Text>
               ))}
             </View>
             {displayItems.map(item => (
-              <View key={item.id} style={[styles.tableRow, { borderBottomColor: colors.bd + '60' }]}>
-                <Text style={[styles.tdText, { fontFamily: 'Courier', fontSize: fontSize.xxs, color: colors.t2 }]} numberOfLines={1}>{item.trace}</Text>
-                <Text style={[styles.tdText, { color: colors.tx }]}>{item.cut.split(' ')[0]}</Text>
-                <Text style={[styles.tdText, { color: colors.tx }]}>{item.grade}</Text>
-                <Text style={[styles.tdText, { color: colors.ac, fontWeight: '800' }]}>{item.day}일</Text>
+              <View key={item.id} style={[styles.tableRow, { borderBottomColor: pal.bd + '60' }]}>
+                <Text style={[styles.tdText, { fontFamily: 'Courier', fontSize: fontSize.xxs, color: pal.t2 }]} numberOfLines={1}>{item.trace}</Text>
+                <Text style={[styles.tdText, { color: pal.tx }]}>{item.cut.split(' ')[0]}</Text>
+                <Text style={[styles.tdText, { color: pal.tx }]}>{item.grade}</Text>
+                <Text style={[styles.tdText, { color: pal.ac, fontWeight: '800' }]}>{item.day}일</Text>
                 {item.completed
-                  ? <Badge label="완료" color={colors.gn} bg={colors.gn + '20'} />
+                  ? <Badge label="완료" color={pal.gn} bg={pal.gn + '20'} />
                   : <StatusBadge status={item.status} />
                 }
               </View>
@@ -255,43 +256,43 @@ export default function AgingScreen() {
 
       {/* 등록 모달 */}
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={[styles.modalHeader, { borderBottomColor: colors.bd, backgroundColor: colors.s1 }]}>
-            <Text style={[styles.modalTitle, { color: colors.tx }]}>🥩 숙성 신규 등록</Text>
+        <View style={{ flex: 1, backgroundColor: pal.bg }}>
+          <View style={[styles.modalHeader, { borderBottomColor: pal.bd, backgroundColor: pal.s1 }]}>
+            <Text style={[styles.modalTitle, { color: pal.tx }]}>🥩 숙성 신규 등록</Text>
             <TouchableOpacity onPress={() => setModal(false)}>
-              <Text style={[styles.modalClose, { color: colors.t2 }]}>✕</Text>
+              <Text style={[styles.modalClose, { color: pal.t2 }]}>✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
             <FormField label="부위명 *" placeholder="예: 등심 (Striploin)" value={form.cut}
-              onChangeText={t => setForm({ ...form, cut: t })} />
+              onChangeText={t => setForm({ ...form, cut: t })} pal={pal} />
 
-            <Text style={[styles.formLabel, { color: colors.t2 }]}>등급 선택</Text>
+            <Text style={[styles.formLabel, { color: pal.t2 }]}>등급 선택</Text>
             <View style={styles.chipRow}>
               {GRADES.map(g => (
-                <TouchableOpacity key={g} style={[styles.chip, { borderColor: colors.bd, backgroundColor: colors.s2 }, form.grade === g && { backgroundColor: colors.ac, borderColor: colors.ac }]}
+                <TouchableOpacity key={g} style={[styles.chip, { borderColor: pal.bd, backgroundColor: pal.s2 }, form.grade === g && { backgroundColor: pal.ac, borderColor: pal.ac }]}
                   onPress={() => setForm({ ...form, grade: g })}>
-                  <Text style={[styles.chipText, { color: colors.t2 }, form.grade === g && { color: '#fff', fontWeight: '800' }]}>{g}</Text>
+                  <Text style={[styles.chipText, { color: pal.t2 }, form.grade === g && { color: '#fff', fontWeight: '800' }]}>{g}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={[styles.formLabel, { color: colors.t2 }]}>원산지</Text>
+            <Text style={[styles.formLabel, { color: pal.t2 }]}>원산지</Text>
             <View style={styles.chipRow}>
               {ORIGINS.map(o => (
-                <TouchableOpacity key={o} style={[styles.chip, { borderColor: colors.bd, backgroundColor: colors.s2 }, form.origin === o && { backgroundColor: colors.ac, borderColor: colors.ac }]}
+                <TouchableOpacity key={o} style={[styles.chip, { borderColor: pal.bd, backgroundColor: pal.s2 }, form.origin === o && { backgroundColor: pal.ac, borderColor: pal.ac }]}
                   onPress={() => setForm({ ...form, origin: o })}>
-                  <Text style={[styles.chipText, { color: colors.t2 }, form.origin === o && { color: '#fff', fontWeight: '800' }]}>{o}</Text>
+                  <Text style={[styles.chipText, { color: pal.t2 }, form.origin === o && { color: '#fff', fontWeight: '800' }]}>{o}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={[styles.formLabel, { color: colors.t2 }]}>목표 숙성일수</Text>
+            <Text style={[styles.formLabel, { color: pal.t2 }]}>목표 숙성일수</Text>
             <View style={styles.chipRow}>
               {TARGET_DAYS.map(d => (
-                <TouchableOpacity key={d} style={[styles.chip, { borderColor: colors.bd, backgroundColor: colors.s2 }, form.targetDay === d && { backgroundColor: colors.ac, borderColor: colors.ac }]}
+                <TouchableOpacity key={d} style={[styles.chip, { borderColor: pal.bd, backgroundColor: pal.s2 }, form.targetDay === d && { backgroundColor: pal.ac, borderColor: pal.ac }]}
                   onPress={() => setForm({ ...form, targetDay: d })}>
-                  <Text style={[styles.chipText, { color: colors.t2 }, form.targetDay === d && { color: '#fff', fontWeight: '800' }]}>{d}일</Text>
+                  <Text style={[styles.chipText, { color: pal.t2 }, form.targetDay === d && { color: '#fff', fontWeight: '800' }]}>{d}일</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -299,17 +300,17 @@ export default function AgingScreen() {
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <View style={{ flex: 1 }}>
                 <FormField label="중량 (kg)" placeholder="14.5" value={form.weight}
-                  onChangeText={t => setForm({ ...form, weight: t })} keyboardType="numeric" />
+                  onChangeText={t => setForm({ ...form, weight: t })} keyboardType="numeric" pal={pal} />
               </View>
               <View style={{ flex: 1 }}>
                 <FormField label="온도 (°C)" placeholder="1.0" value={form.temp}
-                  onChangeText={t => setForm({ ...form, temp: t })} keyboardType="numeric" />
+                  onChangeText={t => setForm({ ...form, temp: t })} keyboardType="numeric" pal={pal} />
               </View>
             </View>
             <FormField label="메모" placeholder="특이사항" value={form.notes}
-              onChangeText={t => setForm({ ...form, notes: t })} />
+              onChangeText={t => setForm({ ...form, notes: t })} pal={pal} />
 
-            <PrimaryBtn label="🥩 등록 완료" onPress={handleSave} color={colors.ac} style={{ marginTop: 8 }} />
+            <PrimaryBtn label="🥩 등록 완료" onPress={handleSave} color={pal.ac} style={{ marginTop: 8 }} />
             <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: 10 }} />
           </ScrollView>
         </View>
@@ -318,26 +319,26 @@ export default function AgingScreen() {
   );
 }
 
-const StatMini = ({ label, value, color }) => (
-  <View style={[styles.statMini, { backgroundColor: colors.s2, borderColor: colors.bd }]}>
+const StatMini = ({ label, value, color, pal }) => (
+  <View style={[styles.statMini, { backgroundColor: pal.s2, borderColor: pal.bd }]}>
     <Text style={[styles.statVal, { color }]}>{value}</Text>
-    <Text style={[styles.statLbl, { color: colors.t3 }]}>{label}</Text>
+    <Text style={[styles.statLbl, { color: pal.t3 }]}>{label}</Text>
   </View>
 );
 
-const EnvBox = ({ label, value, color }) => (
-  <View style={[styles.envBox, { backgroundColor: colors.s2, borderColor: colors.bd }]}>
-    <Text style={[styles.envLabel, { color: colors.t3 }]}>{label}</Text>
+const EnvBox = ({ label, value, color, pal }) => (
+  <View style={[styles.envBox, { backgroundColor: pal.s2, borderColor: pal.bd }]}>
+    <Text style={[styles.envLabel, { color: pal.t3 }]}>{label}</Text>
     <Text style={[styles.envVal, { color }]}>{value}</Text>
   </View>
 );
 
-const FormField = ({ label, ...props }) => (
+const FormField = ({ label, pal, ...props }) => (
   <View style={{ marginBottom: spacing.md }}>
-    {label && <Text style={[styles.formLabel, { color: colors.t2 }]}>{label}</Text>}
+    {label && <Text style={[styles.formLabel, { color: pal.t2 }]}>{label}</Text>}
     <TextInput
-      style={[styles.input, { backgroundColor: colors.s2, borderColor: colors.bd, color: colors.tx }]}
-      placeholderTextColor={colors.t3}
+      style={[styles.input, { backgroundColor: pal.s2, borderColor: pal.bd, color: pal.tx }]}
+      placeholderTextColor={pal.t3}
       {...props}
     />
   </View>

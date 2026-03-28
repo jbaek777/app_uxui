@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert,
 } from 'react-native';
-import { colors, fontSize, spacing, radius, shadow } from '../theme';
+import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
+import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { todaySales as initSales, meatInventory } from '../data/mockData';
 import { genClosingHTML, printAndShare } from '../lib/pdfTemplate';
 
 export default function ClosingScreen() {
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
   const [sales, setSales] = useState(initSales);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ cut: '', qty: '', price: '' });
@@ -49,11 +52,11 @@ export default function ClosingScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: pal.bg }]}>
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 80 }}>
 
         {/* 총매출 히어로 */}
-        <View style={styles.heroCard}>
+        <View style={[styles.heroCard, { backgroundColor: pal.ac }]}>
           <Text style={styles.heroLabel}>오늘 총매출</Text>
           <Text style={styles.heroValue}>{totalSales.toLocaleString()}원</Text>
           <View style={styles.heroRow}>
@@ -75,67 +78,67 @@ export default function ClosingScreen() {
         </View>
 
         {/* 판매 내역 */}
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>🛒 판매 내역</Text>
-            <TouchableOpacity style={styles.addBtn} onPress={() => setModal(true)}>
-              <Text style={styles.addBtnText}>+ 추가</Text>
+            <Text style={[styles.sectionTitle, { color: pal.tx }]}>🛒 판매 내역</Text>
+            <TouchableOpacity style={[styles.addBtn, { borderColor: pal.a2 + '50', backgroundColor: pal.a2 + '15' }]} onPress={() => setModal(true)}>
+              <Text style={[styles.addBtnText, { color: pal.a2 }]}>+ 추가</Text>
             </TouchableOpacity>
           </View>
           {sales.map(r => (
-            <View key={r.id} style={styles.saleRow}>
+            <View key={r.id} style={[styles.saleRow, { borderBottomColor: pal.bd + '50' }]}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.saleCut}>{r.cut}</Text>
-                <Text style={styles.saleMeta}>{r.time} · {r.qty}kg × {r.price.toLocaleString()}원</Text>
+                <Text style={[styles.saleCut, { color: pal.tx }]}>{r.cut}</Text>
+                <Text style={[styles.saleMeta, { color: pal.t3 }]}>{r.time} · {r.qty}kg × {r.price.toLocaleString()}원</Text>
               </View>
-              <Text style={styles.saleTotal}>{r.total.toLocaleString()}원</Text>
+              <Text style={[styles.saleTotal, { color: pal.a2 }]}>{r.total.toLocaleString()}원</Text>
             </View>
           ))}
         </View>
 
         {/* 폐기 내역 */}
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>🗑️ 폐기 내역</Text>
-            <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.rd + '20', borderColor: colors.rd + '40' }]}
+            <Text style={[styles.sectionTitle, { color: pal.tx }]}>🗑️ 폐기 내역</Text>
+            <TouchableOpacity style={[styles.addBtn, { backgroundColor: pal.rd + '20', borderColor: pal.rd + '40' }]}
               onPress={() => setWasteModal(true)}>
-              <Text style={[styles.addBtnText, { color: colors.rd }]}>+ 폐기 등록</Text>
+              <Text style={[styles.addBtnText, { color: pal.rd }]}>+ 폐기 등록</Text>
             </TouchableOpacity>
           </View>
           {waste.length === 0 ? (
-            <Text style={styles.emptyText}>폐기 항목 없음</Text>
+            <Text style={[styles.emptyText, { color: pal.t3 }]}>폐기 항목 없음</Text>
           ) : (
             waste.map(w => (
-              <View key={w.id} style={styles.wasteRow}>
-                <Text style={styles.wasteCut}>{w.cut}</Text>
-                <Text style={styles.wasteMeta}>{w.qty}kg · {w.reason || '사유 미입력'}</Text>
-                <Text style={[styles.wasteVal, { color: colors.rd }]}>손실 추정 {(parseFloat(w.qty) * 5000).toLocaleString()}원</Text>
+              <View key={w.id} style={[styles.wasteRow, { borderBottomColor: pal.bd + '50' }]}>
+                <Text style={[styles.wasteCut, { color: pal.tx }]}>{w.cut}</Text>
+                <Text style={[styles.wasteMeta, { color: pal.t3 }]}>{w.qty}kg · {w.reason || '사유 미입력'}</Text>
+                <Text style={[styles.wasteVal, { color: pal.rd }]}>손실 추정 {(parseFloat(w.qty) * 5000).toLocaleString()}원</Text>
               </View>
             ))
           )}
           {waste.length > 0 && (
             <View style={styles.wasteSummary}>
-              <Text style={styles.wasteSumLabel}>총 손실 추정</Text>
-              <Text style={[styles.wasteSumVal, { color: colors.rd }]}>{wasteTotal.toLocaleString()}원</Text>
+              <Text style={[styles.wasteSumLabel, { color: pal.t2 }]}>총 손실 추정</Text>
+              <Text style={[styles.wasteSumVal, { color: pal.rd }]}>{wasteTotal.toLocaleString()}원</Text>
             </View>
           )}
         </View>
 
         {/* 잔여 재고 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📦 잔여 재고</Text>
+        <View style={[styles.section, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+          <Text style={[styles.sectionTitle, { color: pal.tx }]}>📦 잔여 재고</Text>
           {meatInventory.map(m => (
-            <View key={m.id} style={styles.stockRow}>
-              <Text style={styles.stockCut}>{m.cut}</Text>
-              <Text style={styles.stockOrigin}>{m.origin}</Text>
-              <Text style={[styles.stockQty, { color: m.qty < 5 ? colors.rd : colors.gn }]}>{m.qty}kg</Text>
+            <View key={m.id} style={[styles.stockRow, { borderBottomColor: pal.bd + '40' }]}>
+              <Text style={[styles.stockCut, { color: pal.tx }]}>{m.cut}</Text>
+              <Text style={[styles.stockOrigin, { color: pal.t3 }]}>{m.origin}</Text>
+              <Text style={[styles.stockQty, { color: m.qty < 5 ? pal.rd : pal.gn }]}>{m.qty}kg</Text>
             </View>
           ))}
         </View>
 
         <PrimaryBtn
           label="📊 정산 PDF 저장"
-          color={colors.pu}
+          color={pal.pu}
           style={{ marginTop: spacing.md }}
           onPress={async () => {
             const html = genClosingHTML(sales, waste, meatInventory);
@@ -147,10 +150,10 @@ export default function ClosingScreen() {
 
       {/* 판매 추가 모달 */}
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>판매 추가</Text>
-            <TouchableOpacity onPress={() => setModal(false)}><Text style={styles.closeBtn}>✕</Text></TouchableOpacity>
+        <View style={{ flex: 1, backgroundColor: pal.bg }}>
+          <View style={[styles.modalHeader, { borderBottomColor: pal.bd, backgroundColor: pal.s1 }]}>
+            <Text style={[styles.modalTitle, { color: pal.tx }]}>판매 추가</Text>
+            <TouchableOpacity onPress={() => setModal(false)}><Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
             {[
@@ -159,10 +162,10 @@ export default function ClosingScreen() {
               { label: '판매 단가 (원/kg)', key: 'price', placeholder: '0', keyboardType: 'numeric' },
             ].map(f => (
               <View key={f.key} style={{ marginBottom: spacing.md }}>
-                <Text style={styles.fieldLabel}>{f.label}</Text>
-                <TextInput style={styles.input} value={form[f.key]}
+                <Text style={[styles.fieldLabel, { color: pal.t2 }]}>{f.label}</Text>
+                <TextInput style={[styles.input, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]} value={form[f.key]}
                   onChangeText={t => setForm({ ...form, [f.key]: t })}
-                  placeholder={f.placeholder} placeholderTextColor={colors.t3} keyboardType={f.keyboardType} />
+                  placeholder={f.placeholder} placeholderTextColor={pal.t3} keyboardType={f.keyboardType} />
               </View>
             ))}
             <PrimaryBtn label="저장" onPress={addSale} />
@@ -173,10 +176,10 @@ export default function ClosingScreen() {
 
       {/* 폐기 모달 */}
       <Modal visible={wasteModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>폐기 등록</Text>
-            <TouchableOpacity onPress={() => setWasteModal(false)}><Text style={styles.closeBtn}>✕</Text></TouchableOpacity>
+        <View style={{ flex: 1, backgroundColor: pal.bg }}>
+          <View style={[styles.modalHeader, { borderBottomColor: pal.bd, backgroundColor: pal.s1 }]}>
+            <Text style={[styles.modalTitle, { color: pal.tx }]}>폐기 등록</Text>
+            <TouchableOpacity onPress={() => setWasteModal(false)}><Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
             {[
@@ -185,13 +188,13 @@ export default function ClosingScreen() {
               { label: '폐기 사유', key: 'reason', placeholder: '예: 소비기한 경과' },
             ].map(f => (
               <View key={f.key} style={{ marginBottom: spacing.md }}>
-                <Text style={styles.fieldLabel}>{f.label}</Text>
-                <TextInput style={styles.input} value={wasteForm[f.key]}
+                <Text style={[styles.fieldLabel, { color: pal.t2 }]}>{f.label}</Text>
+                <TextInput style={[styles.input, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]} value={wasteForm[f.key]}
                   onChangeText={t => setWasteForm({ ...wasteForm, [f.key]: t })}
-                  placeholder={f.placeholder} placeholderTextColor={colors.t3} keyboardType={f.keyboardType} />
+                  placeholder={f.placeholder} placeholderTextColor={pal.t3} keyboardType={f.keyboardType} />
               </View>
             ))}
-            <PrimaryBtn label="저장" onPress={addWaste} color={colors.rd} />
+            <PrimaryBtn label="저장" onPress={addWaste} color={pal.rd} />
             <OutlineBtn label="취소" onPress={() => setWasteModal(false)} style={{ marginTop: spacing.sm }} />
           </ScrollView>
         </View>
@@ -201,9 +204,9 @@ export default function ClosingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1 },
 
-  heroCard: { backgroundColor: colors.ac, borderRadius: radius.xl, padding: spacing.lg, marginBottom: spacing.lg, ...shadow.md },
+  heroCard: { borderRadius: radius.xl, padding: spacing.lg, marginBottom: spacing.lg, ...shadow.md },
   heroLabel: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.7)', fontWeight: '700', marginBottom: 6 },
   heroValue: { fontSize: 44, fontWeight: '900', color: '#fff', marginBottom: spacing.md },
   heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -212,34 +215,34 @@ const styles = StyleSheet.create({
   heroStatLabel: { fontSize: fontSize.xxs, color: 'rgba(255,255,255,0.7)', marginTop: 3 },
   heroDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.3)' },
 
-  section: { backgroundColor: colors.s1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, marginBottom: spacing.md, ...shadow.sm },
+  section: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md, ...shadow.sm },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  sectionTitle: { fontSize: fontSize.md, fontWeight: '800', color: colors.tx },
-  addBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1.5, borderColor: colors.a2 + '50', backgroundColor: colors.a2 + '15' },
-  addBtnText: { fontSize: fontSize.xs, color: colors.a2, fontWeight: '800' },
+  sectionTitle: { fontSize: fontSize.md, fontWeight: '800' },
+  addBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1.5 },
+  addBtnText: { fontSize: fontSize.xs, fontWeight: '800' },
 
-  saleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.bd + '50' },
-  saleCut: { fontSize: fontSize.sm, fontWeight: '700', color: colors.tx, marginBottom: 3 },
-  saleMeta: { fontSize: fontSize.xs, color: colors.t3 },
-  saleTotal: { fontSize: fontSize.md, fontWeight: '900', color: colors.a2 },
+  saleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1 },
+  saleCut: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 3 },
+  saleMeta: { fontSize: fontSize.xs },
+  saleTotal: { fontSize: fontSize.md, fontWeight: '900' },
 
-  wasteRow: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.bd + '50' },
-  wasteCut: { fontSize: fontSize.sm, fontWeight: '700', color: colors.tx },
-  wasteMeta: { fontSize: fontSize.xs, color: colors.t3, marginTop: 2 },
+  wasteRow: { paddingVertical: spacing.sm, borderBottomWidth: 1 },
+  wasteCut: { fontSize: fontSize.sm, fontWeight: '700' },
+  wasteMeta: { fontSize: fontSize.xs, marginTop: 2 },
   wasteVal: { fontSize: fontSize.xs, fontWeight: '700', marginTop: 3 },
   wasteSummary: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing.sm, marginTop: spacing.sm },
-  wasteSumLabel: { fontSize: fontSize.sm, color: colors.t2, fontWeight: '700' },
+  wasteSumLabel: { fontSize: fontSize.sm, fontWeight: '700' },
   wasteSumVal: { fontSize: fontSize.md, fontWeight: '900' },
-  emptyText: { fontSize: fontSize.sm, color: colors.t3, textAlign: 'center', paddingVertical: spacing.md },
+  emptyText: { fontSize: fontSize.sm, textAlign: 'center', paddingVertical: spacing.md },
 
-  stockRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.bd + '40' },
-  stockCut: { fontSize: fontSize.sm, fontWeight: '700', color: colors.tx, flex: 1 },
-  stockOrigin: { fontSize: fontSize.xs, color: colors.t3 },
+  stockRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, gap: spacing.sm, borderBottomWidth: 1 },
+  stockCut: { fontSize: fontSize.sm, fontWeight: '700', flex: 1 },
+  stockOrigin: { fontSize: fontSize.xs },
   stockQty: { fontSize: fontSize.sm, fontWeight: '900' },
 
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.bd, backgroundColor: colors.s1 },
-  modalTitle: { fontSize: fontSize.lg, fontWeight: '900', color: colors.tx },
-  closeBtn: { fontSize: 22, color: colors.t2, padding: 4 },
-  fieldLabel: { fontSize: fontSize.sm, color: colors.t2, fontWeight: '700', marginBottom: 7 },
-  input: { backgroundColor: colors.s1, borderWidth: 1.5, borderColor: colors.bd, borderRadius: radius.sm, padding: spacing.md, fontSize: fontSize.md, color: colors.tx, minHeight: 56 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1 },
+  modalTitle: { fontSize: fontSize.lg, fontWeight: '900' },
+  closeBtn: { fontSize: 22, padding: 4 },
+  fieldLabel: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 7 },
+  input: { borderWidth: 1.5, borderRadius: radius.sm, padding: spacing.md, fontSize: fontSize.md, minHeight: 56 },
 });
