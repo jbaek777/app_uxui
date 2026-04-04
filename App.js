@@ -12,6 +12,11 @@ import { StatusBar } from 'expo-status-bar';
 
 import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from './src/theme';
 import { ThemeProvider, useTheme } from './src/lib/ThemeContext';
+import { NetworkProvider, useNetwork } from './src/lib/NetworkContext';
+import { RoleProvider } from './src/lib/RoleContext';
+import { FeatureFlagsProvider } from './src/lib/FeatureFlagsContext';
+import { SubscriptionProvider } from './src/lib/SubscriptionContext';
+import PaywallScreen from './src/screens/PaywallScreen';
 import SplashScreen from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
@@ -24,7 +29,9 @@ import ClosingScreen from './src/screens/ClosingScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import UploadScreen from './src/screens/UploadScreen';
 import { TempScreen, StaffScreen } from './src/screens/OtherScreens';
-import { requestNotificationPermission, scheduleDailyHygieneReminder } from './src/utils/notifications';
+import EducationScreen from './src/screens/EducationScreen';
+import { requestNotificationPermission, scheduleDailyHygieneReminder, scheduleDailyExpiryReminder } from './src/utils/notifications';
+import { ensureAuth } from './src/lib/supabase';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -54,13 +61,13 @@ function HomeStack() {
   );
 }
 
-// ── Tab 2: 이력조회 (스캔 전용) ──────────────────────────
-// AgingScreen은 DocsStack에서만 관리 — 두 스택 중복 등록 시 navigation 충돌 발생
+// ── Tab 2: 조회/스캔 (이력번호 + 서류 OCR 통합) ──────────
 function TraceStack() {
   const headerOpts = useHeaderOpts();
   return (
     <Stack.Navigator screenOptions={headerOpts}>
-      <Stack.Screen name="Scan" component={ScanScreen} options={{ title: '🏷️ 이력번호 조회' }} />
+      <Stack.Screen name="Scan" component={ScanScreen} options={{ title: '🔍 조회 · 스캔' }} />
+      <Stack.Screen name="TraceOCR" component={UploadScreen} options={{ title: '📷 서류 스캔·AI OCR' }} />
     </Stack.Navigator>
   );
 }
@@ -87,6 +94,7 @@ function DocsStack() {
       <Stack.Screen name="Upload" component={UploadScreen} options={{ title: '📷 서류 스캔·AI OCR' }} />
       <Stack.Screen name="Staff" component={StaffScreen} options={{ title: '👥 직원 보건증 현황' }} />
       <Stack.Screen name="Aging" component={AgingScreen} options={{ title: '🥩 숙성 관리' }} />
+      <Stack.Screen name="Education" component={EducationScreen} options={{ title: '📚 교육일지' }} />
     </Stack.Navigator>
   );
 }
@@ -97,8 +105,9 @@ function SettingsStack({ bizData }) {
   return (
     <Stack.Navigator screenOptions={headerOpts}>
       <Stack.Screen name="Settings" options={{ title: '⚙️ 설정' }}>
-        {() => <SettingsScreen route={{ params: { biz: bizData } }} />}
+        {({ navigation }) => <SettingsScreen route={{ params: { biz: bizData } }} navigation={navigation} />}
       </Stack.Screen>
+      <Stack.Screen name="Paywall" component={PaywallScreen} options={{ title: '💎 구독 관리' }} />
     </Stack.Navigator>
   );
 }
@@ -124,6 +133,7 @@ function TabIcon({ emoji, label, focused, tabColor, pal }) {
 function MainTabs({ bizData }) {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -147,7 +157,7 @@ function MainTabs({ bizData }) {
       <Tab.Screen
         name="TraceTab"
         component={TraceStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏷️" label="조회" focused={focused} tabColor={pal.a2} pal={pal} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" label="스캔" focused={focused} tabColor={pal.a2} pal={pal} /> }}
       />
       <Tab.Screen
         name="InventoryTab"
@@ -177,8 +187,13 @@ function AppInner() {
 
   useEffect(() => {
     (async () => {
+      // 익명 인증 먼저 — RLS가 auth.uid() 기준이므로 DB 접근 전 필수
+      await ensureAuth();
       const granted = await requestNotificationPermission();
-      if (granted) await scheduleDailyHygieneReminder();
+      if (granted) {
+        await scheduleDailyHygieneReminder();
+        await scheduleDailyExpiryReminder();
+      }
     })();
   }, []);
 
@@ -229,6 +244,7 @@ function AppInner() {
       <SafeAreaProvider>
         <NavigationContainer>
           <StatusBar style={isDark ? 'light' : 'dark'} />
+          <OfflineBanner />
           <MainTabs bizData={bizData} />
         </NavigationContainer>
       </SafeAreaProvider>
@@ -236,11 +252,31 @@ function AppInner() {
   );
 }
 
+function OfflineBanner() {
+  const { isOnline } = useNetwork();
+  if (isOnline) return null;
+  return (
+    <View style={styles.offlineBanner}>
+      <Text style={styles.offlineBannerText}>
+        📡 오프라인 모드 — 변경사항은 인터넷 연결 시 자동 저장됩니다
+      </Text>
+    </View>
+  );
+}
+
 // ── 앱 루트 ──────────────────────────────────────────────
 function App() {
   return (
     <ThemeProvider>
-      <AppInner />
+      <NetworkProvider>
+        <RoleProvider>
+          <FeatureFlagsProvider>
+            <SubscriptionProvider>
+              <AppInner />
+            </SubscriptionProvider>
+          </FeatureFlagsProvider>
+        </RoleProvider>
+      </NetworkProvider>
     </ThemeProvider>
   );
 }
@@ -255,4 +291,15 @@ const styles = StyleSheet.create({
   },
   tabBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   tabLabel: { fontSize: 12, fontWeight: '700', marginTop: 2, textAlign: 'center' },
+  offlineBanner: {
+    backgroundColor: '#92400e',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  offlineBannerText: {
+    color: '#fef3c7',
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });

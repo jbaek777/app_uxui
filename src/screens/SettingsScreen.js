@@ -3,33 +3,50 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Switch, Alert, Modal, TextInput,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { staffData } from '../data/mockData';
 import { staffStore } from '../lib/dataStore';
+import {
+  scheduleDailyHygieneReminder, cancelHygieneReminder,
+  scheduleDailyExpiryReminder, cancelExpiryReminder,
+} from '../utils/notifications';
+import { useRole } from '../lib/RoleContext';
+import { useSubscription, PLANS } from '../lib/SubscriptionContext';
 
-export default function SettingsScreen({ route }) {
+const NOTIF_KEY = '@meatbig_notifications';
+
+export default function SettingsScreen({ route, navigation }) {
   const { isDark, toggleTheme } = useTheme();
   const pal = isDark ? darkColors : lightColors;
+  const { role, switchToStaff, requestOwnerMode, changePin, ownerPin } = useRole();
+  const { sub, plan: currentPlan, isPremium, isTrial, daysLeft, cancelSubscription } = useSubscription();
+  const [pinChangeModal, setPinChangeModal] = useState(false);
+  const [newPin, setNewPin] = useState('');
+  const [newPinConfirm, setNewPinConfirm] = useState('');
   const biz = route?.params?.biz || { bizName: 'MeatBig 매장', owner: '사장님', bizNo: '000-00-00000', species: ['한우'] };
   const [notifications, setNotifications] = useState({ hygiene: true, expiry: true, temp: false });
   const [staff, setStaff] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const isFirst = useRef(true);
   const [staffModal, setStaffModal] = useState(false);
-  const [isPro, setIsPro] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: '', role: '직원', pin: '', health: '', edu: '' });
   const [editModal, setEditModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [editForm, setEditForm] = useState({ health: '', edu: '' });
 
-  // ── 데이터 로드 (Supabase → AsyncStorage → mockData) ──
+  // ── 데이터 로드 ──
   useEffect(() => {
     staffStore.load(staffData).then(data => {
       setStaff(data);
       setLoaded(true);
     });
+    // 알림 설정 로드
+    AsyncStorage.getItem(NOTIF_KEY).then(raw => {
+      if (raw) setNotifications(JSON.parse(raw));
+    }).catch(() => {});
   }, []);
 
   // ── 데이터 자동 저장 ──
@@ -69,7 +86,7 @@ export default function SettingsScreen({ route }) {
     setStaff([...staff, {
       id, name: newStaff.name.trim(), role: newStaff.role,
       pin: newStaff.pin || '0000',
-      hire: new Date().toLocaleDateString('ko-KR').replace(/\. /g, '.').replace('.', ''),
+      hire: new Date().toLocaleDateString('ko-KR').replace(/\. /g, '.').replace(/\.$/, ''),
       health: newStaff.health || '미등록',
       edu: newStaff.edu || '미등록',
       status: 'ok', color: selectedColor,
@@ -79,13 +96,83 @@ export default function SettingsScreen({ route }) {
     setStaffModal(false);
   };
 
-  const toggleNotif = (key) => setNotifications(p => ({ ...p, [key]: !p[key] }));
+  const toggleNotif = async (key) => {
+    const next = { ...notifications, [key]: !notifications[key] };
+    setNotifications(next);
+    await AsyncStorage.setItem(NOTIF_KEY, JSON.stringify(next)).catch(() => {});
+    // 실제 알림 등록/취소
+    if (key === 'hygiene') {
+      next.hygiene ? scheduleDailyHygieneReminder().catch(() => {}) : cancelHygieneReminder().catch(() => {});
+    } else if (key === 'expiry') {
+      next.expiry ? scheduleDailyExpiryReminder().catch(() => {}) : cancelExpiryReminder().catch(() => {});
+    }
+  };
+
+  const handlePinChange = async () => {
+    if (newPin.length < 4) {
+      Alert.alert('오류', 'PIN은 4자리 이상이어야 합니다.');
+      return;
+    }
+    if (newPin !== newPinConfirm) {
+      Alert.alert('오류', 'PIN이 일치하지 않습니다.');
+      return;
+    }
+    await changePin(newPin);
+    setNewPin('');
+    setNewPinConfirm('');
+    setPinChangeModal(false);
+    Alert.alert('완료', '사장 PIN이 변경되었습니다.');
+  };
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: pal.bg }]}
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}
     >
+
+      {/* 권한 관리 */}
+      <SectionTitle icon="🔐" label="권한 관리" pal={pal} />
+      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+        {/* 현재 모드 표시 */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: pal.bd }}>
+          <View style={{ flex: 1 }}>
+            <Text style={[{ fontSize: fontSize.sm, fontWeight: '700', color: pal.tx }]}>현재 모드</Text>
+          </View>
+          <View style={{ backgroundColor: role === 'owner' ? pal.ac + '20' : pal.a2 + '20', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 }}>
+            <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: role === 'owner' ? pal.ac : pal.a2 }}>
+              {role === 'owner' ? '👑 사장 모드' : '👤 직원 모드'}
+            </Text>
+          </View>
+        </View>
+        {/* 모드 전환 버튼 */}
+        {role === 'owner' ? (
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: pal.bd }}
+            onPress={() => Alert.alert('직원 모드 전환', '직원 모드로 전환하면 재고·설정 탭이 숨겨집니다.\n사장 모드 복귀 시 PIN이 필요합니다.', [
+              { text: '취소', style: 'cancel' },
+              { text: '전환', style: 'destructive', onPress: switchToStaff },
+            ])}>
+            <Text style={{ flex: 1, fontSize: fontSize.sm, color: pal.tx }}>직원 모드로 전환</Text>
+            <Text style={{ color: pal.a2, fontSize: fontSize.md }}>›</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: pal.bd }}
+            onPress={requestOwnerMode}>
+            <Text style={{ flex: 1, fontSize: fontSize.sm, color: pal.tx }}>사장 모드로 복귀 (PIN 필요)</Text>
+            <Text style={{ color: pal.ac, fontSize: fontSize.md }}>›</Text>
+          </TouchableOpacity>
+        )}
+        {/* PIN 변경 (사장 모드에서만) */}
+        {role === 'owner' && (
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 16 }}
+            onPress={() => { setNewPin(''); setNewPinConfirm(''); setPinChangeModal(true); }}>
+            <Text style={{ flex: 1, fontSize: fontSize.sm, color: pal.tx }}>사장 PIN 변경</Text>
+            <Text style={{ color: pal.t3, fontSize: fontSize.xs }}>{ownerPin.replace(/./g, '●')}&nbsp;&nbsp;›</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* 사업장 정보 */}
       <SectionTitle icon="🏪" label="사업장 정보" pal={pal} />
@@ -164,26 +251,40 @@ export default function SettingsScreen({ route }) {
 
       {/* 구독 관리 */}
       <SectionTitle icon="💎" label="구독 관리" pal={pal} />
-      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd, overflow: 'hidden' }]}>
+      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: isPremium ? pal.gn + '60' : pal.bd, overflow: 'hidden' }]}>
         <View style={styles.planRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.planTitle, { color: pal.tx }]}>{isPro ? '🌟 프로 플랜' : '🆓 무료 플랜'}</Text>
+            <Text style={[styles.planTitle, { color: pal.tx }]}>
+              {currentPlan.emoji} {currentPlan.name}
+            </Text>
             <Text style={[styles.planDesc, { color: pal.t3 }]}>
-              {isPro ? '수율계산기, 마감정산, 무제한 이력 저장' : '기본 위생 점검, 이력 50건 저장'}
+              {isTrial && daysLeft !== null
+                ? `무료 체험 중 — ${daysLeft}일 남음`
+                : isPremium
+                  ? `${sub.billingCycle === 'annual' ? '연간' : '월간'} 구독 · ${sub.periodEndsAt ? new Date(sub.periodEndsAt).toLocaleDateString('ko-KR') + ' 만료' : ''}`
+                  : '기본 위생 점검, 이력 50건 저장'}
             </Text>
           </View>
-          <View style={[styles.planBadge, { backgroundColor: isPro ? pal.a2 + '25' : pal.t3 + '20' }]}>
-            <Text style={[styles.planBadgeText, { color: isPro ? pal.a2 : pal.t3 }]}>
-              {isPro ? '이용 중' : '무료'}
+          <View style={[styles.planBadge, { backgroundColor: isPremium ? pal.gn + '20' : pal.t3 + '20' }]}>
+            <Text style={[styles.planBadgeText, { color: isPremium ? pal.gn : pal.t3 }]}>
+              {isTrial ? '체험 중' : isPremium ? '구독 중' : '무료'}
             </Text>
           </View>
         </View>
-        {!isPro && (
+        {isPremium && (
+          <TouchableOpacity
+            style={{ paddingHorizontal: spacing.md, paddingVertical: 12, borderTopWidth: 1, borderTopColor: pal.bd + '50' }}
+            onPress={() => navigation.navigate('Paywall')}
+          >
+            <Text style={{ fontSize: fontSize.sm, color: pal.a2, fontWeight: '700' }}>구독 관리 · 요금제 변경 →</Text>
+          </TouchableOpacity>
+        )}
+        {!isPremium && (
           <PrimaryBtn
-            label="프로로 업그레이드 →"
-            color={pal.a2}
+            label="14일 무료 체험 시작 →"
+            color={pal.ac}
             style={{ margin: spacing.md, marginTop: 0 }}
-            onPress={() => Alert.alert('프로 플랜', '구독 페이지로 이동합니다.\n(월 9,900원 / 연 79,000원)')}
+            onPress={() => navigation.navigate('Paywall')}
           />
         )}
       </View>
@@ -208,9 +309,41 @@ export default function SettingsScreen({ route }) {
       <SectionTitle icon="ℹ️" label="앱 정보" pal={pal} />
       <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
         <InfoRow label="앱 이름" value="MeatBig (미트빅)" pal={pal} />
-        <InfoRow label="슬로건" value='"사장님은 고기만 써세요"' pal={pal} />
         <InfoRow label="버전" value="v1.0.0" last pal={pal} />
       </View>
+
+      {/* PIN 변경 모달 */}
+      <Modal visible={pinChangeModal} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: pal.bg }}>
+          <View style={[styles.modalHeader, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
+            <Text style={[styles.modalTitle, { color: pal.tx }]}>🔐 PIN 변경</Text>
+            <TouchableOpacity onPress={() => setPinChangeModal(false)}>
+              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ padding: spacing.lg }}>
+            <Text style={[styles.fieldLabel, { color: pal.t2 }]}>새 PIN (4자리 이상)</Text>
+            <TextInput
+              style={[styles.fieldInput, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+              placeholder="새 PIN 입력" placeholderTextColor={pal.t3}
+              keyboardType="number-pad" secureTextEntry maxLength={6}
+              value={newPin} onChangeText={setNewPin}
+            />
+            <Text style={[styles.fieldLabel, { color: pal.t2, marginTop: spacing.md }]}>PIN 확인</Text>
+            <TextInput
+              style={[styles.fieldInput, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+              placeholder="PIN 재입력" placeholderTextColor={pal.t3}
+              keyboardType="number-pad" secureTextEntry maxLength={6}
+              value={newPinConfirm} onChangeText={setNewPinConfirm}
+            />
+            <TouchableOpacity
+              style={[styles.saveBtn, { marginTop: spacing.lg }]}
+              onPress={handlePinChange}>
+              <Text style={styles.saveBtnText}>변경 완료</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* 직원 추가 모달 */}
       <Modal visible={staffModal} animationType="slide" presentationStyle="pageSheet">
@@ -417,6 +550,8 @@ const styles = StyleSheet.create({
   planDesc: { fontSize: fontSize.xs },
   planBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   planBadgeText: { fontSize: fontSize.xs, fontWeight: '800' },
+  adminBtn: { margin: spacing.md, marginTop: 4, paddingVertical: 10, borderTopWidth: 1, alignItems: 'center' },
+  adminBtnText: { fontSize: fontSize.xs, fontWeight: '700' },
 
   printerRow: {
     flexDirection: 'row',
@@ -436,6 +571,9 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: fontSize.lg, fontWeight: '900' },
   closeBtn: { fontSize: 22, padding: 4 },
+
+  saveBtn: { backgroundColor: colors.gn, paddingVertical: 14, borderRadius: radius.md, alignItems: 'center' },
+  saveBtnText: { color: '#fff', fontSize: fontSize.md, fontWeight: '800' },
 
   fieldLabel: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 7, marginTop: 4 },
   fieldInput: {
