@@ -17,6 +17,7 @@ import { RoleProvider } from './src/lib/RoleContext';
 import { FeatureFlagsProvider } from './src/lib/FeatureFlagsContext';
 import { SubscriptionProvider } from './src/lib/SubscriptionContext';
 import PaywallScreen from './src/screens/PaywallScreen';
+import TaxReportScreen from './src/screens/TaxReportScreen';
 import SplashScreen from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
@@ -95,6 +96,7 @@ function DocsStack() {
       <Stack.Screen name="Staff" component={StaffScreen} options={{ title: '👥 직원 보건증 현황' }} />
       <Stack.Screen name="Aging" component={AgingScreen} options={{ title: '🥩 숙성 관리' }} />
       <Stack.Screen name="Education" component={EducationScreen} options={{ title: '📚 교육일지' }} />
+      <Stack.Screen name="TaxReport" component={TaxReportScreen} options={{ title: '📊 세무 리포트' }} />
     </Stack.Navigator>
   );
 }

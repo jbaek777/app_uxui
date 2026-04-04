@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn } from '../components/UI';
@@ -7,6 +8,14 @@ import { hygieneData, agingData, tempData, staffData } from '../data/mockData';
 import {
   genHygieneHTML, genTempHTML, genAgingHTML, genStaffHTML, printAndShare,
 } from '../lib/pdfTemplate';
+
+async function loadBiz() {
+  try {
+    const raw = await AsyncStorage.getItem('@meatbig_biz');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return null;
+}
 
 const DOCS = [
   {
@@ -16,7 +25,7 @@ const DOCS = [
     desc: '일일 위생·HACCP 점검 기록',
     color: '#27AE60',
     screen: 'Hygiene',
-    getHTML: () => genHygieneHTML(hygieneData),
+    getHTML: (biz) => genHygieneHTML(hygieneData, biz),
   },
   {
     id: 'temp',
@@ -25,7 +34,7 @@ const DOCS = [
     desc: '냉장·숙성실 온도·습도 기록',
     color: '#00ACC1',
     screen: 'Temp',
-    getHTML: () => genTempHTML(tempData),
+    getHTML: (biz) => genTempHTML(tempData, biz),
   },
   {
     id: 'aging',
@@ -34,7 +43,7 @@ const DOCS = [
     desc: '드라이에이징 이력 및 수율 기록',
     color: '#E8950A',
     screen: 'Aging',
-    getHTML: () => genAgingHTML(agingData),
+    getHTML: (biz) => genAgingHTML(agingData, biz),
   },
   {
     id: 'staff',
@@ -43,12 +52,22 @@ const DOCS = [
     desc: '보건증·위생교육 이수증 만료일',
     color: '#8E44AD',
     screen: 'Staff',
-    getHTML: () => genStaffHTML(staffData),
+    getHTML: (biz) => genStaffHTML(staffData, biz),
+  },
+  {
+    id: 'tax',
+    title: '세무 리포트',
+    icon: '📊',
+    desc: '월별 매출 요약 · 부가세 신고 참고 · CSV 다운로드',
+    color: '#00ACC1',
+    screen: 'TaxReport',
+    getHTML: null,  // PDF 없음 — 화면 이동만
   },
 ];
 
 async function printDoc(doc) {
-  const html = doc.getHTML();
+  const biz = await loadBiz();
+  const html = doc.getHTML(biz);
   if (!html || html.trim().length === 0) {
     Alert.alert('오류', 'PDF 내용을 생성할 수 없습니다.');
     return;
@@ -91,6 +110,8 @@ export default function DocumentScreen({ navigation }) {
           <Shortcut pal={pal} icon="🌡️" label="온도 기록" onPress={() => navigation.navigate('Temp')} color="#00ACC1" />
           <Shortcut pal={pal} icon="💰" label="마감 정산" onPress={() => navigation.navigate('Closing')} color="#E8950A" />
           <Shortcut pal={pal} icon="🥩" label="숙성 관리" onPress={() => navigation.navigate('Aging')} color="#C0392B" />
+          <Shortcut pal={pal} icon="📚" label="교육일지" onPress={() => navigation.navigate('Education')} color="#7C3AED" />
+          <Shortcut pal={pal} icon="📊" label="세무리포트" onPress={() => navigation.navigate('TaxReport')} color="#00ACC1" />
         </View>
 
         {/* ── 출력하기 버튼 ── */}
@@ -158,7 +179,7 @@ export default function DocumentScreen({ navigation }) {
             <Text style={{ fontSize: fontSize.sm, color: pal.t3, marginBottom: spacing.lg }}>
               선택한 서류를 PDF로 생성하여 공유하거나 저장합니다
             </Text>
-            {DOCS.map(doc => (
+            {DOCS.filter(d => d.getHTML !== null).map(doc => (
               <TouchableOpacity
                 key={doc.id}
                 style={[styles.printSelectCard, { backgroundColor: pal.s1, borderColor: doc.color + '40' }]}
