@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, ActivityIn
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
+import { useRole, OWNER_ONLY } from '../lib/RoleContext';
 import { PrimaryBtn } from '../components/UI';
 import { hygieneData, agingData, tempData, staffData } from '../data/mockData';
 import {
@@ -78,9 +79,20 @@ async function printDoc(doc) {
 export default function DocumentScreen({ navigation }) {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
+  const { role, canAccess } = useRole();
+  const isStaff = role === 'staff';
 
   const [printModal, setPrintModal] = useState(false);
   const [printing, setPrinting] = useState(false);
+
+  // 직원 모드에서 사장 전용 화면 접근 차단
+  const navigateSafe = (screen) => {
+    if (OWNER_ONLY.includes(screen) && isStaff) {
+      Alert.alert('🔒 사장 전용', '이 기능은 사장 모드에서만 사용할 수 있습니다.');
+      return;
+    }
+    navigation.navigate(screen);
+  };
 
   const handlePrint = async (doc) => {
     // 1. 모달 먼저 닫기
@@ -106,12 +118,12 @@ export default function DocumentScreen({ navigation }) {
         {/* ── 점검 입력 바로가기 ── */}
         <Text style={[styles.sectionLabel, { color: pal.t2 }]}>점검 입력 바로가기</Text>
         <View style={styles.shortcutGrid}>
-          <Shortcut pal={pal} icon="🧼" label="위생 일지" onPress={() => navigation.navigate('Hygiene')} color="#27AE60" />
-          <Shortcut pal={pal} icon="🌡️" label="온도 기록" onPress={() => navigation.navigate('Temp')} color="#00ACC1" />
-          <Shortcut pal={pal} icon="💰" label="마감 정산" onPress={() => navigation.navigate('Closing')} color="#E8950A" />
-          <Shortcut pal={pal} icon="🥩" label="숙성 관리" onPress={() => navigation.navigate('Aging')} color="#C0392B" />
-          <Shortcut pal={pal} icon="📚" label="교육일지" onPress={() => navigation.navigate('Education')} color="#7C3AED" />
-          <Shortcut pal={pal} icon="📊" label="세무리포트" onPress={() => navigation.navigate('TaxReport')} color="#00ACC1" />
+          <Shortcut pal={pal} icon="🧼" label="위생 일지" onPress={() => navigateSafe('Hygiene')} color="#27AE60" />
+          <Shortcut pal={pal} icon="🌡️" label="온도 기록" onPress={() => navigateSafe('Temp')} color="#00ACC1" />
+          <Shortcut pal={pal} icon="💰" label="마감 정산" onPress={() => navigateSafe('Closing')} color="#E8950A" locked={isStaff} />
+          <Shortcut pal={pal} icon="🥩" label="숙성 관리" onPress={() => navigateSafe('Aging')} color="#C0392B" locked={isStaff} />
+          <Shortcut pal={pal} icon="📚" label="교육일지" onPress={() => navigateSafe('Education')} color="#7C3AED" locked={isStaff} />
+          <Shortcut pal={pal} icon="📊" label="세무리포트" onPress={() => navigateSafe('TaxReport')} color="#00ACC1" locked={isStaff} />
         </View>
 
         {/* ── 출력하기 버튼 ── */}
@@ -128,12 +140,14 @@ export default function DocumentScreen({ navigation }) {
 
         {/* ── 서류 목록 ── */}
         <Text style={[styles.sectionLabel, { color: pal.t2 }]}>관리 서류 현황</Text>
-        {DOCS.map(doc => (
+        {DOCS.map(doc => {
+          const locked = isStaff && OWNER_ONLY.includes(doc.screen);
+          return (
           <TouchableOpacity
             key={doc.id}
-            style={[styles.docCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}
+            style={[styles.docCard, { backgroundColor: pal.s1, borderColor: locked ? pal.bd + '50' : pal.bd, opacity: locked ? 0.55 : 1 }]}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate(doc.screen)}
+            onPress={() => navigateSafe(doc.screen)}
           >
             <View style={[styles.docIconBox, { backgroundColor: doc.color + '20' }]}>
               <Text style={{ fontSize: 30 }}>{doc.icon}</Text>
@@ -143,10 +157,13 @@ export default function DocumentScreen({ navigation }) {
               <Text style={[styles.docDesc, { color: pal.t3 }]}>{doc.desc}</Text>
             </View>
             <View style={[styles.docBadge, { backgroundColor: doc.color + '20' }]}>
-              <Text style={[styles.docBadgeText, { color: doc.color }]}>보기 →</Text>
+              <Text style={[styles.docBadgeText, { color: doc.color }]}>
+                {locked ? '🔒 사장 전용' : '보기 →'}
+              </Text>
             </View>
           </TouchableOpacity>
-        ))}
+          );
+        })}
       </ScrollView>
 
       {/* ── 출력 로딩 오버레이 ── */}
@@ -205,16 +222,16 @@ export default function DocumentScreen({ navigation }) {
   );
 }
 
-const Shortcut = ({ icon, label, onPress, color, pal }) => (
+const Shortcut = ({ icon, label, onPress, color, pal, locked }) => (
   <TouchableOpacity
-    style={[styles.shortcut, { backgroundColor: pal.s1, borderColor: color + '40' }]}
+    style={[styles.shortcut, { backgroundColor: pal.s1, borderColor: locked ? pal.bd : color + '40', opacity: locked ? 0.45 : 1 }]}
     onPress={onPress}
     activeOpacity={0.8}
   >
-    <View style={[styles.shortcutIcon, { backgroundColor: color + '20' }]}>
-      <Text style={{ fontSize: 34 }}>{icon}</Text>
+    <View style={[styles.shortcutIcon, { backgroundColor: (locked ? pal.bd : color) + '20' }]}>
+      <Text style={{ fontSize: 34 }}>{locked ? '🔒' : icon}</Text>
     </View>
-    <Text style={[styles.shortcutLabel, { color: pal.tx }]}>{label}</Text>
+    <Text style={[styles.shortcutLabel, { color: locked ? pal.t3 : pal.tx }]}>{label}</Text>
   </TouchableOpacity>
 );
 

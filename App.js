@@ -13,7 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from './src/theme';
 import { ThemeProvider, useTheme } from './src/lib/ThemeContext';
 import { NetworkProvider, useNetwork } from './src/lib/NetworkContext';
-import { RoleProvider } from './src/lib/RoleContext';
+import { RoleProvider, useRole, STAFF_ALLOWED_TABS } from './src/lib/RoleContext';
 import { FeatureFlagsProvider } from './src/lib/FeatureFlagsContext';
 import { SubscriptionProvider } from './src/lib/SubscriptionContext';
 import PaywallScreen from './src/screens/PaywallScreen';
@@ -131,53 +131,119 @@ function TabIcon({ emoji, label, focused, tabColor, pal }) {
   );
 }
 
+// ── 사장 전환 탭 화면 (직원 모드 탭바 우측) ──────────────
+function OwnerReturnScreen() {
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
+  const { requestOwnerMode, staffName } = useRole();
+  React.useEffect(() => { requestOwnerMode(); }, []);
+  return (
+    <View style={{ flex: 1, backgroundColor: pal.bg, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 48, marginBottom: 16 }}>🔐</Text>
+      <Text style={{ color: pal.tx, fontSize: 16, fontWeight: '700' }}>사장 모드로 전환</Text>
+    </View>
+  );
+}
+
+// ── 직원 모드 배너 ────────────────────────────────────────
+function StaffModeBanner() {
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
+  const { role, staffName, requestOwnerMode } = useRole();
+  if (role !== 'staff') return null;
+  return (
+    <TouchableOpacity
+      style={{
+        backgroundColor: '#E8950A',
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 16, paddingVertical: 8,
+      }}
+      onPress={requestOwnerMode}
+      activeOpacity={0.85}
+    >
+      <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+        👤 직원 모드 — {staffName || '직원'}
+      </Text>
+      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' }}>
+        🔐 사장 전환 탭
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 // ── 메인 탭 네비게이터 ───────────────────────────────────
 function MainTabs({ bizData }) {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
+  const { role } = useRole();
+  const isStaff = role === 'staff';
 
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: pal.s1,
-          borderTopColor: pal.bd,
-          borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 90 : 70,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-          paddingTop: 6,
-        },
-        tabBarShowLabel: false,
-      }}
-    >
-      <Tab.Screen
-        name="HomeTab"
-        component={HomeStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="홈" focused={focused} tabColor={pal.ac} pal={pal} /> }}
-      />
-      <Tab.Screen
-        name="TraceTab"
-        component={TraceStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" label="스캔" focused={focused} tabColor={pal.a2} pal={pal} /> }}
-      />
-      <Tab.Screen
-        name="InventoryTab"
-        component={InventoryStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📦" label="재고" focused={focused} tabColor={pal.gn} pal={pal} /> }}
-      />
-      <Tab.Screen
-        name="DocsTab"
-        component={DocsStack}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🖨️" label="서류" focused={focused} tabColor={pal.pu} pal={pal} /> }}
-      />
-      <Tab.Screen
-        name="SettingsTab"
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" label="설정" focused={focused} tabColor={pal.cyan} pal={pal} /> }}
+    <View style={{ flex: 1 }}>
+      <StaffModeBanner />
+      <Tab.Navigator
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: {
+            backgroundColor: pal.s1,
+            borderTopColor: pal.bd,
+            borderTopWidth: 1,
+            height: Platform.OS === 'ios' ? 90 : 70,
+            paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+            paddingTop: 6,
+          },
+          tabBarShowLabel: false,
+        }}
       >
-        {() => <SettingsStack bizData={bizData} />}
-      </Tab.Screen>
-    </Tab.Navigator>
+        <Tab.Screen
+          name="HomeTab"
+          component={HomeStack}
+          options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="홈" focused={focused} tabColor={pal.ac} pal={pal} /> }}
+        />
+        <Tab.Screen
+          name="TraceTab"
+          component={TraceStack}
+          options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" label="스캔" focused={focused} tabColor={pal.a2} pal={pal} /> }}
+        />
+        {/* 재고 탭 — 사장만 */}
+        {!isStaff && (
+          <Tab.Screen
+            name="InventoryTab"
+            component={InventoryStack}
+            options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📦" label="재고" focused={focused} tabColor={pal.gn} pal={pal} /> }}
+          />
+        )}
+        <Tab.Screen
+          name="DocsTab"
+          component={DocsStack}
+          options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🖨️" label="서류" focused={focused} tabColor={pal.pu} pal={pal} /> }}
+        />
+        {/* 설정 탭 — 사장만 */}
+        {!isStaff && (
+          <Tab.Screen
+            name="SettingsTab"
+            options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" label="설정" focused={focused} tabColor={pal.cyan} pal={pal} /> }}
+          >
+            {() => <SettingsStack bizData={bizData} />}
+          </Tab.Screen>
+        )}
+        {/* 직원 모드 — 설정 탭 대신 사장복귀 탭 */}
+        {isStaff && (
+          <Tab.Screen
+            name="OwnerTab"
+            component={OwnerReturnScreen}
+            options={{
+              tabBarIcon: ({ focused }) => <TabIcon emoji="🔐" label="사장전환" focused={focused} tabColor="#E8950A" pal={pal} />,
+            }}
+            listeners={({ navigation }) => ({
+              tabPress: (e) => {
+                e.preventDefault();
+              },
+            })}
+          />
+        )}
+      </Tab.Navigator>
+    </View>
   );
 }
 

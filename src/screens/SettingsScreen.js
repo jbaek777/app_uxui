@@ -21,7 +21,7 @@ const NOTIF_KEY = '@meatbig_notifications';
 export default function SettingsScreen({ route, navigation }) {
   const { isDark, toggleTheme } = useTheme();
   const pal = isDark ? darkColors : lightColors;
-  const { role, switchToStaff, requestOwnerMode, changePin, ownerPin } = useRole();
+  const { role, staffName, switchToStaff, requestOwnerMode, changePin, ownerPin } = useRole();
   const { sub, plan: currentPlan, isPremium, isTrial, daysLeft, cancelSubscription } = useSubscription();
   const [pinChangeModal, setPinChangeModal] = useState(false);
   const [newPin, setNewPin] = useState('');
@@ -132,42 +132,64 @@ export default function SettingsScreen({ route, navigation }) {
 
       {/* 권한 관리 */}
       <SectionTitle icon="🔐" label="권한 관리" pal={pal} />
-      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-        {/* 현재 모드 표시 */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: pal.bd }}>
-          <View style={{ flex: 1 }}>
-            <Text style={[{ fontSize: fontSize.sm, fontWeight: '700', color: pal.tx }]}>현재 모드</Text>
+      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: role === 'owner' ? pal.ac + '40' : pal.a2 + '60' }]}>
+        {/* 현재 모드 배너 */}
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 12,
+          paddingHorizontal: spacing.md, paddingVertical: 16,
+          borderBottomWidth: 1, borderBottomColor: pal.bd,
+          backgroundColor: role === 'owner' ? pal.ac + '10' : pal.a2 + '12',
+        }}>
+          <View style={{
+            width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: role === 'owner' ? pal.ac + '25' : pal.a2 + '25',
+          }}>
+            <Text style={{ fontSize: 22 }}>{role === 'owner' ? '👑' : '👤'}</Text>
           </View>
-          <View style={{ backgroundColor: role === 'owner' ? pal.ac + '20' : pal.a2 + '20', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 }}>
-            <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: role === 'owner' ? pal.ac : pal.a2 }}>
-              {role === 'owner' ? '👑 사장 모드' : '👤 직원 모드'}
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: role === 'owner' ? pal.ac : pal.a2 }}>
+              {role === 'owner' ? '사장 모드' : `직원 모드${staffName ? ` — ${staffName}` : ''}`}
+            </Text>
+            <Text style={{ fontSize: fontSize.xs, color: pal.t3, marginTop: 2 }}>
+              {role === 'owner' ? '모든 기능에 접근 가능합니다' : '위생·온도·이력 조회만 허용됩니다'}
             </Text>
           </View>
         </View>
-        {/* 모드 전환 버튼 */}
-        {role === 'owner' ? (
+        {/* 직원 모드 전환 (사장 모드에서) */}
+        {role === 'owner' && (
           <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: pal.bd }}
-            onPress={() => Alert.alert('직원 모드 전환', '직원 모드로 전환하면 재고·설정 탭이 숨겨집니다.\n사장 모드 복귀 시 PIN이 필요합니다.', [
-              { text: '취소', style: 'cancel' },
-              { text: '전환', style: 'destructive', onPress: switchToStaff },
-            ])}>
-            <Text style={{ flex: 1, fontSize: fontSize.sm, color: pal.tx }}>직원 모드로 전환</Text>
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: pal.bd }}
+            onPress={switchToStaff}
+          >
+            <Text style={{ fontSize: 18, marginRight: 12 }}>👤</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: pal.tx }}>직원 모드로 전환</Text>
+              <Text style={{ fontSize: fontSize.xs, color: pal.t3, marginTop: 2 }}>직원 선택 → PIN 입력 → 제한 모드 진입</Text>
+            </View>
             <Text style={{ color: pal.a2, fontSize: fontSize.md }}>›</Text>
           </TouchableOpacity>
-        ) : (
+        )}
+        {/* 사장 모드 복귀 (직원 모드에서) */}
+        {role === 'staff' && (
           <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: pal.bd }}
-            onPress={requestOwnerMode}>
-            <Text style={{ flex: 1, fontSize: fontSize.sm, color: pal.tx }}>사장 모드로 복귀 (PIN 필요)</Text>
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: pal.bd }}
+            onPress={requestOwnerMode}
+          >
+            <Text style={{ fontSize: 18, marginRight: 12 }}>🔐</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: pal.ac }}>사장 모드로 복귀</Text>
+              <Text style={{ fontSize: fontSize.xs, color: pal.t3, marginTop: 2 }}>사장 PIN 입력 필요</Text>
+            </View>
             <Text style={{ color: pal.ac, fontSize: fontSize.md }}>›</Text>
           </TouchableOpacity>
         )}
         {/* PIN 변경 (사장 모드에서만) */}
         {role === 'owner' && (
           <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 16 }}
-            onPress={() => { setNewPin(''); setNewPinConfirm(''); setPinChangeModal(true); }}>
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 15 }}
+            onPress={() => { setNewPin(''); setNewPinConfirm(''); setPinChangeModal(true); }}
+          >
+            <Text style={{ fontSize: 18, marginRight: 12 }}>🔑</Text>
             <Text style={{ flex: 1, fontSize: fontSize.sm, color: pal.tx }}>사장 PIN 변경</Text>
             <Text style={{ color: pal.t3, fontSize: fontSize.xs }}>{ownerPin.replace(/./g, '●')}&nbsp;&nbsp;›</Text>
           </TouchableOpacity>
