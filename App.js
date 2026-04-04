@@ -250,6 +250,7 @@ function MainTabs({ bizData }) {
 // ── 앱 내부 (테마 컨텍스트 안에서 렌더링) ───────────────
 function AppInner() {
   const { isDark } = useTheme();
+  const { initRole, roleReady } = useRole();
   const [phase, setPhase] = useState('splash');
   const [bizData, setBizData] = useState(null);
 
@@ -271,6 +272,7 @@ function AppInner() {
       const biz = await AsyncStorage.getItem('@meatbig_biz');
       if (onboarded === 'true' && biz) {
         setBizData(JSON.parse(biz));
+        // role은 RoleContext useEffect에서 AsyncStorage 복원 처리됨
         setPhase('main');
       } else {
         setPhase('onboarding');
@@ -280,12 +282,21 @@ function AppInner() {
     }
   };
 
-  const handleOnboardingDone = ({ biz }) => {
+  // 온보딩 완료 — currentUser.role 기준으로 자동 모드 설정
+  const handleOnboardingDone = async ({ biz, currentUser }) => {
     setBizData(biz);
+    if (currentUser && currentUser.role !== '사장') {
+      // 직원으로 가입 완료 → 자동으로 직원 모드 진입
+      await initRole('staff', currentUser.name, currentUser.id || null);
+    } else {
+      // 사장 온보딩 → 사장 모드 유지
+      await initRole('owner', null, null);
+    }
     setPhase('main');
   };
 
-  if (phase === 'splash') {
+  // RoleContext AsyncStorage 복원 완료 전까지 스플래시 유지
+  if (phase === 'splash' || (phase === 'main' && !roleReady)) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>

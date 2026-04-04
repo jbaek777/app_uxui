@@ -23,9 +23,11 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const PIN_KEY      = '@meatbig_owner_pin';
-const STAFF_KEY    = '@meatbig_staff';
-const DEFAULT_PIN  = '0000';
+const PIN_KEY       = '@meatbig_owner_pin';
+const STAFF_KEY     = '@meatbig_staff';
+const ROLE_KEY      = '@meatbig_role';          // 앱 재기동 시 role 복원
+const CUR_STAFF_KEY = '@meatbig_current_staff'; // 앱 재기동 시 직원명/ID 복원
+const DEFAULT_PIN   = '0000';
 
 // 직원 모드 허용 탭
 export const STAFF_ALLOWED_TABS = ['HomeTab', 'TraceTab', 'DocsTab'];
@@ -38,32 +40,72 @@ const RoleContext = createContext({
   role: 'owner',
   staffName: null,
   staffId: null,
+  roleReady: false,
   switchToStaff: () => {},
   requestOwnerMode: () => {},
+  initRole: async () => {},
   changePin: async () => {},
   ownerPin: DEFAULT_PIN,
   canAccess: () => true,
 });
 
 export function RoleProvider({ children }) {
-  const [role, setRole]         = useState('owner');
-  const [ownerPin, setOwnerPin] = useState(DEFAULT_PIN);
+  const [role, setRole]           = useState('owner');
+  const [ownerPin, setOwnerPin]   = useState(DEFAULT_PIN);
   const [staffName, setStaffName] = useState(null);
-  const [staffId, setStaffId]   = useState(null);
+  const [staffId, setStaffId]     = useState(null);
+  const [roleReady, setRoleReady] = useState(false); // AsyncStorage 복원 완료 여부
 
   // 모달 상태
-  const [ownerPinModal, setOwnerPinModal] = useState(false);  // 사장 복귀 PIN
-  const [staffPickModal, setStaffPickModal] = useState(false); // 직원 선택
-  const [staffPinModal, setStaffPinModal] = useState(false);  // 직원 PIN
+  const [ownerPinModal, setOwnerPinModal]   = useState(false);
+  const [staffPickModal, setStaffPickModal] = useState(false);
+  const [staffPinModal, setStaffPinModal]   = useState(false);
 
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState('');
-  const [staffList, setStaffList] = useState([]);
+  const [pinInput, setPinInput]       = useState('');
+  const [pinError, setPinError]       = useState('');
+  const [staffList, setStaffList]     = useState([]);
   const [selectedStaff, setSelectedStaff] = useState(null);
 
+  // ── 앱 시작 시 저장된 role 복원 ────────────────────────
   useEffect(() => {
-    AsyncStorage.getItem(PIN_KEY).then(p => { if (p) setOwnerPin(p); }).catch(() => {});
+    (async () => {
+      try {
+        const [savedPin, savedRole, savedStaff] = await Promise.all([
+          AsyncStorage.getItem(PIN_KEY),
+          AsyncStorage.getItem(ROLE_KEY),
+          AsyncStorage.getItem(CUR_STAFF_KEY),
+        ]);
+        if (savedPin) setOwnerPin(savedPin);
+        if (savedRole === 'staff') {
+          setRole('staff');
+          if (savedStaff) {
+            const { name, id } = JSON.parse(savedStaff);
+            setStaffName(name || '직원');
+            setStaffId(id || null);
+          }
+        }
+      } catch {}
+      setRoleReady(true);
+    })();
   }, []);
+
+  // ── role 변경 시 AsyncStorage 저장 ─────────────────────
+  const applyRole = useCallback(async (newRole, name = null, id = null) => {
+    setRole(newRole);
+    setStaffName(name);
+    setStaffId(id);
+    await AsyncStorage.setItem(ROLE_KEY, newRole).catch(() => {});
+    if (newRole === 'staff' && name) {
+      await AsyncStorage.setItem(CUR_STAFF_KEY, JSON.stringify({ name, id })).catch(() => {});
+    } else {
+      await AsyncStorage.removeItem(CUR_STAFF_KEY).catch(() => {});
+    }
+  }, []);
+
+  // ── 외부에서 role 초기화 (온보딩 완료 시 호출) ─────────
+  const initRole = useCallback(async (newRole, name = null, id = null) => {
+    await applyRole(newRole, name, id);
+  }, [applyRole]);
 
   // 직원 목록 최신 로드
   const loadStaffList = async () => {
@@ -90,11 +132,7 @@ export function RoleProvider({ children }) {
           { text: '취소', style: 'cancel' },
           {
             text: '익명으로 전환',
-            onPress: () => {
-              setRole('staff');
-              setStaffName('직원');
-              setStaffId(null);
-            },
+            onPress: () => applyRole('staff', '직원', null),
           },
         ]
       );
@@ -112,9 +150,7 @@ export function RoleProvider({ children }) {
     setStaffPickModal(false);
     // PIN이 없거나 '0000'인 경우 바로 진입
     if (!staff.pin || staff.pin === '0000') {
-      setRole('staff');
-      setStaffName(staff.name);
-      setStaffId(staff.id);
+      applyRole('staff', staff.name, staff.id);
       return;
     }
     setPinInput('');
@@ -126,9 +162,7 @@ export function RoleProvider({ children }) {
   const confirmStaffPin = () => {
     if (!selectedStaff) return;
     if (pinInput === selectedStaff.pin) {
-      setRole('staff');
-      setStaffName(selectedStaff.name);
-      setStaffId(selectedStaff.id);
+      applyRole('staff', selectedStaff.name, selectedStaff.id);
       setStaffPinModal(false);
       setPinError('');
     } else {
@@ -146,9 +180,7 @@ export function RoleProvider({ children }) {
 
   const confirmOwnerPin = () => {
     if (pinInput === ownerPin) {
-      setRole('owner');
-      setStaffName(null);
-      setStaffId(null);
+      applyRole('owner', null, null);
       setOwnerPinModal(false);
       setPinError('');
     } else {
@@ -171,8 +203,8 @@ export function RoleProvider({ children }) {
 
   return (
     <RoleContext.Provider value={{
-      role, staffName, staffId, ownerPin,
-      switchToStaff, requestOwnerMode, changePin, canAccess,
+      role, staffName, staffId, ownerPin, roleReady,
+      switchToStaff, requestOwnerMode, initRole, changePin, canAccess,
     }}>
       {children}
 
