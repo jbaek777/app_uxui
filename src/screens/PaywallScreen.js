@@ -1,9 +1,7 @@
 /**
- * PaywallScreen — 구독 요금제 선택 + 결제 UI
- * - 무료 체험 시작
- * - 베이직 / 프로 플랜 선택
- * - 월간 / 연간 토글
- * - RevenueCat SDK 연동 준비 (현재 Alert 처리)
+ * PaywallScreen — 구독 관리 + 요금제 선택
+ * - 미구독: 요금제 카탈로그 → 14일 무료 체험 / 바로 구독
+ * - 구독 중: 현재 플랜 상태 + 요금제 변경 카탈로그 + 취소
  */
 import React, { useState } from 'react';
 import {
@@ -17,13 +15,20 @@ import { useSubscription, PLANS } from '../lib/SubscriptionContext';
 export default function PaywallScreen({ navigation, route }) {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
-  const { sub, isPremium, isTrial, daysLeft, startTrial, upgradePlan, restorePurchase } = useSubscription();
+  const {
+    sub, isPremium, isTrial, daysLeft,
+    startTrial, upgradePlan, restorePurchase, cancelSubscription,
+  } = useSubscription();
 
-  const [selectedPlan, setSelectedPlan] = useState('basic');
-  const [billingCycle, setBillingCycle] = useState('monthly');
+  // 기본 선택 — 현재 플랜 또는 'basic'
+  const [selectedPlan, setSelectedPlan] = useState(isPremium ? sub.planId : 'basic');
+  const [billingCycle, setBillingCycle] = useState(sub.billingCycle || 'monthly');
   const [loading, setLoading] = useState(false);
 
   const fromFeature = route?.params?.featureKey;
+  const currentPlanId = sub.planId;
+
+  // ── 핸들러 ───────────────────────────────────────────────
 
   const handleStartTrial = async () => {
     setLoading(true);
@@ -34,32 +39,47 @@ export default function PaywallScreen({ navigation, route }) {
         `${PLANS[selectedPlan].name} 14일 무료 체험이 시작되었습니다.\n모든 프리미엄 기능을 자유롭게 사용해보세요!`,
         [{ text: '시작하기', onPress: () => navigation?.goBack() }]
       );
-    } catch (e) {
+    } catch {
       Alert.alert('오류', '체험 시작에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubscribe = async () => {
-    // TODO: RevenueCat SDK 연동 시 실제 결제 처리
-    // Purchases.purchasePackage(package)
-    setLoading(true);
-    try {
-      // 현재는 즉시 구독 활성화 (테스트용)
-      await upgradePlan(selectedPlan, billingCycle);
-      const plan = PLANS[selectedPlan];
-      const price = billingCycle === 'annual' ? plan.annualPriceLabel : plan.priceLabel;
-      Alert.alert(
-        '✅ 구독 완료!',
-        `${plan.name} (${price}) 구독이 완료되었습니다.\n모든 프리미엄 기능을 이용하실 수 있습니다!`,
-        [{ text: '확인', onPress: () => navigation?.goBack() }]
-      );
-    } catch (e) {
-      Alert.alert('결제 오류', '결제에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setLoading(false);
-    }
+  const handleSubscribe = async (planId, cycle) => {
+    const plan = PLANS[planId];
+    const price = cycle === 'annual' ? plan.annualPriceLabel : plan.priceLabel;
+    const isChange = isPremium && planId !== currentPlanId;
+    const isUpgrade = isPremium && planId === 'pro' && currentPlanId === 'basic';
+    const isDowngrade = isPremium && planId === 'basic' && currentPlanId === 'pro';
+
+    const actionLabel = isUpgrade ? '업그레이드' : isDowngrade ? '다운그레이드' : isChange ? '요금제 변경' : '구독';
+
+    Alert.alert(
+      `${plan.emoji} ${actionLabel} 확인`,
+      `${plan.name} (${price}) 으로 ${actionLabel}하시겠습니까?`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: actionLabel,
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await upgradePlan(planId, cycle);
+              Alert.alert(
+                '✅ 완료!',
+                `${plan.name} 구독이 완료되었습니다.`,
+                [{ text: '확인', onPress: () => navigation?.goBack() }]
+              );
+            } catch {
+              Alert.alert('오류', '처리 중 문제가 발생했습니다.');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleRestore = async () => {
@@ -67,77 +87,162 @@ export default function PaywallScreen({ navigation, route }) {
     const restored = await restorePurchase();
     setLoading(false);
     if (restored) {
-      Alert.alert('✅ 복원 완료', '구독 정보가 복원되었습니다.', [
-        { text: '확인', onPress: () => navigation?.goBack() }
-      ]);
+      Alert.alert('✅ 복원 완료', '구독 정보가 복원되었습니다.',
+        [{ text: '확인', onPress: () => navigation?.goBack() }]
+      );
     } else {
       Alert.alert('복원 실패', '복원할 구독 내역이 없습니다.');
     }
   };
 
-  // 이미 구독 중인 경우 — 관리 화면 표시
-  if (isPremium) {
-    const plan = PLANS[sub.planId];
+  const handleCancel = () => {
+    Alert.alert(
+      '구독 취소',
+      '구독을 취소하면 즉시 무료 플랜으로 전환됩니다.\n남은 기간의 환불은 앱스토어/구글플레이 정책을 따릅니다.',
+      [
+        { text: '유지', style: 'cancel' },
+        {
+          text: '취소하기',
+          style: 'destructive',
+          onPress: async () => {
+            await cancelSubscription();
+            Alert.alert('취소 완료', '구독이 취소되었습니다.',
+              [{ text: '확인', onPress: () => navigation?.goBack() }]
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  // ── 플랜 카드 공통 컴포넌트 ──────────────────────────────
+  const PlanCard = ({ planId }) => {
+    const plan = PLANS[planId];
+    const isCurrent = currentPlanId === planId && isPremium;
+    const isSelected = selectedPlan === planId;
+    const accentColor = planId === 'pro' ? pal.a2 : pal.ac;
+
     return (
-      <ScrollView style={{ flex: 1, backgroundColor: pal.bg }} contentContainerStyle={{ padding: spacing.lg }}>
-        <View style={[s.activeCard, { backgroundColor: pal.s1, borderColor: pal.gn + '60' }]}>
-          <Text style={[s.activeEmoji]}>{plan.emoji}</Text>
-          <Text style={[s.activeTitle, { color: pal.tx }]}>{plan.name} 이용 중</Text>
-          {isTrial && daysLeft !== null && (
-            <View style={[s.trialBadge, { backgroundColor: pal.a2 + '25' }]}>
-              <Text style={[s.trialBadgeText, { color: pal.a2 }]}>
-                무료 체험 {daysLeft}일 남음
-              </Text>
-            </View>
-          )}
-          {!isTrial && sub.periodEndsAt && (
-            <Text style={[s.activeMeta, { color: pal.t3 }]}>
-              다음 결제일: {new Date(sub.periodEndsAt).toLocaleDateString('ko-KR')}
-            </Text>
-          )}
+      <TouchableOpacity
+        style={[s.planCard, {
+          backgroundColor: pal.s1,
+          borderColor: isCurrent ? pal.gn : isSelected ? accentColor : pal.bd,
+          borderWidth: isCurrent || isSelected ? 2 : 1,
+        }]}
+        onPress={() => setSelectedPlan(planId)}
+        activeOpacity={0.8}
+      >
+        {/* 헤더 행 */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+          <Text style={{ fontSize: 20, marginRight: 8 }}>{plan.emoji}</Text>
+          <Text style={[s.planName, { color: pal.tx }]}>{plan.name}</Text>
+          <View style={{ marginLeft: 'auto', flexDirection: 'row', gap: 6 }}>
+            {isCurrent && (
+              <View style={[s.badge, { backgroundColor: pal.gn + '25' }]}>
+                <Text style={[s.badgeText, { color: pal.gn }]}>이용 중</Text>
+              </View>
+            )}
+            {!isCurrent && isSelected && (
+              <View style={[s.badge, { backgroundColor: accentColor + '25' }]}>
+                <Text style={[s.badgeText, { color: accentColor }]}>선택</Text>
+              </View>
+            )}
+            {planId === 'pro' && !isCurrent && (
+              <View style={[s.badge, { backgroundColor: pal.a2 + '20' }]}>
+                <Text style={[s.badgeText, { color: pal.a2 }]}>추천</Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        <Text style={[s.sectionTitle, { color: pal.t2, marginTop: spacing.xl }]}>이용 중인 기능</Text>
+        {/* 가격 */}
+        <Text style={[s.planPrice, { color: pal.tx }]}>
+          {billingCycle === 'annual' ? plan.annualPriceLabel : plan.priceLabel}
+        </Text>
+        {billingCycle === 'annual' && (
+          <Text style={{ fontSize: 11, color: pal.gn, marginBottom: spacing.sm, fontWeight: '700' }}>
+            월간 대비 20% 절약
+          </Text>
+        )}
+
+        {/* 기능 목록 */}
         {plan.features.map((f, i) => (
-          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
-            <Text style={{ color: pal.gn, marginRight: 8, fontSize: fontSize.md }}>✓</Text>
-            <Text style={{ color: pal.tx, fontSize: fontSize.sm }}>{f}</Text>
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 5 }}>
+            <Text style={{ color: planId === 'pro' ? pal.a2 : pal.gn, marginRight: 6, fontSize: fontSize.sm }}>✓</Text>
+            <Text style={{ color: pal.t2, fontSize: fontSize.sm, flex: 1, lineHeight: 18 }}>{f}</Text>
           </View>
         ))}
 
-        {isTrial && (
+        {/* 변경 버튼 (구독 중이고 현재 플랜 아닌 경우) */}
+        {isPremium && !isCurrent && isSelected && (
           <TouchableOpacity
-            style={[s.subscribeBtn, { backgroundColor: pal.ac, marginTop: spacing.xl }]}
-            onPress={() => {
-              setLoading(false);
-              // 체험 중 결제로 전환
-              handleSubscribe();
-            }}
+            style={[s.changeBtn, { backgroundColor: accentColor, marginTop: spacing.md }]}
+            onPress={() => handleSubscribe(planId, billingCycle)}
+            disabled={loading}
           >
-            <Text style={s.subscribeBtnText}>지금 구독하기 (체험 → 정식)</Text>
+            {loading
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={s.changeBtnText}>
+                  {planId === 'pro' && currentPlanId === 'basic' ? '⬆️ 프로로 업그레이드' : '⬇️ 베이직으로 변경'}
+                </Text>
+            }
           </TouchableOpacity>
         )}
-      </ScrollView>
+      </TouchableOpacity>
     );
-  }
+  };
 
-  // 미구독 — 요금제 선택 화면
-  const basicPlan = PLANS.basic;
-  const proPlan = PLANS.pro;
-
+  // ── 렌더 ─────────────────────────────────────────────────
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: pal.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: pal.bg }}
+      contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}
+    >
 
-      {/* 헤더 */}
-      <View style={{ alignItems: 'center', marginBottom: spacing.xl }}>
-        <Text style={{ fontSize: 48, marginBottom: 8 }}>🥩</Text>
-        <Text style={[s.heroTitle, { color: pal.tx }]}>MeatBig 프리미엄</Text>
-        <Text style={[s.heroSub, { color: pal.t2 }]}>
-          {fromFeature ? '이 기능은 구독 후 이용 가능합니다' : '모든 기능을 14일 무료로 체험하세요'}
+      {/* ── 현재 구독 상태 배너 (구독 중인 경우) ── */}
+      {isPremium && (
+        <View style={[s.statusBanner, {
+          backgroundColor: isTrial ? pal.a2 + '15' : pal.gn + '15',
+          borderColor: isTrial ? pal.a2 + '50' : pal.gn + '50',
+        }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.statusTitle, { color: isTrial ? pal.a2 : pal.gn }]}>
+              {isTrial ? `⏳ 무료 체험 중 (${daysLeft}일 남음)` : `✅ ${PLANS[currentPlanId]?.name} 구독 중`}
+            </Text>
+            {!isTrial && sub.periodEndsAt && (
+              <Text style={[s.statusSub, { color: pal.t3 }]}>
+                다음 결제일: {new Date(sub.periodEndsAt).toLocaleDateString('ko-KR')} ·{' '}
+                {sub.billingCycle === 'annual' ? '연간' : '월간'} 구독
+              </Text>
+            )}
+            {isTrial && (
+              <Text style={[s.statusSub, { color: pal.t3 }]}>
+                체험 종료 후 자동 결제되지 않습니다
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* ── 헤더 (미구독 시) ── */}
+      {!isPremium && (
+        <View style={{ alignItems: 'center', marginBottom: spacing.xl }}>
+          <Text style={{ fontSize: 48, marginBottom: 8 }}>🥩</Text>
+          <Text style={[s.heroTitle, { color: pal.tx }]}>MeatBig 프리미엄</Text>
+          <Text style={[s.heroSub, { color: pal.t2 }]}>
+            {fromFeature ? '이 기능은 구독 후 이용 가능합니다' : '모든 기능을 14일 무료로 체험하세요'}
+          </Text>
+        </View>
+      )}
+
+      {/* ── 섹션 타이틀 (구독 중) ── */}
+      {isPremium && (
+        <Text style={[s.sectionLabel, { color: pal.t3, marginBottom: spacing.md }]}>
+          요금제 선택 · 변경
         </Text>
-      </View>
+      )}
 
-      {/* 결제 주기 토글 */}
+      {/* ── 결제 주기 토글 ── */}
       <View style={[s.cycleToggle, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
         <TouchableOpacity
           style={[s.cycleBtn, billingCycle === 'monthly' && { backgroundColor: pal.ac }]}
@@ -156,103 +261,124 @@ export default function PaywallScreen({ navigation, route }) {
         </TouchableOpacity>
       </View>
 
-      {/* 베이직 플랜 카드 */}
+      {/* ── 플랜 카드 (무료 플랜 포함 전체 비교) ── */}
+      {/* 무료 플랜 */}
       <TouchableOpacity
         style={[s.planCard, {
           backgroundColor: pal.s1,
-          borderColor: selectedPlan === 'basic' ? pal.ac : pal.bd,
-          borderWidth: selectedPlan === 'basic' ? 2 : 1,
+          borderColor: selectedPlan === 'free' ? pal.t2 : pal.bd,
+          borderWidth: selectedPlan === 'free' ? 2 : 1,
+          opacity: isPremium ? 0.6 : 1,
         }]}
-        onPress={() => setSelectedPlan('basic')}
-        activeOpacity={0.8}
+        onPress={() => !isPremium && setSelectedPlan('free')}
+        activeOpacity={isPremium ? 1 : 0.8}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
-          <Text style={{ fontSize: 22, marginRight: 8 }}>{basicPlan.emoji}</Text>
-          <Text style={[s.planName, { color: pal.tx }]}>{basicPlan.name}</Text>
-          {selectedPlan === 'basic' && (
-            <View style={[s.selectedBadge, { backgroundColor: pal.ac + '25', marginLeft: 'auto' }]}>
-              <Text style={[s.selectedBadgeText, { color: pal.ac }]}>선택됨</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+          <Text style={{ fontSize: 20, marginRight: 8 }}>{PLANS.free.emoji}</Text>
+          <Text style={[s.planName, { color: pal.tx }]}>{PLANS.free.name}</Text>
+          {!isPremium && currentPlanId === 'free' && (
+            <View style={[s.badge, { backgroundColor: pal.t3 + '25', marginLeft: 'auto' }]}>
+              <Text style={[s.badgeText, { color: pal.t3 }]}>현재 플랜</Text>
             </View>
           )}
         </View>
-        <Text style={[s.planPrice, { color: pal.tx }]}>
-          {billingCycle === 'annual' ? basicPlan.annualPriceLabel : basicPlan.priceLabel}
-        </Text>
-        {basicPlan.features.map((f, i) => (
-          <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 6 }}>
-            <Text style={{ color: pal.gn, marginRight: 6, fontSize: fontSize.sm }}>✓</Text>
-            <Text style={{ color: pal.t2, fontSize: fontSize.sm, flex: 1 }}>{f}</Text>
+        <Text style={[s.planPrice, { color: pal.tx }]}>{PLANS.free.priceLabel}</Text>
+        {PLANS.free.features.map((f, i) => (
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 5 }}>
+            <Text style={{ color: pal.t3, marginRight: 6, fontSize: fontSize.sm }}>✓</Text>
+            <Text style={{ color: pal.t3, fontSize: fontSize.sm, flex: 1 }}>{f}</Text>
           </View>
         ))}
       </TouchableOpacity>
 
-      {/* 프로 플랜 카드 */}
-      <TouchableOpacity
-        style={[s.planCard, {
-          backgroundColor: pal.s1,
-          borderColor: selectedPlan === 'pro' ? pal.a2 : pal.bd,
-          borderWidth: selectedPlan === 'pro' ? 2 : 1,
-          marginTop: spacing.md,
-        }]}
-        onPress={() => setSelectedPlan('pro')}
-        activeOpacity={0.8}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
-          <Text style={{ fontSize: 22, marginRight: 8 }}>{proPlan.emoji}</Text>
-          <Text style={[s.planName, { color: pal.tx }]}>{proPlan.name}</Text>
-          {selectedPlan === 'pro' && (
-            <View style={[s.selectedBadge, { backgroundColor: pal.a2 + '25', marginLeft: 'auto' }]}>
-              <Text style={[s.selectedBadgeText, { color: pal.a2 }]}>선택됨</Text>
-            </View>
+      {/* 베이직 플랜 */}
+      <View style={{ marginTop: spacing.md }}>
+        <PlanCard planId="basic" />
+      </View>
+
+      {/* 프로 플랜 */}
+      <View style={{ marginTop: spacing.md }}>
+        <PlanCard planId="pro" />
+      </View>
+
+      {/* ── 미구독 CTA ── */}
+      {!isPremium && (
+        <>
+          <TouchableOpacity
+            style={[s.primaryBtn, {
+              backgroundColor: selectedPlan === 'pro' ? pal.a2 : selectedPlan === 'free' ? pal.t3 : pal.ac,
+              marginTop: spacing.xl,
+              opacity: selectedPlan === 'free' ? 0.5 : 1,
+            }]}
+            onPress={selectedPlan !== 'free' ? handleStartTrial : undefined}
+            disabled={loading || selectedPlan === 'free'}
+          >
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <>
+                  <Text style={s.primaryBtnText}>14일 무료 체험 시작</Text>
+                  <Text style={s.primaryBtnSub}>신용카드 없이 시작 가능</Text>
+                </>
+            }
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[s.outlineBtn, { borderColor: pal.bd, marginTop: spacing.sm }]}
+            onPress={() => selectedPlan !== 'free' && handleSubscribe(selectedPlan, billingCycle)}
+            disabled={loading || selectedPlan === 'free'}
+          >
+            <Text style={[s.outlineBtnText, { color: selectedPlan === 'free' ? pal.t3 : pal.t2 }]}>
+              바로 구독하기 ({billingCycle === 'annual' ? '연간' : '월간'})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={{ alignItems: 'center', marginTop: spacing.lg }} onPress={handleRestore}>
+            <Text style={[{ fontSize: fontSize.sm, textDecorationLine: 'underline', color: pal.t3 }]}>구매 복원</Text>
+          </TouchableOpacity>
+        </>
+      )}
+
+      {/* ── 구독 중 CTA ── */}
+      {isPremium && (
+        <>
+          {/* 체험 → 정식 전환 */}
+          {isTrial && selectedPlan !== 'free' && (
+            <TouchableOpacity
+              style={[s.primaryBtn, {
+                backgroundColor: selectedPlan === 'pro' ? pal.a2 : pal.ac,
+                marginTop: spacing.xl,
+              }]}
+              onPress={() => handleSubscribe(selectedPlan, billingCycle)}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <>
+                    <Text style={s.primaryBtnText}>정식 구독 시작</Text>
+                    <Text style={s.primaryBtnSub}>{billingCycle === 'annual' ? '연간' : '월간'} · 체험 기간 종료 후 결제</Text>
+                  </>
+              }
+            </TouchableOpacity>
           )}
-        </View>
-        <Text style={[s.planPrice, { color: pal.tx }]}>
-          {billingCycle === 'annual' ? proPlan.annualPriceLabel : proPlan.priceLabel}
-        </Text>
-        {proPlan.features.map((f, i) => (
-          <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 6 }}>
-            <Text style={{ color: pal.a2, marginRight: 6, fontSize: fontSize.sm }}>✓</Text>
-            <Text style={{ color: pal.t2, fontSize: fontSize.sm, flex: 1 }}>{f}</Text>
-          </View>
-        ))}
-      </TouchableOpacity>
 
-      {/* 14일 무료 체험 버튼 */}
-      <TouchableOpacity
-        style={[s.subscribeBtn, { backgroundColor: selectedPlan === 'pro' ? pal.a2 : pal.ac, marginTop: spacing.xl }]}
-        onPress={handleStartTrial}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <>
-            <Text style={s.subscribeBtnText}>14일 무료 체험 시작</Text>
-            <Text style={s.subscribeBtnSub}>신용카드 없이 시작 가능</Text>
-          </>
-        )}
-      </TouchableOpacity>
+          {/* 구독 취소 */}
+          <TouchableOpacity
+            style={[s.cancelBtn, { borderColor: pal.rd + '50', marginTop: spacing.xl }]}
+            onPress={handleCancel}
+          >
+            <Text style={[s.cancelBtnText, { color: pal.rd }]}>구독 취소</Text>
+          </TouchableOpacity>
 
-      {/* 바로 구독 */}
-      <TouchableOpacity
-        style={[s.outlineBtn, { borderColor: pal.bd, marginTop: spacing.sm }]}
-        onPress={handleSubscribe}
-        disabled={loading}
-      >
-        <Text style={[s.outlineBtnText, { color: pal.t2 }]}>
-          바로 구독하기 ({billingCycle === 'annual' ? '연간' : '월간'})
-        </Text>
-      </TouchableOpacity>
-
-      {/* 구매 복원 */}
-      <TouchableOpacity style={{ alignItems: 'center', marginTop: spacing.lg }} onPress={handleRestore}>
-        <Text style={[s.restoreText, { color: pal.t3 }]}>구매 복원</Text>
-      </TouchableOpacity>
+          <TouchableOpacity style={{ alignItems: 'center', marginTop: spacing.md }} onPress={handleRestore}>
+            <Text style={[{ fontSize: fontSize.sm, textDecorationLine: 'underline', color: pal.t3 }]}>구매 복원</Text>
+          </TouchableOpacity>
+        </>
+      )}
 
       {/* 약관 */}
       <Text style={[s.termsText, { color: pal.t3 }]}>
-        구독은 언제든지 취소 가능합니다. 무료 체험 후 자동 결제되지 않습니다.
-        {'\n'}구독 시 이용약관 및 개인정보처리방침에 동의하는 것으로 간주됩니다.
+        구독은 언제든지 취소 가능합니다. 무료 체험 후 자동 결제되지 않습니다.{'\n'}
+        구독 시 이용약관 및 개인정보처리방침에 동의하는 것으로 간주됩니다.
       </Text>
     </ScrollView>
   );
@@ -261,6 +387,16 @@ export default function PaywallScreen({ navigation, route }) {
 const s = StyleSheet.create({
   heroTitle: { fontSize: fontSize.xxl, fontWeight: '900', marginBottom: 6, textAlign: 'center' },
   heroSub: { fontSize: fontSize.sm, textAlign: 'center', lineHeight: 20 },
+  sectionLabel: { fontSize: fontSize.xs, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  statusBanner: {
+    borderRadius: radius.md, borderWidth: 1,
+    padding: spacing.md, marginBottom: spacing.lg,
+    flexDirection: 'row', alignItems: 'center',
+  },
+  statusTitle: { fontSize: fontSize.sm, fontWeight: '800', marginBottom: 3 },
+  statusSub: { fontSize: fontSize.xs },
+
   cycleToggle: {
     flexDirection: 'row', borderRadius: radius.md, borderWidth: 1,
     overflow: 'hidden', marginBottom: spacing.lg,
@@ -272,30 +408,23 @@ const s = StyleSheet.create({
   cycleBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
   discountBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
   discountText: { fontSize: 11, fontWeight: '800' },
+
   planCard: { borderRadius: radius.lg, padding: spacing.lg },
   planName: { fontSize: fontSize.md, fontWeight: '800' },
-  planPrice: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: spacing.sm },
-  selectedBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  selectedBadgeText: { fontSize: 11, fontWeight: '800' },
-  subscribeBtn: {
-    paddingVertical: 18, borderRadius: radius.md, alignItems: 'center',
+  planPrice: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 4 },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  badgeText: { fontSize: 11, fontWeight: '800' },
+  changeBtn: {
+    paddingVertical: 12, borderRadius: radius.md, alignItems: 'center',
   },
-  subscribeBtnText: { color: '#fff', fontSize: fontSize.md, fontWeight: '900' },
-  subscribeBtnSub: { color: 'rgba(255,255,255,0.8)', fontSize: fontSize.xs, marginTop: 3 },
-  outlineBtn: {
-    paddingVertical: 14, borderRadius: radius.md, alignItems: 'center', borderWidth: 1,
-  },
+  changeBtnText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '800' },
+
+  primaryBtn: { paddingVertical: 18, borderRadius: radius.md, alignItems: 'center' },
+  primaryBtnText: { color: '#fff', fontSize: fontSize.md, fontWeight: '900' },
+  primaryBtnSub: { color: 'rgba(255,255,255,0.8)', fontSize: fontSize.xs, marginTop: 3 },
+  outlineBtn: { paddingVertical: 14, borderRadius: radius.md, alignItems: 'center', borderWidth: 1 },
   outlineBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
-  restoreText: { fontSize: fontSize.sm, textDecorationLine: 'underline' },
+  cancelBtn: { paddingVertical: 14, borderRadius: radius.md, alignItems: 'center', borderWidth: 1 },
+  cancelBtnText: { fontSize: fontSize.sm, fontWeight: '700' },
   termsText: { fontSize: 11, textAlign: 'center', lineHeight: 16, marginTop: spacing.lg },
-  sectionTitle: { fontSize: fontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.sm },
-  activeCard: {
-    borderRadius: radius.lg, borderWidth: 2, padding: spacing.xl,
-    alignItems: 'center', marginBottom: spacing.lg,
-  },
-  activeEmoji: { fontSize: 48, marginBottom: 8 },
-  activeTitle: { fontSize: fontSize.xl, fontWeight: '900', marginBottom: spacing.sm },
-  trialBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginBottom: 6 },
-  trialBadgeText: { fontSize: fontSize.xs, fontWeight: '800' },
-  activeMeta: { fontSize: fontSize.xs },
 });
