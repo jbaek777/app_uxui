@@ -1,9 +1,9 @@
 /**
  * SubscriptionContext
- * - 구독 상태 전역 관리
- * - AsyncStorage 영구 저장
- * - Supabase subscriptions 테이블 동기화
- * - RevenueCat SDK 연동 준비 (현재는 stub)
+ * - 구독 단위: 사업장(store_id = 사업자번호) 기준
+ * - 유저(개인)는 구독 개념 없음 — 사업장 구독을 공유
+ * - 사장만 구독 변경 가능, 직원은 읽기만
+ * - AsyncStorage 로컬 캐시 + Supabase 서버 동기화
  */
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -67,13 +67,14 @@ export const PLANS = {
 };
 
 const DEFAULT_STATE = {
-  planId: 'free',        // 'free' | 'basic' | 'pro'
-  isActive: false,       // 구독 활성 여부
-  isTrial: false,        // 무료 체험 중
-  trialEndsAt: null,     // ISO 날짜
-  periodEndsAt: null,    // 구독 만료일
-  billingCycle: null,    // 'monthly' | 'annual'
-  purchasedAt: null,
+  planId:      'free',
+  isActive:    false,
+  isTrial:     false,
+  trialUsed:   false,   // 사업장 단위 체험 사용 여부 (영구)
+  trialEndsAt: null,
+  periodEndsAt:null,
+  billingCycle:null,
+  storeId:     null,    // 사업자번호 (구독 키)
 };
 
 const SubscriptionContext = createContext({
@@ -81,6 +82,7 @@ const SubscriptionContext = createContext({
   plan: PLANS.free,
   isPremium: false,
   isTrial: false,
+  daysLeft: null,
   startTrial: async () => {},
   upgradePlan: async () => {},
   restorePurchase: async () => {},
@@ -88,25 +90,55 @@ const SubscriptionContext = createContext({
   checkFeature: () => true,
 });
 
+// ─── 현재 유저의 사업자번호(storeId) 조회 ─────────────────
+async function getMyStoreId() {
+  try {
+    // 1) 로컬 캐시 먼저
+    const bizRaw = await AsyncStorage.getItem('@meatbig_biz');
+    if (bizRaw) {
+      const biz = JSON.parse(bizRaw);
+      const sid = (biz.bizNo || '').replace(/-/g, '');
+      if (sid) return sid;
+    }
+    // 2) Supabase stores에서 조회 (사장)
+    const { data: ownedStore } = await supabase
+      .from('stores')
+      .select('store_id')
+      .limit(1)
+      .maybeSingle();
+    if (ownedStore?.store_id) return ownedStore.store_id;
+
+    // 3) store_members에서 조회 (직원)
+    const { data: memberRow } = await supabase
+      .from('store_members')
+      .select('store_id, stores(store_id)')
+      .limit(1)
+      .maybeSingle();
+    if (memberRow?.stores?.store_id) return memberRow.stores.store_id;
+  } catch {}
+  return null;
+}
+
 export function SubscriptionProvider({ children }) {
   const [sub, setSub] = useState(DEFAULT_STATE);
 
-  // 로드
+  // 앱 시작 시 로드
   useEffect(() => {
     (async () => {
       try {
+        // 1) 로컬 캐시
         const raw = await AsyncStorage.getItem(SUB_KEY);
         if (raw) {
-          const saved = JSON.parse(raw);
-          // 만료 체크
-          const normalized = checkExpiry(saved);
-          setSub(normalized);
+          const saved = checkExpiry(JSON.parse(raw));
+          setSub(saved);
         }
+        // 2) Supabase 서버에서 최신 구독 상태 동기화
+        await syncFromServer();
       } catch {}
     })();
   }, []);
 
-  // 만료 자동 체크 (앱 포그라운드 복귀 등)
+  // 만료 자동 체크
   const checkExpiry = (state) => {
     if (!state.isActive && !state.isTrial) return state;
     const now = new Date();
@@ -119,45 +151,99 @@ export function SubscriptionProvider({ children }) {
     return state;
   };
 
-  const save = async (newState) => {
-    setSub(newState);
-    await AsyncStorage.setItem(SUB_KEY, JSON.stringify(newState)).catch(() => {});
-    // Supabase 동기화 (실패해도 로컬은 유지)
+  // Supabase → 로컬 동기화 (서버 우선)
+  const syncFromServer = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from('subscriptions').upsert({
-          user_id: user.id,
-          plan_id: newState.planId,
-          is_active: newState.isActive,
-          is_trial: newState.isTrial,
-          trial_ends_at: newState.trialEndsAt,
-          period_ends_at: newState.periodEndsAt,
-          billing_cycle: newState.billingCycle,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' });
+      const storeId = await getMyStoreId();
+      if (!storeId) return;
+
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('store_id', storeId)
+        .maybeSingle();
+
+      if (!error && data) {
+        const synced = checkExpiry({
+          planId:       data.plan_id || 'free',
+          isActive:     data.is_active || false,
+          isTrial:      data.is_trial || false,
+          trialUsed:    data.trial_used || false,
+          trialEndsAt:  data.trial_ends_at || null,
+          periodEndsAt: data.period_ends_at || null,
+          billingCycle: data.billing_cycle || null,
+          storeId,
+        });
+        setSub(synced);
+        await AsyncStorage.setItem(SUB_KEY, JSON.stringify(synced));
       }
     } catch {}
   };
 
-  // 14일 무료 체험 시작
+  // 로컬 + Supabase 저장
+  const save = async (newState) => {
+    const storeId = newState.storeId || await getMyStoreId();
+    const finalState = { ...newState, storeId };
+    setSub(finalState);
+    await AsyncStorage.setItem(SUB_KEY, JSON.stringify(finalState)).catch(() => {});
+
+    // Supabase 동기화 (사장만 쓰기 가능 — RLS)
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && storeId) {
+        await supabase.from('subscriptions').upsert({
+          store_id:     storeId,
+          owner_uid:    user.id,
+          plan_id:      finalState.planId,
+          is_active:    finalState.isActive,
+          is_trial:     finalState.isTrial,
+          trial_used:   finalState.trialUsed,
+          trial_ends_at:  finalState.trialEndsAt,
+          period_ends_at: finalState.periodEndsAt,
+          billing_cycle:  finalState.billingCycle,
+          updated_at:     new Date().toISOString(),
+        }, { onConflict: 'store_id' });
+      }
+    } catch {}
+  };
+
+  // ─── 14일 무료 체험 시작 ────────────────────────────────
   const startTrial = useCallback(async (planId = 'basic') => {
+    const storeId = await getMyStoreId();
+
+    // 서버에서 체험 이력 확인 (사업장 단위 — 어뷰징 방지)
+    if (storeId) {
+      try {
+        const { data } = await supabase
+          .from('subscriptions')
+          .select('trial_used')
+          .eq('store_id', storeId)
+          .maybeSingle();
+
+        if (data?.trial_used === true) {
+          return { success: false, reason: 'already_used' };
+        }
+      } catch {}
+    }
+
     const trialEnds = new Date();
     trialEnds.setDate(trialEnds.getDate() + 14);
     const newState = {
       ...DEFAULT_STATE,
       planId,
-      isActive: false,
-      isTrial: true,
+      isActive:    false,
+      isTrial:     true,
+      trialUsed:   true,   // 영구 기록
       trialEndsAt: trialEnds.toISOString(),
-      purchasedAt: new Date().toISOString(),
+      storeId,
     };
     await save(newState);
-    return newState;
+    return { success: true };
   }, []);
 
-  // 결제 완료 (RevenueCat 콜백 또는 수동 업그레이드)
+  // ─── 결제 완료 ──────────────────────────────────────────
   const upgradePlan = useCallback(async (planId, billingCycle = 'monthly') => {
+    const storeId = await getMyStoreId();
     const periodEnds = new Date();
     if (billingCycle === 'annual') {
       periodEnds.setFullYear(periodEnds.getFullYear() + 1);
@@ -166,51 +252,37 @@ export function SubscriptionProvider({ children }) {
     }
     const newState = {
       planId,
-      isActive: true,
-      isTrial: false,
-      trialEndsAt: null,
+      isActive:     true,
+      isTrial:      false,
+      trialUsed:    true,  // 결제했으면 체험도 사용한 것으로
+      trialEndsAt:  null,
       periodEndsAt: periodEnds.toISOString(),
       billingCycle,
-      purchasedAt: new Date().toISOString(),
+      storeId,
     };
     await save(newState);
     return newState;
   }, []);
 
-  // 구매 복원 (RevenueCat restorePurchases)
+  // ─── 구매 복원 ──────────────────────────────────────────
   const restorePurchase = useCallback(async () => {
-    // TODO: RevenueCat SDK 연동 시 실제 복원 로직
-    // 현재는 Supabase에서 최신 구독 상태 조회
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase.from('subscriptions')
-          .select('*').eq('user_id', user.id).single();
-        if (data && data.is_active) {
-          const restored = {
-            planId: data.plan_id,
-            isActive: data.is_active,
-            isTrial: data.is_trial,
-            trialEndsAt: data.trial_ends_at,
-            periodEndsAt: data.period_ends_at,
-            billingCycle: data.billing_cycle,
-            purchasedAt: data.updated_at,
-          };
-          await save(restored);
-          return true;
-        }
-      }
-    } catch {}
-    return false;
+    await syncFromServer();
+    return true;
   }, []);
 
-  // 구독 취소
+  // ─── 구독 취소 ──────────────────────────────────────────
   const cancelSubscription = useCallback(async () => {
-    const newState = { ...DEFAULT_STATE };
+    const storeId = await getMyStoreId();
+    // trialUsed는 유지 (재체험 방지)
+    const newState = {
+      ...DEFAULT_STATE,
+      trialUsed: sub.trialUsed,
+      storeId,
+    };
     await save(newState);
-  }, []);
+  }, [sub.trialUsed]);
 
-  // 기능 접근 가능 여부
+  // ─── 기능 접근 가능 여부 ────────────────────────────────
   const checkFeature = useCallback((featureKey) => {
     const { planId, isActive, isTrial } = sub;
     const hasPremium = isActive || isTrial;
@@ -222,7 +294,6 @@ export function SubscriptionProvider({ children }) {
   const plan = PLANS[sub.planId] || PLANS.free;
   const isPremium = sub.isActive || sub.isTrial;
 
-  // 만료일까지 남은 일수
   const daysLeft = (() => {
     const target = sub.isTrial ? sub.trialEndsAt : sub.periodEndsAt;
     if (!target) return null;
