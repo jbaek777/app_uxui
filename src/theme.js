@@ -68,21 +68,30 @@ export function getShadow(isDark) {
   return { sm: {}, md: {} };
 }
 
+// ─── 화면 크기 비례 스케일 ────────────────────────────────
+// 기준: 390dp (갤럭시 S23 / 아이폰 14)
+// 범위: 0.88(소형폰) ~ 1.15(대형폰) 로 제한
+import { Dimensions } from 'react-native';
+const BASE_WIDTH = 390;
+const { width: SCREEN_W } = Dimensions.get('window');
+const _scale = Math.min(Math.max(SCREEN_W / BASE_WIDTH, 0.88), 1.15);
+const sc = (n) => Math.round(n * _scale);
+
 export const fontSize = {
-  xxl: 38,
-  xl:  30,
-  lg:  24,
-  md:  20,
-  sm:  17,
-  xs:  15,
-  xxs: 13,
+  xxl: sc(38),
+  xl:  sc(30),
+  lg:  sc(24),
+  md:  sc(20),
+  sm:  sc(17),
+  xs:  sc(15),
+  xxs: sc(13),
 };
 
 export const spacing = {
-  xs:  6,
-  sm:  12,
-  md:  18,
-  lg:  24,
-  xl:  36,
-  xxl: 52,
+  xs:  sc(6),
+  sm:  sc(12),
+  md:  sc(18),
+  lg:  sc(24),
+  xl:  sc(36),
+  xxl: sc(52),
 };

@@ -113,7 +113,7 @@ export default function DocumentScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: pal.bg }]}>
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
 
         {/* ── 점검 입력 바로가기 ── */}
         <Text style={[styles.sectionLabel, { color: pal.t2 }]}>점검 입력 바로가기</Text>
@@ -192,7 +192,7 @@ export default function DocumentScreen({ navigation }) {
               <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
+          <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
             <Text style={{ fontSize: fontSize.sm, color: pal.t3, marginBottom: spacing.lg }}>
               선택한 서류를 PDF로 생성하여 공유하거나 저장합니다
             </Text>

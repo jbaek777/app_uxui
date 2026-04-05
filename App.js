@@ -1,7 +1,8 @@
 import 'react-native-gesture-handler';
 import { registerRootComponent } from 'expo';
 import React, { useState, useEffect } from 'react';
-import { View, Text, Platform, StyleSheet } from 'react-native';
+import { View, Text, Platform, StyleSheet, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -177,6 +178,12 @@ function MainTabs({ bizData }) {
   const pal = isDark ? darkColors : lightColors;
   const { role } = useRole();
   const isStaff = role === 'staff';
+  const insets = useSafeAreaInsets();
+
+  // Safe Area 반영 탭바 높이
+  // iOS: 50 + 홈인디케이터(insets.bottom)
+  // Android: 56 + 소프트 내비게이션 바(insets.bottom)
+  const TAB_H = (Platform.OS === 'ios' ? 50 : 56) + insets.bottom;
 
   return (
     <View style={{ flex: 1 }}>
@@ -188,8 +195,8 @@ function MainTabs({ bizData }) {
             backgroundColor: pal.s1,
             borderTopColor: pal.bd,
             borderTopWidth: 1,
-            height: Platform.OS === 'ios' ? 90 : 70,
-            paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+            height: TAB_H,
+            paddingBottom: insets.bottom + (Platform.OS === 'ios' ? 0 : 4),
             paddingTop: 6,
           },
           tabBarShowLabel: false,

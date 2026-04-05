@@ -305,7 +305,7 @@ export default function ScanScreen({ navigation }) {
       </View>
 
       {/* 스캔 이력 */}
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
         {history.length > 0 && (
           <>
             <Text style={[styles.histTitle, { color: pal.tx }]}>최근 조회 이력</Text>
@@ -389,7 +389,7 @@ export default function ScanScreen({ navigation }) {
                 <Text style={[styles.resultClose, { color: pal.t2 }]}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+            <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
               <View style={[styles.traceBox, { backgroundColor: pal.a2 + '18', borderColor: pal.a2 + '50' }]}>
                 <Text style={[styles.traceLabel, { color: pal.t2 }]}>이력번호</Text>
                 <Text style={[styles.traceNo, { color: pal.a2 }]}>{result.traceNo}</Text>

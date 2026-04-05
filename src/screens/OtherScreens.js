@@ -8,6 +8,7 @@ import { useTheme } from '../lib/ThemeContext';
 import { StatusBadge, AlertBox, PrimaryBtn, OutlineBtn, ProgressBar, AddBtn } from '../components/UI';
 import { hygieneData as initHyg, tempData as initTemp, staffData, inventoryData } from '../data/mockData';
 import { hygieneApi, sensorApi, employeeApi, inventoryApi } from '../lib/supabase';
+import { tempStore } from '../lib/dataStore';
 import { genHygieneHTML, genTempHTML, printAndShare } from '../lib/pdfTemplate';
 
 // ═══ 위생 일지 ═══════════════════════════════════════════
@@ -89,7 +90,7 @@ export function HygieneScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
         {logs.map(log => {
           const isOpen = expanded === log.id;
           return (
@@ -158,23 +159,29 @@ export function HygieneScreen() {
 export function TempScreen() {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
-  const [records, setRecords] = useState(initTemp);
+  const [records, setRecords] = useState([]);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ temp: '', humidity: '', person: '홍길동', note: '' });
+  const [form, setForm] = useState({ temp: '', humidity: '', person: '', note: '' });
 
-  const handleSave = () => {
+  useEffect(() => {
+    tempStore.load().then(data => setRecords(data.length > 0 ? data : initTemp));
+  }, []);
+
+  const handleSave = async () => {
     const t = parseFloat(form.temp) || 0;
     const now = new Date();
-    setRecords([{
+    const record = {
       id: Date.now().toString(),
       date: now.toLocaleDateString('ko-KR'),
       time: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-      temp: t, humidity: parseInt(form.humidity) || 82,
-      person: form.person, note: form.note || '—',
+      temp: t, humidity: parseFloat(form.humidity) || 82,
+      person: form.person || '—', note: form.note || '—',
       status: t > 4 ? 'warn' : 'ok',
-    }, ...records]);
+    };
+    const updated = await tempStore.add(record);
+    setRecords(updated);
     setModal(false);
-    setForm({ temp: '', humidity: '', person: '홍길동', note: '' });
+    setForm({ temp: '', humidity: '', person: '', note: '' });
   };
 
   const latest = records[0];
@@ -204,7 +211,7 @@ export function TempScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
         {records.map(r => (
           <View key={r.id} style={[styles.tempCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
             <View style={styles.tempRow}>
@@ -275,7 +282,7 @@ export function DocsScreen() {
   const [checked, setChecked] = useState({ d1: true, d2: true, d4: true, d5: true, d6: true, a1: true, a2: true, a4: true });
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: pal.bg }} contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: pal.bg }} contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
       <AlertBox type="warn" icon="⚠️" title="미비 서류 2건" message="소비기한 설정 근거 문서 · 건강진단결과서(김○○)" />
       <DocSection title="📋 공통 필수 서류" docs={commonDocs} checked={checked} onToggle={k => setChecked({ ...checked, [k]: !checked[k] })} />
       <DocSection title="🥩 건조숙성육 특화 서류" docs={agingDocs} checked={checked} onToggle={k => setChecked({ ...checked, [k]: !checked[k] })} />
@@ -323,7 +330,7 @@ export function StaffScreen() {
   const expiredStaff = staff.filter(s => s.status === 'expired');
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: pal.bg }} contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: pal.bg }} contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
       {expiredStaff.length > 0 && (
         <AlertBox type="error" icon="🚨" title="보건증 만료"
           message={expiredStaff.map(s => `${s.name} — ${s.health} 만료`).join('\n')} />
@@ -435,7 +442,7 @@ export function InventoryScreen() {
         <AddBtn label="+ 품목 추가" onPress={() => setModal(true)} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
         {filtered.map(item => {
           const conf = CONF[item.status] || CONF.ok;
           const pct = item.minQty > 0 ? Math.min(100, Math.round((item.qty / item.minQty) * 100)) : 100;

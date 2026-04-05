@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
@@ -38,7 +39,7 @@ export default function ClosingScreen() {
   const addSale = () => {
     if (!form.cut || !form.qty || !form.price) { Alert.alert('입력 오류', '부위, 중량, 단가를 모두 입력해주세요.'); return; }
     const qty = parseFloat(form.qty) || 0;
-    const price = parseInt(form.price) || 0;
+    const price = Math.round(parseFloat(form.price) || 0);
     setSales([...sales, {
       id: Date.now().toString(),
       cut: form.cut,
@@ -62,7 +63,7 @@ export default function ClosingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: pal.bg }]}>
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 80 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120 }}>
 
         {/* 총매출 히어로 */}
         <View style={[styles.heroCard, { backgroundColor: pal.ac }]}>
@@ -157,7 +158,9 @@ export default function ClosingScreen() {
               total_cost: totalCost,
               total_waste: wasteTotal,
             });
-            const html = genClosingHTML(sales, waste, realMeat.length > 0 ? realMeat : initMeat.filter(m => !m.sold));
+            let biz = null;
+            try { const raw = await AsyncStorage.getItem('@meatbig_biz'); if (raw) biz = JSON.parse(raw); } catch (_) {}
+            const html = genClosingHTML(sales, waste, realMeat.length > 0 ? realMeat : initMeat.filter(m => !m.sold), biz);
             await printAndShare(html, '일일마감정산서');
           }}
         />

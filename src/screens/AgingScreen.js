@@ -7,6 +7,7 @@ import { agingData as initialData } from '../data/mockData';
 import { agingApi } from '../lib/supabase';
 import { getStoreInfo } from '../lib/dataStore';
 import { genAgingHTML, printAndShare } from '../lib/pdfTemplate';
+import { scheduleAgingCompleteAlert } from '../utils/notifications';
 
 async function exportAgingPDF(items) {
   await printAndShare(genAgingHTML(items), '숙성관리대장');
@@ -40,8 +41,8 @@ export default function AgingScreen() {
     }).catch(() => {});
   }, []);
 
-  const pct = item => Math.min(100, Math.round((item.day / item.targetDay) * 100));
-  const yieldPct = item => (item.weight / item.initWeight * 100).toFixed(1);
+  const pct = item => (!item.targetDay ? 0 : Math.min(100, Math.round((item.day / item.targetDay) * 100)));
+  const yieldPct = item => (item.initWeight > 0 ? (item.weight / item.initWeight * 100).toFixed(1) : '100.0');
 
   const handleSave = async () => {
     if (!form.cut) { Alert.alert('입력 오류', '부위명을 입력해주세요.'); return; }
@@ -70,12 +71,17 @@ export default function AgingScreen() {
       {
         text: '완료 처리', style: 'default',
         onPress: () => {
+          const target = items.find(i => i.id === id);
           setItems(prev => prev.map(i =>
             i.id === id
               ? { ...i, status: 'done', completed: true, completedDate: new Date().toLocaleDateString('ko-KR') }
               : i
           ));
           setExpanded(null);
+          // 숙성 완료 알림 (즉시)
+          if (target) {
+            scheduleAgingCompleteAlert(target.trace || id, target.cut || '숙성육', 0).catch(() => {});
+          }
         },
       },
     ]);
@@ -137,7 +143,7 @@ export default function AgingScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
         {displayItems.length === 0 && (
           <View style={styles.emptyBox}>
             <Text style={[styles.emptyText, { color: pal.t3 }]}>
@@ -265,7 +271,7 @@ export default function AgingScreen() {
               <Text style={[styles.modalClose, { color: pal.t2 }]}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+          <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
             <FormField label="부위명 *" placeholder="예: 등심 (Striploin)" value={form.cut}
               onChangeText={t => setForm({ ...form, cut: t })} pal={pal} />
 

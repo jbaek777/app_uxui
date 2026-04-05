@@ -8,17 +8,19 @@ import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn, AlertBox } from '../components/UI';
 import { GaugeBar } from '../components/GaugeBar';
 import { meatInventory as initMeat } from '../data/mockData';
-import { meatStore, salesStore, expiryLogStore, yieldStore } from '../lib/dataStore';
+import { meatStore, salesStore, expiryLogStore, yieldStore, supplierStore } from '../lib/dataStore';
 
-const TABS = ['재고 현황', '판매내역', '수율 계산기', '소비기한'];
+const TABS = ['재고 현황', '판매내역', '수율 계산기', '소비기한', '거래처'];
 
 export default function InventoryScreen() {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
   const [tab, setTab] = useState(0);
   const [meat, setMeat] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const isFirst = useRef(true);
+  const isFirstSupplier = useRef(true);
 
   // 앱 실행 시 데이터 로드 (Supabase → AsyncStorage → mockData)
   useEffect(() => {
@@ -33,6 +35,7 @@ export default function InventoryScreen() {
         setMeat(refreshed);
         setLoaded(true);
       });
+    supplierStore.load().then(setSuppliers);
   }, []);
 
   // 데이터 변경 시 자동 저장 (첫 로드 제외)
@@ -43,13 +46,23 @@ export default function InventoryScreen() {
     }
   }, [meat]);
 
+  useEffect(() => {
+    if (isFirstSupplier.current) { isFirstSupplier.current = false; return; }
+    supplierStore.save(suppliers);
+  }, [suppliers]);
+
   const getDdaySafe = m => m.dday != null ? m.dday : (m.d_day != null ? m.d_day : 99);
   const critical = meat.filter(m => getDdaySafe(m) <= 1 && !m.sold);
 
   return (
     <View style={{ flex: 1, backgroundColor: pal.bg }}>
-      {/* 탭 바 */}
-      <View style={[styles.tabBar, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
+      {/* 탭 바 — 5개이므로 가로 스크롤 */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[styles.tabBarScroll, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}
+        contentContainerStyle={styles.tabBarContent}
+      >
         {TABS.map((t, i) => (
           <TouchableOpacity
             key={t}
@@ -61,43 +74,48 @@ export default function InventoryScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
-      {tab === 0 && <StockTab meat={meat} setMeat={setMeat} critical={critical} />}
+      {tab === 0 && <StockTab meat={meat} setMeat={setMeat} critical={critical} suppliers={suppliers} />}
       {tab === 1 && <SoldHistoryTab meat={meat} />}
       {tab === 2 && <YieldTab />}
       {tab === 3 && <ExpiryTab meat={meat} setMeat={setMeat} />}
+      {tab === 4 && <SupplierTab suppliers={suppliers} setSuppliers={setSuppliers} meat={meat} />}
     </View>
   );
 }
 
 // ── 재고 현황 탭 ──────────────────────────────────────────
-function StockTab({ meat, setMeat, critical }) {
+function StockTab({ meat, setMeat, critical, suppliers }) {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ cut: '', origin: '', qty: '', buyPrice: '', sellPrice: '', expire: '' });
+  const [supplierPicker, setSupplierPicker] = useState(false);
+  const [form, setForm] = useState({ cut: '', origin: '', qty: '', buyPrice: '', sellPrice: '', expire: '', supplierId: '', supplierName: '' });
 
   const activeItems = meat.filter(m => !m.sold);
   const soldItems   = meat.filter(m => m.sold);
-  const totalValue  = activeItems.reduce((s, m) => s + m.qty * m.buyPrice, 0);
-  const lossRisk    = activeItems.filter(m => m.dday <= 3).reduce((s, m) => s + m.qty * m.buyPrice, 0);
+  const totalValue  = activeItems.reduce((s, m) => s + (m.qty || 0) * (m.buyPrice || 0), 0);
+  const lossRisk    = activeItems.filter(m => (m.dday ?? 99) <= 3).reduce((s, m) => s + (m.qty || 0) * (m.buyPrice || 0), 0);
 
   const handleAdd = () => {
     if (!form.cut || !form.qty) { Alert.alert('입력 오류', '부위명과 중량을 입력해주세요.'); return; }
     const qty  = parseFloat(form.qty) || 0;
-    const buy  = parseInt(form.buyPrice) || 0;
-    const sell = parseInt(form.sellPrice) || (buy > 0 ? Math.round(buy * 1.55) : 0);
+    const buy  = Math.round(parseFloat(form.buyPrice) || 0);
+    const sell = Math.round(parseFloat(form.sellPrice) || (buy > 0 ? buy * 1.55 : 0));
     const dday = form.expire ? Math.ceil((new Date(form.expire) - new Date()) / 86400000) : 99;
+    const today = new Date().toLocaleDateString('ko-KR');
     setMeat([...meat, {
       id: Date.now().toString(), cut: form.cut, origin: form.origin || '미입력',
       qty, unit: 'kg', buyPrice: buy, sellPrice: sell,
       expire: form.expire, dday,
       status: dday <= 0 ? 'critical' : dday <= 2 ? 'low' : 'ok',
       sold: false, soldDate: null, editCount: 0, editLog: [],
+      supplierId: form.supplierId, supplierName: form.supplierName,
+      inboundDate: today,
     }]);
     setModal(false);
-    setForm({ cut: '', origin: '', qty: '', buyPrice: '', sellPrice: '', expire: '' });
+    setForm({ cut: '', origin: '', qty: '', buyPrice: '', sellPrice: '', expire: '', supplierId: '', supplierName: '' });
   };
 
   const handleSold = (id) => {
@@ -120,7 +138,7 @@ function StockTab({ meat, setMeat, critical }) {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
         {/* 2×2 요약 그리드 */}
         <View style={styles.summaryGrid}>
           <SummaryBox icon="📦" label="재고 부위"  value={`${activeItems.length}종`}                                       color={pal.a2}   pal={pal} />
@@ -143,8 +161,22 @@ function StockTab({ meat, setMeat, critical }) {
 
         <View style={{ padding: spacing.md }}>
         {activeItems.length === 0 && (
-          <View style={styles.emptyBox}>
-            <Text style={[styles.emptyText, { color: pal.t3 }]}>재고 항목이 없습니다</Text>
+          <View style={[styles.stockEmptyBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+            <Text style={{ fontSize: 52, marginBottom: spacing.md }}>📦</Text>
+            <Text style={[styles.stockEmptyTitle, { color: pal.tx }]}>등록된 재고가 없습니다</Text>
+            <Text style={[styles.stockEmptyDesc, { color: pal.t3 }]}>
+              + 재고 추가 버튼으로 첫 재고를 등록하면{'\n'}매입가·소비기한·마진율이 자동으로 관리됩니다
+            </Text>
+            <View style={[styles.stockEmptyTip, { backgroundColor: pal.a2 + '15', borderColor: pal.a2 + '40' }]}>
+              <Text style={[styles.stockEmptyTipText, { color: pal.a2 }]}>
+                💡 거래명세서를 OCR 스캔하면{'\n'}부위·중량·원산지가 자동으로 채워집니다
+              </Text>
+            </View>
+            <View style={[styles.stockEmptyTip, { backgroundColor: pal.gn + '12', borderColor: pal.gn + '30', marginTop: 6 }]}>
+              <Text style={[styles.stockEmptyTipText, { color: pal.gn }]}>
+                📊 재고 등록 후 대시보드에서 마진 분석을 확인하세요
+              </Text>
+            </View>
           </View>
         )}
 
@@ -221,9 +253,66 @@ function StockTab({ meat, setMeat, critical }) {
                 ) : null}
               </View>
             ))}
+
+            {/* 거래처 선택 */}
+            <View style={{ marginBottom: spacing.md }}>
+              <Text style={[styles.fieldLabel, { color: pal.t2 }]}>거래처 (선택)</Text>
+              <TouchableOpacity
+                style={[styles.supplierPickerBtn, { backgroundColor: pal.s2, borderColor: form.supplierName ? pal.ac : pal.bd }]}
+                onPress={() => setSupplierPicker(true)}
+              >
+                <Text style={{ color: form.supplierName ? pal.tx : pal.t3, fontSize: fontSize.sm, fontWeight: form.supplierName ? '700' : '400' }}>
+                  {form.supplierName || (suppliers.length === 0 ? '거래처를 먼저 등록하세요' : '거래처 선택')}
+                </Text>
+                {form.supplierName ? (
+                  <TouchableOpacity onPress={() => setForm({ ...form, supplierId: '', supplierName: '' })}>
+                    <Text style={{ color: pal.t3, fontSize: 16 }}>✕</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={{ color: pal.t3 }}>▼</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
             <PrimaryBtn label="등록 완료" onPress={handleAdd} />
             <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* 거래처 선택 피커 모달 */}
+      <Modal visible={supplierPicker} animationType="slide" transparent>
+        <View style={styles.pickerOverlay}>
+          <View style={[styles.pickerBox, { backgroundColor: pal.s1 }]}>
+            <View style={[styles.pickerHeader, { borderBottomColor: pal.bd }]}>
+              <Text style={[styles.pickerTitle, { color: pal.tx }]}>거래처 선택</Text>
+              <TouchableOpacity onPress={() => setSupplierPicker(false)}>
+                <Text style={{ color: pal.t3, fontSize: 22 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {suppliers.length === 0 ? (
+              <View style={{ padding: spacing.xl, alignItems: 'center' }}>
+                <Text style={{ color: pal.t3, fontSize: fontSize.sm }}>등록된 거래처가 없습니다</Text>
+                <Text style={{ color: pal.t3, fontSize: fontSize.xs, marginTop: 6 }}>거래처 탭에서 먼저 추가하세요</Text>
+              </View>
+            ) : (
+              <ScrollView style={{ maxHeight: 300 }}>
+                {suppliers.map(s => (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={[styles.pickerItem, { borderBottomColor: pal.bd }]}
+                    onPress={() => {
+                      setForm({ ...form, supplierId: s.id, supplierName: s.name });
+                      setSupplierPicker(false);
+                    }}
+                  >
+                    <Text style={[styles.pickerItemName, { color: pal.tx }]}>{s.name}</Text>
+                    {s.phone ? <Text style={[styles.pickerItemSub, { color: pal.t3 }]}>{s.phone}</Text> : null}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
         </View>
       </Modal>
     </View>
@@ -250,7 +339,7 @@ function SoldHistoryTab({ meat }) {
   const totalProfit  = totalRevenue - totalCost;
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+    <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
       {soldItems.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={{ fontSize: 48, marginBottom: spacing.md }}>📋</Text>
@@ -360,7 +449,7 @@ function YieldTab() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
+    <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
       <AlertBox type="info" icon="ℹ️" message="원육 중량과 정육 후 중량을 입력하면 수율과 실제 원가를 계산합니다." />
 
       <View style={{ marginBottom: spacing.md }}>
@@ -517,7 +606,7 @@ function ExpiryTab({ meat, setMeat }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+    <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
       {today.length    > 0 && <ExpiryGroup label="🔴 오늘 만료"  items={today}    color={pal.rd} onEdit={openEdit} onLog={openLog} pal={pal} />}
       {tomorrow.length > 0 && <ExpiryGroup label="🟡 내일 만료"  items={tomorrow} color={pal.yw} onEdit={openEdit} onLog={openLog} pal={pal} />}
       {week.length     > 0 && <ExpiryGroup label="🟠 이번 주"    items={week}     color={pal.a2} onEdit={openEdit} onLog={openLog} pal={pal} />}
@@ -599,6 +688,161 @@ function ExpiryTab({ meat, setMeat }) {
   );
 }
 
+// ── 거래처 탭 ─────────────────────────────────────────────
+function SupplierTab({ suppliers, setSuppliers, meat }) {
+  const { isDark } = useTheme();
+  const pal = isDark ? darkColors : lightColors;
+  const [modal, setModal]       = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [form, setForm]         = useState({ name: '', phone: '', memo: '' });
+
+  const openAdd = () => {
+    setEditTarget(null);
+    setForm({ name: '', phone: '', memo: '' });
+    setModal(true);
+  };
+
+  const openEdit = (s) => {
+    setEditTarget(s);
+    setForm({ name: s.name, phone: s.phone || '', memo: s.memo || '' });
+    setModal(true);
+  };
+
+  const handleSave = () => {
+    if (!form.name.trim()) { Alert.alert('입력 오류', '업체명을 입력해주세요.'); return; }
+    if (editTarget) {
+      setSuppliers(prev => prev.map(s => s.id === editTarget.id ? { ...s, ...form } : s));
+    } else {
+      setSuppliers(prev => [...prev, { id: Date.now().toString(), ...form, priceHistory: [] }]);
+    }
+    setModal(false);
+  };
+
+  const handleDelete = (id) => {
+    Alert.alert('거래처 삭제', '삭제하면 연결된 재고의 거래처 정보도 초기화됩니다. 계속할까요?', [
+      { text: '취소', style: 'cancel' },
+      { text: '삭제', style: 'destructive', onPress: () => setSuppliers(prev => prev.filter(s => s.id !== id)) },
+    ]);
+  };
+
+  // 월별 거래처별 매입액 집계
+  const thisMonth = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
+  const monthlyBySupplier = {};
+  meat.forEach(m => {
+    if (!m.supplierName) return;
+    const month = m.inboundDate
+      ? (() => { const d = new Date(m.inboundDate.replace(/\.\s*/g, '-').replace(/-$/, '')); return isNaN(d) ? '' : d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' }); })()
+      : '';
+    if (!month) return;
+    if (!monthlyBySupplier[m.supplierName]) monthlyBySupplier[m.supplierName] = {};
+    if (!monthlyBySupplier[m.supplierName][month]) monthlyBySupplier[m.supplierName][month] = 0;
+    monthlyBySupplier[m.supplierName][month] += (m.qty || 0) * (m.buyPrice || 0);
+  });
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
+        {suppliers.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={{ fontSize: 48, marginBottom: spacing.md }}>🏪</Text>
+            <Text style={[styles.emptyText, { color: pal.t3 }]}>등록된 거래처가 없습니다</Text>
+            <Text style={{ color: pal.t3, fontSize: fontSize.xs, marginTop: 8, textAlign: 'center' }}>
+              + 거래처 추가 버튼으로 업체를 등록하면{'\n'}재고 입고 시 연결할 수 있습니다
+            </Text>
+          </View>
+        ) : (
+          suppliers.map(s => {
+            const history = monthlyBySupplier[s.name] || {};
+            const months  = Object.keys(history).sort((a, b) => b.localeCompare(a));
+            const totalBuy = Object.values(history).reduce((acc, v) => acc + v, 0);
+            return (
+              <View key={s.id} style={[styles.supplierCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+                <View style={styles.supplierCardTop}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.supplierName, { color: pal.tx }]}>{s.name}</Text>
+                    {s.phone ? <Text style={[styles.supplierPhone, { color: pal.t3 }]}>📞 {s.phone}</Text> : null}
+                    {s.memo  ? <Text style={[styles.supplierMemo,  { color: pal.t3 }]}>📝 {s.memo}</Text>  : null}
+                  </View>
+                  <View style={{ gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.supplierEditBtn, { borderColor: pal.ac + '60' }]}
+                      onPress={() => openEdit(s)}
+                    >
+                      <Text style={{ color: pal.ac, fontSize: fontSize.xs, fontWeight: '700' }}>수정</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.supplierEditBtn, { borderColor: pal.rd + '50' }]}
+                      onPress={() => handleDelete(s.id)}
+                    >
+                      <Text style={{ color: pal.rd, fontSize: fontSize.xs, fontWeight: '700' }}>삭제</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* 월별 매입액 */}
+                {months.length > 0 && (
+                  <View style={[styles.supplierHistSection, { borderTopColor: pal.bd }]}>
+                    <Text style={[styles.supplierHistTitle, { color: pal.t2 }]}>월별 매입 현황</Text>
+                    {months.map(m => (
+                      <View key={m} style={styles.supplierHistRow}>
+                        <Text style={[styles.supplierHistMonth, { color: pal.t3 }]}>{m}</Text>
+                        <Text style={[styles.supplierHistAmt, { color: pal.ac }]}>
+                          {(history[m] / 10000).toFixed(0)}만원
+                        </Text>
+                      </View>
+                    ))}
+                    <View style={[styles.supplierHistRow, { marginTop: 4 }]}>
+                      <Text style={[styles.supplierHistMonth, { color: pal.t2, fontWeight: '800' }]}>누적 합계</Text>
+                      <Text style={[styles.supplierHistAmt, { color: pal.gn, fontWeight: '900' }]}>
+                        {(totalBuy / 10000).toFixed(0)}만원
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            );
+          })
+        )}
+
+        <PrimaryBtn label="+ 거래처 추가" onPress={openAdd} color={pal.pu} style={{ marginTop: spacing.sm }} />
+      </ScrollView>
+
+      {/* 거래처 추가/수정 모달 */}
+      <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: pal.bg }}>
+          <View style={[styles.modalHeader, { borderBottomColor: pal.bd, backgroundColor: pal.s1 }]}>
+            <Text style={[styles.modalTitle, { color: pal.tx }]}>{editTarget ? '거래처 수정' : '거래처 추가'}</Text>
+            <TouchableOpacity onPress={() => setModal(false)}>
+              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+            {[
+              { label: '업체명 *', key: 'name', placeholder: '예: 한국축산' },
+              { label: '연락처',   key: 'phone', placeholder: '예: 010-1234-5678', keyboardType: 'phone-pad' },
+              { label: '메모',     key: 'memo',  placeholder: '예: 등심·채끝 전문, 매주 화/금 입고' },
+            ].map(f => (
+              <View key={f.key} style={{ marginBottom: spacing.md }}>
+                <Text style={[styles.fieldLabel, { color: pal.t2 }]}>{f.label}</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: pal.s2, borderColor: pal.bd, color: pal.tx }]}
+                  value={form[f.key]}
+                  onChangeText={t => setForm({ ...form, [f.key]: t })}
+                  placeholder={f.placeholder}
+                  placeholderTextColor={pal.t3}
+                  keyboardType={f.keyboardType}
+                />
+              </View>
+            ))}
+            <PrimaryBtn label={editTarget ? '수정 완료' : '추가 완료'} onPress={handleSave} />
+            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
+          </ScrollView>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
 const ExpiryGroup = ({ label, items, color, onEdit, onLog, pal }) => (
   <View style={styles.expiryGroup}>
     <Text style={[styles.expiryGroupLabel, { color }]}>{label}</Text>
@@ -657,8 +901,10 @@ const ResultRow = ({ label, value, color, big, pal }) => (
 );
 
 const styles = StyleSheet.create({
-  tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
-  tab: { flex: 1, paddingVertical: 13, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
+  // 탭바 — 가로 스크롤
+  tabBarScroll: { borderBottomWidth: 1, flexGrow: 0 },
+  tabBarContent: { flexDirection: 'row' },
+  tab: { paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent', minWidth: 80 },
   tabText: { fontSize: 13, fontWeight: '600' },
   tabTextActive: { fontWeight: '900' },
 
@@ -684,6 +930,17 @@ const styles = StyleSheet.create({
 
   emptyBox:  { alignItems: 'center', paddingVertical: 60 },
   emptyText: { fontSize: fontSize.md, fontWeight: '600' },
+
+  // 재고 현황 빈 상태
+  stockEmptyBox: {
+    borderRadius: radius.lg, borderWidth: 1,
+    padding: spacing.xl, marginBottom: spacing.md,
+    alignItems: 'center', ...shadow.sm,
+  },
+  stockEmptyTitle: { fontSize: fontSize.md, fontWeight: '900', marginBottom: spacing.sm, textAlign: 'center' },
+  stockEmptyDesc:  { fontSize: fontSize.sm, fontWeight: '600', textAlign: 'center', lineHeight: 22, marginBottom: spacing.md, color: '#94a3b8' },
+  stockEmptyTip:   { borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, width: '100%' },
+  stockEmptyTipText: { fontSize: fontSize.xs, fontWeight: '700', textAlign: 'center', lineHeight: 20 },
 
   // 판매내역
   soldGroup:       { marginBottom: spacing.lg },
@@ -769,4 +1026,32 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: fontSize.lg, fontWeight: '900' },
   closeBtn:   { fontSize: 22, padding: 4 },
   input: { borderWidth: 1.5, borderRadius: radius.sm, padding: spacing.md, fontSize: fontSize.sm, minHeight: 52 },
+
+  // 거래처 선택 버튼 (재고 추가 모달 내)
+  supplierPickerBtn: {
+    borderWidth: 1.5, borderRadius: radius.sm, padding: spacing.md, minHeight: 52,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+
+  // 거래처 선택 피커 모달
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  pickerBox:     { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32 },
+  pickerHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, borderBottomWidth: 1 },
+  pickerTitle:   { fontSize: fontSize.md, fontWeight: '900' },
+  pickerItem:    { paddingVertical: 14, paddingHorizontal: spacing.lg, borderBottomWidth: 1 },
+  pickerItemName:{ fontSize: fontSize.md, fontWeight: '700' },
+  pickerItemSub: { fontSize: fontSize.xs, marginTop: 2 },
+
+  // 거래처 카드
+  supplierCard:     { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
+  supplierCardTop:  { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  supplierName:     { fontSize: fontSize.md, fontWeight: '900', marginBottom: 4 },
+  supplierPhone:    { fontSize: fontSize.xs, marginBottom: 2 },
+  supplierMemo:     { fontSize: fontSize.xs },
+  supplierEditBtn:  { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center' },
+  supplierHistSection: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1 },
+  supplierHistTitle:   { fontSize: fontSize.xs, fontWeight: '700', marginBottom: 6 },
+  supplierHistRow:     { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
+  supplierHistMonth:   { fontSize: fontSize.xs, fontWeight: '600' },
+  supplierHistAmt:     { fontSize: fontSize.xs, fontWeight: '800' },
 });
