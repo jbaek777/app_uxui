@@ -11,11 +11,13 @@ import { businessInfo } from '../data/mockData';
 
 // ─── 문서 일련번호 생성 ──────────────────────────────────────
 const DOC_PREFIX = {
-  hygiene : 'HG',
-  temp    : 'TM',
-  aging   : 'AG',
-  closing : 'CL',
-  staff   : 'ST',
+  hygiene   : 'HG',
+  temp      : 'TM',
+  aging     : 'AG',
+  closing   : 'CL',
+  staff     : 'ST',
+  education : 'ED',
+  tax       : 'TX',
 };
 
 function genDocNo(type) {
@@ -218,8 +220,8 @@ export const PDF_CSS = `
 `;
 
 // ─── 공통 헤더 빌더 ─────────────────────────────────────────
-export function buildHeader({ title, type, period }) {
-  const biz = businessInfo;
+export function buildHeader({ title, type, period, biz: bizOverride }) {
+  const biz = bizOverride || businessInfo;
   const docNo = genDocNo(type);
   const printDate = new Date().toLocaleDateString('ko-KR', {
     year: 'numeric', month: '2-digit', day: '2-digit',
@@ -293,7 +295,7 @@ export function buildHTML(bodyContent) {
 // ═══════════════════════════════════════════════════════════════
 
 /** 위생관리 점검표 */
-export function genHygieneHTML(logs) {
+export function genHygieneHTML(logs, biz) {
   const period = logs.length > 0
     ? `${logs[logs.length - 1].date} ~ ${logs[0].date}`
     : new Date().toLocaleDateString('ko-KR');
@@ -334,7 +336,7 @@ export function genHygieneHTML(logs) {
   const warnCount = logs.length - passCount;
 
   const body = `
-    ${buildHeader({ title: '위생관리 점검표', type: 'hygiene', period })}
+    ${buildHeader({ title: '위생관리 점검표', type: 'hygiene', period, biz })}
 
     <div class="summary-grid">
       <div class="summary-box">
@@ -383,7 +385,7 @@ export function genHygieneHTML(logs) {
 }
 
 /** 온도관리 기록부 */
-export function genTempHTML(records) {
+export function genTempHTML(records, biz) {
   const period = records.length > 0
     ? `${records[records.length - 1].date} ~ ${records[0].date}`
     : new Date().toLocaleDateString('ko-KR');
@@ -409,7 +411,7 @@ export function genTempHTML(records) {
   const warnCount = records.filter(r => r.status === 'warn').length;
 
   const body = `
-    ${buildHeader({ title: '온도관리 기록부', type: 'temp', period })}
+    ${buildHeader({ title: '온도관리 기록부', type: 'temp', period, biz })}
 
     <div class="summary-grid">
       <div class="summary-box">
@@ -454,7 +456,7 @@ export function genTempHTML(records) {
 }
 
 /** 숙성 관리 대장 */
-export function genAgingHTML(items) {
+export function genAgingHTML(items, biz) {
   const active = items.filter(i => !i.completed);
   const done   = items.filter(i => i.completed);
 
@@ -486,7 +488,7 @@ export function genAgingHTML(items) {
 
   const body = `
     ${buildHeader({ title: '숙성 관리 대장', type: 'aging',
-      period: new Date().toLocaleDateString('ko-KR') })}
+      period: new Date().toLocaleDateString('ko-KR'), biz })}
 
     <div class="summary-grid">
       <div class="summary-box">
@@ -558,7 +560,7 @@ export function genAgingHTML(items) {
 }
 
 /** 일일 마감 정산서 */
-export function genClosingHTML(sales, waste, inventory) {
+export function genClosingHTML(sales, waste, inventory, biz) {
   const today = new Date().toLocaleDateString('ko-KR');
   const totalSales  = sales.reduce((s, r) => s + r.total, 0);
   const totalWaste  = waste.reduce((s, w) => s + (parseFloat(w.qty) || 0) * (w.lossUnit || 5000), 0);
@@ -595,7 +597,7 @@ export function genClosingHTML(sales, waste, inventory) {
   }).join('');
 
   const body = `
-    ${buildHeader({ title: '일일 마감 정산서', type: 'closing', period: today })}
+    ${buildHeader({ title: '일일 마감 정산서', type: 'closing', period: today, biz })}
 
     <div class="summary-grid">
       <div class="summary-box">
@@ -672,7 +674,7 @@ export function genClosingHTML(sales, waste, inventory) {
 }
 
 /** 직원 보건증 현황 */
-export function genStaffHTML(staff) {
+export function genStaffHTML(staff, biz) {
   const today = new Date();
 
   const getDaysLeft = (dateStr) => {
@@ -705,7 +707,7 @@ export function genStaffHTML(staff) {
 
   const body = `
     ${buildHeader({ title: '직원 보건증 현황', type: 'staff',
-      period: today.toLocaleDateString('ko-KR') })}
+      period: today.toLocaleDateString('ko-KR'), biz })}
 
     <div class="summary-grid">
       <div class="summary-box">
@@ -745,6 +747,174 @@ export function genStaffHTML(staff) {
     ${buildSignature(['작성자', '위생관리자'])}
     ${buildLegal('보건증은 「식품위생법」 제40조에 따라 1년마다 갱신하여야 합니다. 만료 30일 전 사전 갱신을 권장합니다.')}
     ${buildFooter()}`;
+
+  return buildHTML(body);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 교육일지 전체 목록 HTML
+// ═══════════════════════════════════════════════════════════════
+export function genEducationAllHTML(logs, biz) {
+  const period = logs.length > 0
+    ? `${logs[logs.length - 1].date} ~ ${logs[0].date}`
+    : new Date().toLocaleDateString('ko-KR');
+
+  const rows = logs.length === 0
+    ? `<tr><td colspan="4" class="center" style="color:#9ca3af;padding:20px;">기록된 교육일지가 없습니다</td></tr>`
+    : logs.map((log, idx) => `
+      <tr>
+        <td class="center bold">${logs.length - idx}</td>
+        <td class="center">${log.date}</td>
+        <td>${log.attendees || '—'}</td>
+        <td>${(log.topics || []).map((t, i) => `${i + 1}. ${t}`).join('<br>')}</td>
+        <td>${log.notes || '—'}</td>
+      </tr>`).join('');
+
+  const body = `
+    ${buildHeader({ title: '영업자 자체위생교육 실시일지', type: 'education', period, biz })}
+
+    <div class="summary-grid">
+      <div class="summary-box">
+        <div class="s-label">총 교육 횟수</div>
+        <div class="s-value">${logs.length}건</div>
+      </div>
+      <div class="summary-box">
+        <div class="s-label">출력일</div>
+        <div class="s-value" style="font-size:13px">${new Date().toLocaleDateString('ko-KR')}</div>
+      </div>
+    </div>
+
+    <div class="section-title">교육 실시 기록</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="center" style="width:40px">No.</th>
+          <th class="center" style="width:100px">교육일시</th>
+          <th style="width:120px">교육대상</th>
+          <th>교육내용</th>
+          <th style="width:120px">기타사항</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <div class="legal-note">
+      ※ 본 일지는 「식품위생법」 제41조(영업자 등의 교육) 및 관련 고시에 따른 자체위생교육 기록입니다.<br>
+      ※ 교육 이수 여부는 관할 보건소 점검 시 제출 자료로 활용될 수 있습니다.
+    </div>
+
+    ${buildSignature(['교육실시자', '확인자(점장)', '대표자'])}
+    ${buildFooter()}
+  `;
+
+  return buildHTML(body);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 세무 리포트 PDF HTML
+// ═══════════════════════════════════════════════════════════════
+export function genTaxReportHTML(months, biz, year) {
+  const bizName = biz?.bizName || '';
+  const bizNo   = biz?.bizNo   || '';
+
+  // 연간 합계
+  const annual = months.reduce((acc, m) => ({
+    sales:  acc.sales  + (m.totalSales  || 0),
+    cost:   acc.cost   + (m.totalCost   || 0),
+    margin: acc.margin + (m.totalMargin || 0),
+    cnt:    acc.cnt    + (m.salesCount  || 0),
+  }), { sales: 0, cost: 0, margin: 0, cnt: 0 });
+
+  const annualPct = annual.sales > 0
+    ? ((annual.margin / annual.sales) * 100).toFixed(1)
+    : '0.0';
+
+  function fmt(n) {
+    return Math.round(n || 0).toLocaleString('ko-KR');
+  }
+  function fmtMonth(key) {
+    const [y, m] = key.split('-');
+    return `${y}년 ${parseInt(m)}월`;
+  }
+
+  const monthRows = months.length === 0
+    ? `<tr><td colspan="7" class="center" style="color:#9ca3af;padding:20px;">${year}년 데이터가 없습니다</td></tr>`
+    : months.map(m => {
+        const pct = m.totalSales > 0
+          ? ((m.totalMargin / m.totalSales) * 100).toFixed(1)
+          : '0.0';
+        const marginColor = m.totalMargin >= 0 ? '#15803d' : '#C0392B';
+        return `
+          <tr>
+            <td class="center bold">${fmtMonth(m.month)}</td>
+            <td class="center">${m.salesCount}건</td>
+            <td class="right">${m.totalQty ? m.totalQty.toFixed(1) : '0.0'}kg</td>
+            <td class="right bold">${fmt(m.totalSales)}원</td>
+            <td class="right">${fmt(m.totalCost)}원</td>
+            <td class="right bold" style="color:${marginColor}">${fmt(m.totalMargin)}원</td>
+            <td class="right" style="color:${marginColor}">${pct}%</td>
+          </tr>`;
+      }).join('');
+
+  const body = `
+    ${buildHeader({ title: `${year}년 세무 리포트`, type: 'tax', period: `${year}년 1월 ~ ${year}년 12월`, biz })}
+
+    <div class="summary-grid">
+      <div class="summary-box">
+        <div class="s-label">연간 매출</div>
+        <div class="s-value green">${fmt(annual.sales)}원</div>
+      </div>
+      <div class="summary-box">
+        <div class="s-label">연간 매입</div>
+        <div class="s-value warn">${fmt(annual.cost)}원</div>
+      </div>
+      <div class="summary-box">
+        <div class="s-label">연간 마진</div>
+        <div class="s-value ${annual.margin >= 0 ? 'green' : 'accent'}">${fmt(annual.margin)}원</div>
+      </div>
+      <div class="summary-box">
+        <div class="s-label">마진율</div>
+        <div class="s-value accent">${annualPct}%</div>
+      </div>
+    </div>
+
+    <div class="section-title">월별 매출·매입·마진 현황</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="center">월</th>
+          <th class="center">판매건수</th>
+          <th class="center">총중량</th>
+          <th class="center">매출액</th>
+          <th class="center">매입액</th>
+          <th class="center">마진액</th>
+          <th class="center">마진율</th>
+        </tr>
+      </thead>
+      <tbody>${monthRows}</tbody>
+      <tfoot>
+        <tr style="background:#f3f4f6;font-weight:900;">
+          <td class="bold">합계</td>
+          <td class="center">${annual.cnt}건</td>
+          <td></td>
+          <td class="right bold">${fmt(annual.sales)}원</td>
+          <td class="right">${fmt(annual.cost)}원</td>
+          <td class="right bold">${fmt(annual.margin)}원</td>
+          <td class="right">${annualPct}%</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="legal-note">
+      ※ 본 리포트는 MeatBig 앱 데이터 기준 참고용이며, 실제 세무 신고 금액과 다를 수 있습니다.<br>
+      ※ 식육(생육·냉장·냉동)은 부가가치세법 제26조에 따라 면세 품목입니다.<br>
+      ※ 가공육(소시지·햄 등)은 과세 품목(10%)이므로 별도 신고가 필요합니다.<br>
+      ※ 부가세 신고 기간: 1기(1~6월) → 7월 25일 / 2기(7~12월) → 1월 25일<br>
+      ※ 출력일: ${new Date().toLocaleDateString('ko-KR')} · 매장명: ${bizName} · 사업자번호: ${bizNo}
+    </div>
+
+    ${buildFooter()}
+  `;
 
   return buildHTML(body);
 }

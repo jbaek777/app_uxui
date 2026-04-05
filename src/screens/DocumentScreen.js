@@ -5,9 +5,11 @@ import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } fr
 import { useTheme } from '../lib/ThemeContext';
 import { useRole, OWNER_ONLY } from '../lib/RoleContext';
 import { PrimaryBtn } from '../components/UI';
-import { hygieneData, agingData, tempData, staffData } from '../data/mockData';
+import { hygieneData, agingData, tempData, staffData, meats as mockMeats } from '../data/mockData';
+import { educationStore, meatStore } from '../lib/dataStore';
 import {
-  genHygieneHTML, genTempHTML, genAgingHTML, genStaffHTML, printAndShare,
+  genHygieneHTML, genTempHTML, genAgingHTML, genStaffHTML,
+  genEducationAllHTML, genTaxReportHTML, printAndShare,
 } from '../lib/pdfTemplate';
 
 async function loadBiz() {
@@ -16,6 +18,45 @@ async function loadBiz() {
     if (raw) return JSON.parse(raw);
   } catch (_) {}
   return null;
+}
+
+// ── 세무리포트용 월별 집계 (TaxReportScreen과 동일 로직) ──────
+function monthKey(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr.replace(/\./g, '-'));
+  if (isNaN(d)) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function buildMonthlyReport(items) {
+  const byMonth = {};
+  items.forEach(item => {
+    if (!item.sold) return;
+    const key = monthKey(item.soldDate) || monthKey(item.expire);
+    if (!key) return;
+    if (!byMonth[key]) {
+      byMonth[key] = { month: key, salesCount: 0, totalQty: 0, totalSales: 0, totalCost: 0, totalMargin: 0, exemptSales: 0, taxableSales: 0, items: [] };
+    }
+    const row = byMonth[key];
+    const sales = (item.sellPrice || 0) * (item.qty || 0);
+    const cost  = (item.buyPrice  || 0) * (item.qty || 0);
+    row.salesCount += 1;
+    row.totalQty   += item.qty || 0;
+    row.totalSales += sales;
+    row.totalCost  += cost;
+    row.totalMargin += (sales - cost);
+    row.exemptSales += sales;
+    row.items.push(item);
+  });
+  items.forEach(item => {
+    if (item.sold) return;
+    const key = monthKey(item.inboundDate) || monthKey(item.expire);
+    if (!key) return;
+    if (!byMonth[key]) {
+      byMonth[key] = { month: key, salesCount: 0, totalQty: 0, totalSales: 0, totalCost: 0, totalMargin: 0, exemptSales: 0, taxableSales: 0, items: [] };
+    }
+    byMonth[key].totalCost += (item.buyPrice || 0) * (item.qty || 0);
+  });
+  return Object.values(byMonth).sort((a, b) => b.month.localeCompare(a.month));
 }
 
 const DOCS = [
@@ -56,19 +97,37 @@ const DOCS = [
     getHTML: (biz) => genStaffHTML(staffData, biz),
   },
   {
+    id: 'education',
+    title: '영업자 자체위생교육 일지',
+    icon: '📚',
+    desc: '월 1회 직원 위생교육 실시 기록',
+    color: '#7C3AED',
+    screen: 'Education',
+    getHTML: async (biz) => {
+      const logs = await educationStore.load();
+      return genEducationAllHTML(logs, biz);
+    },
+  },
+  {
     id: 'tax',
     title: '세무 리포트',
     icon: '📊',
-    desc: '월별 매출 요약 · 부가세 신고 참고 · CSV 다운로드',
+    desc: '연간 매출·매입·마진 요약 · 부가세 신고 참고용',
     color: '#00ACC1',
     screen: 'TaxReport',
-    getHTML: null,  // PDF 없음 — 화면 이동만
+    getHTML: async (biz) => {
+      const items = await meatStore.load(mockMeats);
+      const months = buildMonthlyReport(items);
+      const year = new Date().getFullYear();
+      const filtered = months.filter(m => m.month.startsWith(String(year)));
+      return genTaxReportHTML(filtered, biz, year);
+    },
   },
 ];
 
 async function printDoc(doc) {
   const biz = await loadBiz();
-  const html = doc.getHTML(biz);
+  const html = await doc.getHTML(biz);  // async getHTML 지원 (교육일지·세무리포트)
   if (!html || html.trim().length === 0) {
     Alert.alert('오류', 'PDF 내용을 생성할 수 없습니다.');
     return;
@@ -131,7 +190,7 @@ export default function DocumentScreen({ navigation }) {
           <Text style={{ fontSize: 32 }}>🖨️</Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.printBigLabel}>출력하기</Text>
-            <Text style={styles.printBigDesc}>위생·온도·숙성·보건증 서류를 PDF로 출력</Text>
+            <Text style={styles.printBigDesc}>위생·온도·숙성·보건증·교육일지·세무리포트 PDF 출력</Text>
           </View>
           <View style={styles.printBigBadge}>
             <Text style={styles.printBigBadgeText}>PDF</Text>
@@ -194,7 +253,8 @@ export default function DocumentScreen({ navigation }) {
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
             <Text style={{ fontSize: fontSize.sm, color: pal.t3, marginBottom: spacing.lg }}>
-              선택한 서류를 PDF로 생성하여 공유하거나 저장합니다
+              선택한 서류를 PDF로 생성하여 공유하거나 저장합니다{'\n'}
+              <Text style={{ color: pal.t3, fontSize: fontSize.xxs }}>교육일지·세무리포트는 현재 저장된 전체 데이터 기준</Text>
             </Text>
             {DOCS.filter(d => d.getHTML !== null).map(doc => (
               <TouchableOpacity
