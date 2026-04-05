@@ -2,9 +2,10 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
-// 환경변수 또는 직접 입력
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
+// ⚠️ SERVICE_KEY는 클라이언트 앱에 절대 포함 금지 — Supabase Edge Function에서만 사용
+// export const supabaseAdmin = ... (제거됨)
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -14,6 +15,24 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: false,
   },
 });
+
+// ─── 익명 인증 초기화 ────────────────────────────────────
+// 앱 시작 시 한 번 호출 — 세션이 있으면 재사용, 없으면 익명 로그인
+export async function ensureAuth() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) return session.user;
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) {
+      console.warn('[auth] 익명 로그인 실패:', error.message);
+      return null;
+    }
+    return data.user;
+  } catch (e) {
+    console.warn('[auth] ensureAuth 오류:', e.message);
+    return null;
+  }
+}
 
 // ─── 숙성관리 ───────────────────────────────────────────
 export const agingApi = {
