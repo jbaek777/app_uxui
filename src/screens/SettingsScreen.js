@@ -15,6 +15,7 @@ import {
 } from '../utils/notifications';
 import { useRole } from '../lib/RoleContext';
 import { useSubscription, PLANS } from '../lib/SubscriptionContext';
+import { useAuth } from '../lib/AuthContext';
 
 const NOTIF_KEY = '@meatbig_notifications';
 
@@ -23,6 +24,20 @@ export default function SettingsScreen({ route, navigation }) {
   const pal = isDark ? darkColors : lightColors;
   const { role, staffName, switchToStaff, requestOwnerMode, changePin, ownerPin } = useRole();
   const { sub, plan: currentPlan, isPremium, isTrial, daysLeft, cancelSubscription } = useSubscription();
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = () => {
+    Alert.alert(
+      '로그아웃',
+      '로그아웃하면 이 기기에서 데이터가 삭제됩니다.\n(클라우드에 저장된 데이터는 유지됩니다)',
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '로그아웃', style: 'destructive', onPress: async () => {
+          await signOut();
+        }},
+      ]
+    );
+  };
   const [pinChangeModal, setPinChangeModal] = useState(false);
   const [newPin, setNewPin] = useState('');
   const [newPinConfirm, setNewPinConfirm] = useState('');
@@ -331,8 +346,18 @@ export default function SettingsScreen({ route, navigation }) {
       <SectionTitle icon="ℹ️" label="앱 정보" pal={pal} />
       <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
         <InfoRow label="앱 이름" value="MeatBig (미트빅)" pal={pal} />
-        <InfoRow label="버전" value="v1.0.0" last pal={pal} />
+        <InfoRow label="버전" value="v1.0.0" pal={pal} />
+        <InfoRow label="계정" value={user?.email || '—'} last pal={pal} />
       </View>
+
+      {/* 로그아웃 */}
+      <TouchableOpacity
+        style={[styles.logoutBtn, { borderColor: pal.rd }]}
+        onPress={handleSignOut}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.logoutText, { color: pal.rd }]}>🚪 로그아웃</Text>
+      </TouchableOpacity>
 
       {/* PIN 변경 모달 */}
       <Modal visible={pinChangeModal} animationType="slide" presentationStyle="pageSheet">
@@ -523,6 +548,12 @@ const styles = StyleSheet.create({
     ...shadow.sm,
     overflow: 'hidden',
   },
+  logoutBtn: {
+    borderWidth: 1.5, borderRadius: radius.md,
+    paddingVertical: 16, alignItems: 'center',
+    marginTop: spacing.sm, marginBottom: spacing.xl,
+  },
+  logoutText: { fontSize: fontSize.sm, fontWeight: '800' },
 
   infoRow: {
     flexDirection: 'row',

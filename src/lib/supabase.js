@@ -16,18 +16,11 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 });
 
-// ─── 익명 인증 초기화 ────────────────────────────────────
-// 앱 시작 시 한 번 호출 — 세션이 있으면 재사용, 없으면 익명 로그인
+// ─── 현재 세션 유저 반환 (없으면 null) ──────────────────
 export async function ensureAuth() {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) return session.user;
-    const { data, error } = await supabase.auth.signInAnonymously();
-    if (error) {
-      console.warn('[auth] 익명 로그인 실패:', error.message);
-      return null;
-    }
-    return data.user;
+    return session?.user ?? null;
   } catch (e) {
     console.warn('[auth] ensureAuth 오류:', e.message);
     return null;

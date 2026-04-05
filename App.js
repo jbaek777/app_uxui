@@ -17,9 +17,11 @@ import { NetworkProvider, useNetwork } from './src/lib/NetworkContext';
 import { RoleProvider, useRole, STAFF_ALLOWED_TABS } from './src/lib/RoleContext';
 import { FeatureFlagsProvider } from './src/lib/FeatureFlagsContext';
 import { SubscriptionProvider } from './src/lib/SubscriptionContext';
+import { AuthProvider, useAuth } from './src/lib/AuthContext';
 import PaywallScreen from './src/screens/PaywallScreen';
 import TaxReportScreen from './src/screens/TaxReportScreen';
 import SplashScreen from './src/screens/SplashScreen';
+import LoginScreen from './src/screens/LoginScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import ScanScreen from './src/screens/ScanScreen';
@@ -33,7 +35,6 @@ import UploadScreen from './src/screens/UploadScreen';
 import { TempScreen, StaffScreen } from './src/screens/OtherScreens';
 import EducationScreen from './src/screens/EducationScreen';
 import { requestNotificationPermission, scheduleDailyHygieneReminder, scheduleDailyExpiryReminder } from './src/utils/notifications';
-import { ensureAuth } from './src/lib/supabase';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -258,13 +259,12 @@ function MainTabs({ bizData }) {
 function AppInner() {
   const { isDark } = useTheme();
   const { initRole, roleReady } = useRole();
+  const { user, authReady, loadStoreFromCloud } = useAuth();
   const [phase, setPhase] = useState('splash');
   const [bizData, setBizData] = useState(null);
 
   useEffect(() => {
     (async () => {
-      // 익명 인증 먼저 — RLS가 auth.uid() 기준이므로 DB 접근 전 필수
-      await ensureAuth();
       const granted = await requestNotificationPermission();
       if (granted) {
         await scheduleDailyHygieneReminder();
@@ -274,16 +274,66 @@ function AppInner() {
   }, []);
 
   const handleSplashDone = async () => {
+    // authReady 아직 안됐으면 잠깐 대기
+    if (!authReady) { setPhase('splash'); return; }
+
+    // 로그인 안 된 상태 → 로그인 화면
+    if (!user) { setPhase('login'); return; }
+
+    // 로그인 됐으면 가게 데이터 확인
     try {
+      // 1) 로컬 먼저 확인
       const onboarded = await AsyncStorage.getItem('@meatbig_onboarded');
-      const biz = await AsyncStorage.getItem('@meatbig_biz');
-      if (onboarded === 'true' && biz) {
-        setBizData(JSON.parse(biz));
-        // role은 RoleContext useEffect에서 AsyncStorage 복원 처리됨
+      const bizRaw    = await AsyncStorage.getItem('@meatbig_biz');
+
+      if (onboarded === 'true' && bizRaw) {
+        setBizData(JSON.parse(bizRaw));
         setPhase('main');
-      } else {
-        setPhase('onboarding');
+        return;
       }
+
+      // 2) 로컬 없으면 Supabase에서 복원 시도 (기기 변경 등)
+      const cloudBiz = await loadStoreFromCloud();
+      if (cloudBiz) {
+        setBizData(cloudBiz);
+        setPhase('main');
+        return;
+      }
+
+      // 3) 둘 다 없으면 온보딩
+      setPhase('onboarding');
+    } catch {
+      setPhase('onboarding');
+    }
+  };
+
+  // authReady 변경 시 splash 재처리
+  useEffect(() => {
+    if (phase === 'splash' && authReady) {
+      handleSplashDone();
+    }
+  }, [authReady]);
+
+  // 로그인 완료 콜백
+  const handleLoginDone = async (type) => {
+    try {
+      // 로그인 후 가게 데이터 확인
+      const onboarded = await AsyncStorage.getItem('@meatbig_onboarded');
+      const bizRaw    = await AsyncStorage.getItem('@meatbig_biz');
+
+      if (onboarded === 'true' && bizRaw) {
+        setBizData(JSON.parse(bizRaw));
+        setPhase('main');
+        return;
+      }
+      // Supabase에서 복원 시도
+      const cloudBiz = await loadStoreFromCloud();
+      if (cloudBiz) {
+        setBizData(cloudBiz);
+        setPhase('main');
+        return;
+      }
+      setPhase('onboarding');
     } catch {
       setPhase('onboarding');
     }
@@ -293,22 +343,32 @@ function AppInner() {
   const handleOnboardingDone = async ({ biz, currentUser }) => {
     setBizData(biz);
     if (currentUser && currentUser.role !== '사장') {
-      // 직원으로 가입 완료 → 자동으로 직원 모드 진입
       await initRole('staff', currentUser.name, currentUser.id || null);
     } else {
-      // 사장 온보딩 → 사장 모드 유지
       await initRole('owner', null, null);
     }
     setPhase('main');
   };
 
-  // RoleContext AsyncStorage 복원 완료 전까지 스플래시 유지
+  // 스플래시 & roleReady 대기
   if (phase === 'splash' || (phase === 'main' && !roleReady)) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <StatusBar style={isDark ? 'light' : 'dark'} />
           <SplashScreen onDone={handleSplashDone} />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    );
+  }
+
+  // 로그인 화면
+  if (phase === 'login') {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <StatusBar style="light" />
+          <LoginScreen onDone={handleLoginDone} />
         </SafeAreaProvider>
       </GestureHandlerRootView>
     );
@@ -353,17 +413,19 @@ function OfflineBanner() {
 // ── 앱 루트 ──────────────────────────────────────────────
 function App() {
   return (
-    <ThemeProvider>
-      <NetworkProvider>
-        <RoleProvider>
-          <FeatureFlagsProvider>
-            <SubscriptionProvider>
-              <AppInner />
-            </SubscriptionProvider>
-          </FeatureFlagsProvider>
-        </RoleProvider>
-      </NetworkProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <NetworkProvider>
+          <RoleProvider>
+            <FeatureFlagsProvider>
+              <SubscriptionProvider>
+                <AppInner />
+              </SubscriptionProvider>
+            </FeatureFlagsProvider>
+          </RoleProvider>
+        </NetworkProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 

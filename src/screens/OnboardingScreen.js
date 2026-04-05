@@ -6,6 +6,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, fontSize, spacing, radius, shadow } from '../theme';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
+import { supabase } from '../lib/supabase';
 
 const SPECIES = ['한우', '육우', '한돈', '수입우', '닭', '오리'];
 const ROLES = ['사장', '직원'];
@@ -134,17 +135,51 @@ export default function OnboardingScreen({ onDone }) {
       return;
     }
     // 직원 초대 코드 생성 (사업자번호 앞 3자리 + 4자리 랜덤)
-    const bizPrefix = biz.bizNo.replace(/-/g, '').slice(0, 3);
+    const bizPrefix = biz.bizNo.replace(/-/g, '').slice(0, 3) || '000';
     const invitePin = bizPrefix + String(Math.floor(1000 + Math.random() * 9000));
+    const bizFull = { ...biz, species };
     try {
+      // 1) 로컬 저장
       await AsyncStorage.setItem('@meatbig_onboarded', 'true');
-      await AsyncStorage.setItem('@meatbig_biz', JSON.stringify({ ...biz, species }));
+      await AsyncStorage.setItem('@meatbig_biz', JSON.stringify(bizFull));
       await AsyncStorage.setItem('@meatbig_staff', JSON.stringify(valid));
       await AsyncStorage.setItem('@meatbig_invite_pin', invitePin);
+
+      // 2) Supabase stores 테이블 저장 (기기 변경 시 복원용)
+      const { data: storeRow, error: storeErr } = await supabase
+        .from('stores')
+        .upsert({
+          store_id:   biz.bizNo.replace(/-/g, '') || `store_${Date.now()}`,
+          store_name: biz.bizName,
+          owner:      biz.owner,
+          biz_no:     biz.bizNo,
+          biz_type:   biz.bizType,
+          region_si:  biz.addrSi,
+          region_gu:  biz.addrGu,
+          region_dong:biz.addrDong,
+          species,
+          invite_pin: invitePin,
+        }, { onConflict: 'store_id' })
+        .select()
+        .single();
+
+      // 3) store_members 저장 (사장 계정)
+      if (!storeErr && storeRow) {
+        await supabase.from('store_members').upsert(
+          valid.map(s => ({
+            store_id: storeRow.id,
+            name: s.name,
+            role: s.role,
+            pin: s.pin,
+          })),
+          { onConflict: 'store_id, name' }
+        );
+      }
+
       Alert.alert(
         '직원 초대 코드 📋',
         `직원이 앱에 가입할 때 사용하는 코드:\n\n🔑 ${invitePin}\n\n이 코드를 직원에게 알려주세요.\n(설정 → 직원 관리에서 다시 확인 가능)`,
-        [{ text: '확인', onPress: () => onDone({ biz: { ...biz, species }, staff: valid, currentUser: valid[0] }) }]
+        [{ text: '확인', onPress: () => onDone({ biz: bizFull, staff: valid, currentUser: valid[0] }) }]
       );
     } catch {
       Alert.alert('저장 오류', '다시 시도해주세요.');
@@ -158,34 +193,69 @@ export default function OnboardingScreen({ onDone }) {
     if (!empPin.trim()) { Alert.alert('입력 오류', '초대 코드를 입력해주세요.'); return; }
 
     try {
-      const storedPin = await AsyncStorage.getItem('@meatbig_invite_pin');
-      const storedBiz = await AsyncStorage.getItem('@meatbig_biz');
-
-      if (!storedPin || !storedBiz) {
-        Alert.alert('가입 불가', '해당 사업장이 아직 앱을 등록하지 않았습니다.\n사장님께 먼저 앱 등록을 요청하세요.');
-        return;
-      }
-      const bizData = JSON.parse(storedBiz);
       const inputBizNo = empBizNo.replace(/-/g, '');
-      const storedBizNo = bizData.bizNo.replace(/-/g, '');
 
-      if (inputBizNo !== storedBizNo) {
-        Alert.alert('인증 실패', '사업자번호가 일치하지 않습니다.');
+      // Supabase에서 초대코드 + 사업자번호 검증
+      const { data: storeRow, error } = await supabase
+        .from('stores')
+        .select('*')
+        .eq('store_id', inputBizNo)
+        .eq('invite_pin', empPin.trim())
+        .maybeSingle();
+
+      if (error || !storeRow) {
+        // 로컬 폴백 (같은 기기인 경우)
+        const storedPin = await AsyncStorage.getItem('@meatbig_invite_pin');
+        const storedBiz = await AsyncStorage.getItem('@meatbig_biz');
+        if (!storedPin || !storedBiz) {
+          Alert.alert('인증 실패', '사업자번호 또는 초대 코드가 올바르지 않습니다.');
+          return;
+        }
+        const bizData = JSON.parse(storedBiz);
+        if (bizData.bizNo.replace(/-/g, '') !== inputBizNo || storedPin !== empPin.trim()) {
+          Alert.alert('인증 실패', '사업자번호 또는 초대 코드가 올바르지 않습니다.');
+          return;
+        }
+        // 로컬 인증 성공
+        const storedStaff = await AsyncStorage.getItem('@meatbig_staff');
+        const staffList = storedStaff ? JSON.parse(storedStaff) : [];
+        const newEmployee = { name: empName.trim(), role: '직원', pin: '', id: Date.now().toString() };
+        const updatedStaff = [...staffList, newEmployee];
+        await AsyncStorage.setItem('@meatbig_staff', JSON.stringify(updatedStaff));
+        await AsyncStorage.setItem('@meatbig_onboarded', 'true');
+        onDone({ biz: bizData, staff: updatedStaff, currentUser: newEmployee });
         return;
       }
-      if (empPin.trim() !== storedPin) {
-        Alert.alert('인증 실패', '초대 코드가 올바르지 않습니다.\n사장님께 코드를 다시 확인하세요.');
-        return;
-      }
 
+      // Supabase 인증 성공 → store_members에 추가
+      const { data: memberRow } = await supabase
+        .from('store_members')
+        .insert({ store_id: storeRow.id, name: empName.trim(), role: '직원', pin: '' })
+        .select()
+        .single();
+
+      // 로컬에 가게 정보 캐시
+      const bizData = {
+        bizNo: storeRow.biz_no || storeRow.store_id,
+        bizName: storeRow.store_name,
+        owner: storeRow.owner,
+        bizType: storeRow.biz_type,
+        addrSi: storeRow.region_si,
+        addrGu: storeRow.region_gu,
+        addrDong: storeRow.region_dong,
+        species: storeRow.species || [],
+      };
+      const newEmployee = { name: empName.trim(), role: '직원', pin: '', id: memberRow?.id || Date.now().toString() };
       const storedStaff = await AsyncStorage.getItem('@meatbig_staff');
       const staffList = storedStaff ? JSON.parse(storedStaff) : [];
-      const newEmployee = { name: empName, role: '직원', pin: '', id: Date.now().toString() };
-      await AsyncStorage.setItem('@meatbig_staff', JSON.stringify([...staffList, newEmployee]));
+      const updatedStaff = [...staffList, newEmployee];
+      await AsyncStorage.setItem('@meatbig_biz', JSON.stringify(bizData));
+      await AsyncStorage.setItem('@meatbig_staff', JSON.stringify(updatedStaff));
       await AsyncStorage.setItem('@meatbig_onboarded', 'true');
+      await AsyncStorage.setItem('@meatbig_invite_pin', storeRow.invite_pin);
 
-      onDone({ biz: bizData, staff: [...staffList, newEmployee], currentUser: newEmployee });
-    } catch {
+      onDone({ biz: bizData, staff: updatedStaff, currentUser: newEmployee });
+    } catch (e) {
       Alert.alert('오류', '가입 중 오류가 발생했습니다.');
     }
   };
