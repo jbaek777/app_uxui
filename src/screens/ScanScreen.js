@@ -12,7 +12,50 @@ import { PrimaryBtn, OutlineBtn, StatusBadge } from '../components/UI';
 const OFFLINE_QUEUE_KEY = '@meatbig_scan_queue';
 const SCAN_HISTORY_KEY = '@meatbig_scan_history';
 
-// ─── 공공 API 모의 응답 ────────────────────────────────────
+// ─── 축산물이력제 API (data.go.kr 발급) ──────────────────
+const MTRACE_KEY = process.env.EXPO_PUBLIC_MTRACE_API_KEY || '';
+const MTRACE_BASE = 'https://api.mtrace.go.kr/mtrace/api';
+
+// 날짜 포맷 변환 (20221015 → 2022.10.15)
+function fmtDate(val) {
+  const s = String(val || '');
+  if (s.length === 8) return `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}`;
+  return s || 'N/A';
+}
+
+// 실제 API 호출 (소 이력 조회)
+async function fetchMtrace(traceNo) {
+  const url = `${MTRACE_BASE}/cattleIndvdlQryApi?tno=${traceNo}&apiKey=${encodeURIComponent(MTRACE_KEY)}&_type=json`;
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(tid);
+    const json = await res.json();
+    const body = json?.response?.body;
+    if (!body || body.totalCount === 0) return null;
+    // item이 배열(복수)이거나 단일 객체일 수 있음
+    const raw = body.items?.item;
+    const item = Array.isArray(raw) ? raw[0] : raw;
+    if (!item) return null;
+    return {
+      traceNo,
+      animalType: item.lsTypeNm || '소',
+      grade: item.gradeNm || 'N/A',
+      birthDate: fmtDate(item.birthYmd),
+      farmName: [item.farmNm, item.farmAddr].filter(Boolean).join(' (') + (item.farmAddr ? ')' : '') || 'N/A',
+      slaughterDate: fmtDate(item.slaugtDt),
+      slaughterPlace: item.slaugtPlcNm || 'N/A',
+      weight: item.wt ? `${item.wt}kg` : 'N/A',
+      inspection: item.inspPassYn === 'Y' ? '적합' : (item.inspPassYn === 'N' ? '부적합' : 'N/A'),
+    };
+  } catch {
+    clearTimeout(tid);
+    return null;
+  }
+}
+
+// ─── 데모용 Mock 데이터 (API 키 없을 때 폴백) ─────────────
 const MOCK_TRACE_DB = {
   '002091700003743': {
     traceNo: '002091700003743', animalType: '한우', grade: '1++',
@@ -29,11 +72,26 @@ const MOCK_TRACE_DB = {
 };
 
 async function lookupTrace(traceNo) {
-  await new Promise(r => setTimeout(r, 800));
   const clean = traceNo.replace(/\D/g, '');
-  return MOCK_TRACE_DB[clean] || {
-    traceNo: clean, animalType: '조회 완료', grade: 'N/A',
-    birthDate: 'N/A', farmName: '등록된 이력 없음',
+
+  // API 키 없으면 Mock 데이터로 폴백
+  if (!MTRACE_KEY) {
+    await new Promise(r => setTimeout(r, 600));
+    return MOCK_TRACE_DB[clean] || {
+      traceNo: clean, animalType: '데모 모드', grade: 'N/A',
+      birthDate: 'N/A', farmName: 'API 키 미설정 — data.go.kr에서 발급 필요',
+      slaughterDate: 'N/A', slaughterPlace: 'N/A', weight: 'N/A', inspection: 'N/A',
+    };
+  }
+
+  // 실제 API 조회
+  const result = await fetchMtrace(clean);
+  if (result) return result;
+
+  // 조회 결과 없음 (미등록 이력번호)
+  return {
+    traceNo: clean, animalType: '이력 없음', grade: 'N/A',
+    birthDate: 'N/A', farmName: '해당 이력번호가 등록되지 않았습니다',
     slaughterDate: 'N/A', slaughterPlace: 'N/A', weight: 'N/A', inspection: 'N/A',
   };
 }
@@ -51,9 +109,10 @@ async function checkOnline() {
   }
 }
 
-export default function ScanScreen() {
+export default function ScanScreen({ navigation }) {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
+  const [mode, setMode] = useState('trace'); // 'trace' | 'ocr'
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -169,6 +228,31 @@ export default function ScanScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: pal.bg }}>
+      {/* ── 상단 세그먼트 탭 ── */}
+      <View style={[styles.segmentBar, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
+        <TouchableOpacity
+          style={[styles.segmentTab, mode === 'trace' && { borderBottomColor: pal.ac }]}
+          onPress={() => setMode('trace')}
+        >
+          <Text style={[styles.segmentText, { color: mode === 'trace' ? pal.ac : pal.t3 }, mode === 'trace' && { fontWeight: '900' }]}>
+            🏷️ 이력 조회
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.segmentTab, mode === 'ocr' && { borderBottomColor: pal.pu }]}
+          onPress={() => setMode('ocr')}
+        >
+          <Text style={[styles.segmentText, { color: mode === 'ocr' ? pal.pu : pal.t3 }, mode === 'ocr' && { fontWeight: '900' }]}>
+            📷 서류 OCR
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* OCR 탭 */}
+      {mode === 'ocr' && <OCRHub pal={pal} navigation={navigation} />}
+
+      {/* 이력 조회 탭 */}
+      {mode === 'trace' && <>
       {/* 오프라인 / 동기화 배너 */}
       {!isOnline && (
         <View style={[styles.offlineBanner, { backgroundColor: pal.yw + '22', borderColor: pal.yw + '60' }]}>
@@ -194,6 +278,15 @@ export default function ScanScreen() {
             : <Text style={{ color: pal.a2, fontSize: 18 }}>↑</Text>
           }
         </TouchableOpacity>
+      )}
+
+      {/* API 키 미설정 안내 배너 */}
+      {!MTRACE_KEY && (
+        <View style={[styles.offlineBanner, { backgroundColor: pal.pu + '18', borderColor: pal.pu + '50' }]}>
+          <Text style={[styles.offlineBannerText, { color: pal.pu }]}>
+            🔑 데모 모드 — data.go.kr에서 API 키 발급 후 실제 조회 가능
+          </Text>
+        </View>
       )}
 
       {/* 스캔 버튼 */}
@@ -339,7 +432,91 @@ export default function ScanScreen() {
           </View>
         )}
       </Modal>
+      </>}
     </View>
+  );
+}
+
+// ── 서류 OCR 허브 ─────────────────────────────────────────
+const OCR_DOC_TYPES = [
+  {
+    icon: '📄',
+    title: '거래명세서',
+    desc: '부위·중량·단가 자동 추출\n→ 재고 자동 등록',
+    color: '#3b82f6',
+    badge: '재고 연동',
+  },
+  {
+    icon: '🔬',
+    title: '도축검사증명서',
+    desc: '이력번호·도축일·원산지 추출\n→ 소비기한 자동 계산(+14일)',
+    color: '#8b5cf6',
+    badge: '재고 연동',
+  },
+  {
+    icon: '🏥',
+    title: '보건증',
+    desc: '직원 이름·만료일 자동 추출\n→ 직원 서류 자동 업데이트',
+    color: '#22c55e',
+    badge: '직원 연동',
+  },
+  {
+    icon: '📋',
+    title: '위생교육이수증',
+    desc: '이수일·만료일 자동 추출\n→ 직원 교육 이력 업데이트',
+    color: '#06b6d4',
+    badge: '직원 연동',
+  },
+];
+
+function OCRHub({ pal, navigation }) {
+  return (
+    <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 60 }}>
+      {/* 안내 배너 */}
+      <View style={[styles.ocrBanner, { backgroundColor: pal.pu + '14', borderColor: pal.pu + '40' }]}>
+        <Text style={{ fontSize: 36 }}>🤖</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.ocrBannerTitle, { color: pal.tx }]}>AI 서류 자동 인식</Text>
+          <Text style={[styles.ocrBannerSub, { color: pal.t3 }]}>
+            서류를 촬영하면 텍스트를 읽어{'\n'}재고 및 직원 데이터를 자동으로 저장합니다.
+          </Text>
+        </View>
+      </View>
+
+      {/* 지원 서류 목록 */}
+      <Text style={[styles.ocrSectionLabel, { color: pal.t2 }]}>지원하는 서류 종류</Text>
+      {OCR_DOC_TYPES.map(d => (
+        <View key={d.title} style={[styles.ocrDocCard, { backgroundColor: pal.s1, borderColor: pal.bd, borderLeftColor: d.color, borderLeftWidth: 4 }]}>
+          <Text style={{ fontSize: 28 }}>{d.icon}</Text>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Text style={[styles.ocrDocTitle, { color: pal.tx }]}>{d.title}</Text>
+              <View style={[styles.ocrDocBadge, { backgroundColor: d.color + '20' }]}>
+                <Text style={[styles.ocrDocBadgeText, { color: d.color }]}>{d.badge}</Text>
+              </View>
+            </View>
+            <Text style={[styles.ocrDocDesc, { color: pal.t3 }]}>{d.desc}</Text>
+          </View>
+        </View>
+      ))}
+
+      {/* OCR 시작 버튼 */}
+      <TouchableOpacity
+        style={[styles.ocrStartBtn, { backgroundColor: pal.pu }]}
+        onPress={() => navigation.navigate('TraceOCR')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.ocrStartIcon}>📷</Text>
+        <View>
+          <Text style={styles.ocrStartLabel}>서류 스캔 · AI OCR 시작</Text>
+          <Text style={styles.ocrStartSub}>카메라로 촬영하거나 갤러리에서 선택</Text>
+        </View>
+      </TouchableOpacity>
+
+      <Text style={[styles.ocrNotice, { color: pal.t3 }]}>
+        💡 인터넷 연결 필요 · 결과 확인 후 저장
+      </Text>
+    </ScrollView>
   );
 }
 
@@ -362,6 +539,27 @@ const InfoRow = ({ label, value, highlight, highlightColor }) => (
 );
 
 const styles = StyleSheet.create({
+  // 세그먼트 탭바
+  segmentBar: { flexDirection: 'row', borderBottomWidth: 1 },
+  segmentTab: { flex: 1, paddingVertical: 13, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
+  segmentText: { fontSize: fontSize.sm, fontWeight: '700' },
+
+  // OCR 허브
+  ocrBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, padding: spacing.md, marginBottom: spacing.lg, },
+  ocrBannerTitle: { fontSize: fontSize.sm, fontWeight: '900', marginBottom: 4 },
+  ocrBannerSub: { fontSize: fontSize.xs, lineHeight: 20 },
+  ocrSectionLabel: { fontSize: fontSize.xs, fontWeight: '800', marginBottom: spacing.sm, letterSpacing: 0.5 },
+  ocrDocCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, },
+  ocrDocTitle: { fontSize: fontSize.sm, fontWeight: '900' },
+  ocrDocBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  ocrDocBadgeText: { fontSize: 10, fontWeight: '800' },
+  ocrDocDesc: { fontSize: fontSize.xs, lineHeight: 20 },
+  ocrStartBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.lg, marginBottom: spacing.sm, },
+  ocrStartIcon: { fontSize: 36 },
+  ocrStartLabel: { color: '#fff', fontSize: fontSize.md, fontWeight: '900', marginBottom: 3 },
+  ocrStartSub: { color: 'rgba(255,255,255,0.75)', fontSize: fontSize.xs, fontWeight: '600' },
+  ocrNotice: { fontSize: fontSize.xs, textAlign: 'center', marginTop: 4 },
+
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   permIcon: { fontSize: 56, marginBottom: spacing.md },
   permTitle: { fontSize: fontSize.xl, fontWeight: '800', marginBottom: spacing.sm },
