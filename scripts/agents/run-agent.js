@@ -33,8 +33,11 @@ if (MISSING.length > 0) {
 }
 
 const TODAY   = new Date().toISOString().split('T')[0];
-const REPO    = process.cwd();
+// scripts/agents/ 에서 두 단계 위가 프로젝트 루트
+const REPO    = path.join(__dirname, '..', '..');
 const DB_ID   = (process.env.NOTION_DATABASE_ID || '').trim().replace(/\n/g, '');
+
+console.log(`📁 프로젝트 루트: ${REPO}`);
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
@@ -50,8 +53,8 @@ function rf(relPath, max = 3500) {
 }
 
 function gitLog(n = 15) {
-  try { return execSync(`git log --oneline -${n}`, { cwd: REPO }).toString().trim(); }
-  catch { return '[git log 불가]'; }
+  try { return execSync(`git log --oneline -${n}`, { cwd: REPO, stdio: ['pipe','pipe','pipe'] }).toString().trim(); }
+  catch (e) { return `[git log 불가: ${e.message}]`; }
 }
 
 // Notion 텍스트 2000자 제한 → 여러 블록으로 분할
