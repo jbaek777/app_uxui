@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Modal, ScrollView, ActivityIndicator, Alert, AppState,
+  TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -122,6 +123,8 @@ export default function ScanScreen({ navigation }) {
   const [pendingQueue, setPendingQueue] = useState([]);
   const [syncing, setSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [manualInput, setManualInput] = useState('');
+  const [manualLoading, setManualLoading] = useState(false);
 
   // 앱 시작 시 히스토리 + 큐 불러오기
   useEffect(() => {
@@ -171,6 +174,44 @@ export default function ScanScreen({ navigation }) {
       setSyncing(false);
     }
   }, [pendingQueue, syncing]);
+
+  const handleManualLookup = async () => {
+    const clean = manualInput.replace(/\D/g, '');
+    if (clean.length < 5) {
+      Alert.alert('입력 오류', '이력번호를 정확히 입력해주세요.');
+      return;
+    }
+    setManualLoading(true);
+    try {
+      const online = await checkOnline();
+      setIsOnline(online);
+      let info;
+      if (online) {
+        info = await lookupTrace(clean);
+      } else {
+        info = {
+          traceNo: clean, animalType: '오프라인 스캔',
+          grade: '—', birthDate: '—', farmName: '서버 미연결 (동기화 대기)',
+          slaughterDate: '—', slaughterPlace: '—', weight: '—', inspection: '—',
+        };
+      }
+      const entry = { ...info, rawData: clean, scanTime: new Date().toLocaleString('ko-KR'), synced: online };
+      setResult(entry);
+      const newHistory = [entry, ...history.slice(0, 9)];
+      setHistory(newHistory);
+      await saveHistory(newHistory);
+      setManualInput('');
+      if (!online) {
+        const newQueue = [entry, ...pendingQueue];
+        setPendingQueue(newQueue);
+        await saveQueue(newQueue);
+      }
+    } catch {
+      Alert.alert('오류', '이력 조회에 실패했습니다.');
+    } finally {
+      setManualLoading(false);
+    }
+  };
 
   const handleBarcode = async ({ data }) => {
     if (scanned) return;
@@ -251,94 +292,120 @@ export default function ScanScreen({ navigation }) {
       {/* OCR 탭 */}
       {mode === 'ocr' && <OCRHub pal={pal} navigation={navigation} />}
 
-      {/* 이력 조회 탭 */}
-      {mode === 'trace' && <>
-      {/* 오프라인 / 동기화 배너 */}
-      {!isOnline && (
-        <View style={[styles.offlineBanner, { backgroundColor: pal.yw + '22', borderColor: pal.yw + '60' }]}>
-          <Text style={[styles.offlineBannerText, { color: pal.yw }]}>
-            📡 오프라인 모드 — 스캔 결과가 로컬에 저장됩니다
-          </Text>
-        </View>
-      )}
-      {pendingQueue.length > 0 && (
-        <TouchableOpacity
-          style={[styles.syncBanner, { backgroundColor: pal.a2 + '18', borderColor: pal.a2 + '40' }]}
-          onPress={trySyncQueue}
-          activeOpacity={0.8}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.syncBannerTitle, { color: pal.a2 }]}>
-              🔄 미동기화 {pendingQueue.length}건
+      {/* 이력 조회 탭 — 전체 ScrollView */}
+      {mode === 'trace' && (
+        <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
+
+          {/* 배너: 오프라인 */}
+          {!isOnline && (
+            <View style={[styles.offlineBanner, { backgroundColor: pal.yw + '18', borderColor: pal.yw + '50', marginBottom: spacing.sm }]}>
+              <Text style={{ fontSize: 14 }}>📡</Text>
+              <Text style={[styles.offlineBannerText, { color: pal.yw }]}>오프라인 모드 — 스캔 결과가 로컬에 저장됩니다</Text>
+            </View>
+          )}
+          {/* 배너: 미동기화 대기 */}
+          {pendingQueue.length > 0 && (
+            <TouchableOpacity
+              style={[styles.syncBanner, { backgroundColor: pal.a2 + '18', borderColor: pal.a2 + '40', marginBottom: spacing.sm }]}
+              onPress={trySyncQueue}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 14 }}>🔄</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.syncBannerTitle, { color: pal.a2 }]}>오프라인 {pendingQueue.length}건 대기 중</Text>
+                <Text style={[styles.syncBannerSub, { color: pal.t3 }]}>네트워크 연결 시 자동 동기화 · 탭하여 지금 동기화</Text>
+              </View>
+              {syncing
+                ? <ActivityIndicator size="small" color={pal.a2} />
+                : <Text style={{ color: pal.a2, fontSize: 18 }}>↑</Text>
+              }
+            </TouchableOpacity>
+          )}
+          {/* 배너: 데모 모드 */}
+          {!MTRACE_KEY && (
+            <View style={[styles.offlineBanner, { backgroundColor: pal.pu + '12', borderColor: pal.pu + '40', marginBottom: spacing.sm }]}>
+              <Text style={{ fontSize: 14 }}>🔑</Text>
+              <Text style={[styles.offlineBannerText, { color: pal.pu }]}>데모 모드 — data.go.kr에서 API 키 발급 후 실제 조회 가능</Text>
+            </View>
+          )}
+
+          {/* 스캔 카드 */}
+          <View style={[styles.scanLaunchArea, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+            <Text style={[styles.scanTitle, { color: pal.tx }]}>🏷️ 축산물 이력번호 조회</Text>
+            <Text style={[styles.scanSub, { color: pal.t2 }]}>
+              바코드·QR코드를 스캔하면{'\n'}도축 정보·등급·원산지를 즉시 확인합니다
             </Text>
-            <Text style={[styles.syncBannerSub, { color: pal.t3 }]}>탭하여 서버에 동기화</Text>
+            <TouchableOpacity
+              style={[styles.scanBigBtn, { backgroundColor: pal.ac }]}
+              onPress={() => { setScanning(true); setScanned(false); }}
+            >
+              <Text style={styles.scanBigIcon}>📷</Text>
+              <Text style={styles.scanBigLabel}>바코드 스캔 시작</Text>
+            </TouchableOpacity>
           </View>
-          {syncing
-            ? <ActivityIndicator size="small" color={pal.a2} />
-            : <Text style={{ color: pal.a2, fontSize: 18 }}>↑</Text>
-          }
-        </TouchableOpacity>
-      )}
 
-      {/* API 키 미설정 안내 배너 */}
-      {!MTRACE_KEY && (
-        <View style={[styles.offlineBanner, { backgroundColor: pal.pu + '18', borderColor: pal.pu + '50' }]}>
-          <Text style={[styles.offlineBannerText, { color: pal.pu }]}>
-            🔑 데모 모드 — data.go.kr에서 API 키 발급 후 실제 조회 가능
-          </Text>
-        </View>
-      )}
+          {/* 직접 입력 — 독립 행 (preview 스타일: 전체 너비 + 내장 버튼) */}
+          <View style={[styles.lookupWrap, { backgroundColor: pal.s1, borderColor: manualInput ? pal.ac : pal.bd }]}>
+            <TextInput
+              style={[styles.lookupInput, { color: pal.tx }]}
+              placeholder="이력번호 15자리 직접 입력"
+              placeholderTextColor={pal.t3}
+              value={manualInput}
+              onChangeText={setManualInput}
+              keyboardType="numeric"
+              maxLength={20}
+              onSubmitEditing={handleManualLookup}
+              returnKeyType="search"
+            />
+            <TouchableOpacity
+              style={[styles.lookupBtn, { backgroundColor: manualLoading ? pal.bd : pal.ac }]}
+              onPress={handleManualLookup}
+              disabled={manualLoading}
+            >
+              {manualLoading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={{ fontSize: 16 }}>🔍</Text>
+              }
+            </TouchableOpacity>
+          </View>
 
-      {/* 스캔 버튼 */}
-      <View style={[styles.scanLaunchArea, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-        <Text style={[styles.scanTitle, { color: pal.tx }]}>🏷️ 축산물 이력번호 조회</Text>
-        <Text style={[styles.scanSub, { color: pal.t2 }]}>
-          바코드·QR코드를 스캔하면{'\n'}도축 정보·등급·원산지를 즉시 확인합니다
-        </Text>
-        <TouchableOpacity
-          style={[styles.scanBigBtn, { backgroundColor: pal.ac }]}
-          onPress={() => { setScanning(true); setScanned(false); }}
-        >
-          <Text style={styles.scanBigIcon}>📷</Text>
-          <Text style={styles.scanBigLabel}>바코드 스캔 시작</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 스캔 이력 */}
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
-        {history.length > 0 && (
-          <>
-            <Text style={[styles.histTitle, { color: pal.tx }]}>최근 조회 이력</Text>
-            {history.map((h, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[styles.histCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}
-                onPress={() => setResult(h)}
-              >
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={[styles.histTrace, { color: pal.tx }]}>{h.traceNo}</Text>
-                    {h.synced === false && (
-                      <View style={[styles.pendingBadge, { backgroundColor: pal.yw + '30' }]}>
-                        <Text style={[styles.pendingBadgeText, { color: pal.yw }]}>미동기화</Text>
-                      </View>
-                    )}
+          {/* 최근 조회 이력 */}
+          {history.length > 0 && (
+            <>
+              <Text style={[styles.recentTitle, { color: pal.t3 }]}>최근 조회 내역</Text>
+              {history.map((h, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.recentItem, { backgroundColor: pal.s1, borderColor: pal.bd }]}
+                  onPress={() => setResult(h)}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={[styles.recentNo, { color: pal.tx }]}>{h.traceNo}</Text>
+                      {h.synced === false && (
+                        <View style={[styles.pendingBadge, { backgroundColor: pal.yw + '30' }]}>
+                          <Text style={[styles.pendingBadgeText, { color: pal.yw }]}>미동기화</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.recentInfo, { color: pal.t3 }]}>
+                      {h.animalType}{h.grade && h.grade !== 'N/A' ? ` · ${h.grade}등급` : ''} · {h.farmName}
+                    </Text>
                   </View>
-                  <Text style={[styles.histMeta, { color: pal.t2 }]}>{h.animalType} · {h.grade}등급 · {h.farmName}</Text>
-                  <Text style={[styles.histTime, { color: pal.t3 }]}>{h.scanTime}</Text>
-                </View>
-                <Text style={{ fontSize: 18, color: pal.t3 }}>›</Text>
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-        {history.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🔍</Text>
-            <Text style={[styles.emptyText, { color: pal.t3 }]}>스캔 이력이 없습니다{'\n'}바코드를 스캔해보세요</Text>
-          </View>
-        )}
-      </ScrollView>
+                  <Text style={[styles.recentDate, { color: pal.t3 }]}>{h.scanTime?.split(' ')[1] || h.scanTime}</Text>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+          {history.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🔍</Text>
+              <Text style={[styles.emptyText, { color: pal.t3 }]}>스캔 이력이 없습니다{'\n'}바코드를 스캔하거나 이력번호를 입력하세요</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
 
       {/* 카메라 모달 */}
       <Modal visible={scanning} animationType="slide">
@@ -578,6 +645,35 @@ const styles = StyleSheet.create({
   scanBigIcon: { fontSize: 32, marginBottom: 8 },
   scanBigLabel: { color: '#fff', fontSize: fontSize.md, fontWeight: '900' },
 
+  // 직접 입력 (lookup)
+  lookupWrap: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: radius.md, borderWidth: 2,
+    paddingLeft: spacing.md, marginBottom: spacing.md,
+  },
+  lookupInput: {
+    flex: 1, fontSize: fontSize.sm, fontWeight: '600',
+    paddingVertical: 14, paddingRight: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  lookupBtn: {
+    width: 44, height: 44, borderRadius: radius.sm,
+    alignItems: 'center', justifyContent: 'center', margin: 4,
+  },
+
+  // 최근 조회 이력 (compact)
+  recentTitle: { fontSize: fontSize.xs, fontWeight: '800', marginBottom: spacing.sm, letterSpacing: 0.5 },
+  recentItem: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: radius.md, borderWidth: 1,
+    paddingHorizontal: spacing.md, paddingVertical: 12,
+    marginBottom: 6,
+  },
+  recentNo:   { fontSize: fontSize.sm, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  recentInfo: { fontSize: fontSize.xs, marginTop: 2 },
+  recentDate: { fontSize: fontSize.xs, flexShrink: 0, marginLeft: spacing.sm },
+
+  // 기존 호환 스타일 유지
   histTitle: { fontSize: fontSize.md, fontWeight: '800', marginBottom: spacing.sm },
   histCard: {
     flexDirection: 'row', alignItems: 'center',
@@ -605,13 +701,12 @@ const styles = StyleSheet.create({
   camHint: { color: '#fff', fontSize: fontSize.sm, fontWeight: '600', textShadowColor: '#000', textShadowRadius: 4 },
 
   offlineBanner: {
-    marginHorizontal: spacing.md, marginTop: spacing.sm,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
     borderRadius: radius.sm, borderWidth: 1, padding: spacing.sm,
   },
-  offlineBannerText: { fontSize: fontSize.xs, fontWeight: '700', textAlign: 'center' },
+  offlineBannerText: { flex: 1, fontSize: fontSize.xs, fontWeight: '700' },
   syncBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: spacing.md, marginTop: spacing.sm,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
     borderRadius: radius.sm, borderWidth: 1, padding: spacing.md,
   },
   syncBannerTitle: { fontSize: fontSize.sm, fontWeight: '800', marginBottom: 2 },
@@ -652,4 +747,5 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: fontSize.sm, fontWeight: '600' },
   infoValue: { fontSize: fontSize.sm, fontWeight: '700', textAlign: 'right', flex: 1, marginLeft: 16 },
+
 });
