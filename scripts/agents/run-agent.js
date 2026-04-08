@@ -22,6 +22,16 @@ if (!VALID_TYPES.includes(AGENT_TYPE)) {
   process.exit(1);
 }
 
+// 필수 환경변수 체크 — 없으면 명확한 에러 메시지 출력
+const MISSING = ['ANTHROPIC_API_KEY', 'NOTION_API_KEY', 'NOTION_DATABASE_ID']
+  .filter(k => !process.env[k]);
+if (MISSING.length > 0) {
+  console.error('❌ 필수 GitHub Secrets가 설정되지 않았습니다:');
+  MISSING.forEach(k => console.error(`   - ${k}`));
+  console.error('\n👉 GitHub 저장소 → Settings → Secrets → Actions → New repository secret');
+  process.exit(1);
+}
+
 const TODAY   = new Date().toISOString().split('T')[0];
 const REPO    = process.cwd();
 const DB_ID   = process.env.NOTION_DATABASE_ID;
@@ -267,7 +277,7 @@ async function main() {
   let result;
   try {
     const response = await anthropic.messages.create({
-      model:      'claude-haiku-4-5',
+      model:      'claude-3-5-haiku-20241022',
       max_tokens: 2048,
       system:     cfg.system,
       messages:   [{ role: 'user', content: `분석 대상:\n\n${cfg.context()}` }],
