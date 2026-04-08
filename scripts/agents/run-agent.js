@@ -277,7 +277,7 @@ async function main() {
   let result;
   try {
     const response = await anthropic.messages.create({
-      model:      'claude-3-5-haiku-20241022',
+      model:      'claude-3-haiku-20240307',
       max_tokens: 2048,
       system:     cfg.system,
       messages:   [{ role: 'user', content: `분석 대상:\n\n${cfg.context()}` }],
