@@ -174,33 +174,24 @@ export default function DocumentScreen({ navigation }) {
     <View style={[styles.container, { backgroundColor: pal.bg }]}>
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
 
-        {/* ── 점검 입력 바로가기 ── */}
-        <Text style={[styles.sectionLabel, { color: pal.t2 }]}>점검 입력 바로가기</Text>
+        {/* ── 바로가기 (3열 그리드) ── */}
+        <Text style={[styles.sectionLabel, { color: pal.t2 }]}>바로가기</Text>
         <View style={styles.shortcutGrid}>
-          <Shortcut pal={pal} icon="🧼" label="위생 일지" onPress={() => navigateSafe('Hygiene')} color="#27AE60" />
-          <Shortcut pal={pal} icon="🌡️" label="온도 기록" onPress={() => navigateSafe('Temp')} color="#00ACC1" />
-          <Shortcut pal={pal} icon="💰" label="마감 정산" onPress={() => navigateSafe('Closing')} color="#E8950A" locked={isStaff} />
-          <Shortcut pal={pal} icon="🥩" label="숙성 관리" onPress={() => navigateSafe('Aging')} color="#C0392B" locked={isStaff} />
-          <Shortcut pal={pal} icon="📚" label="교육일지" onPress={() => navigateSafe('Education')} color="#7C3AED" locked={isStaff} />
-          <Shortcut pal={pal} icon="📊" label="세무리포트" onPress={() => navigateSafe('TaxReport')} color="#00ACC1" locked={isStaff} />
+          <Shortcut pal={pal} icon="🧼" label="위생 일지"  onPress={() => navigateSafe('Hygiene')}   color="#27AE60" />
+          <Shortcut pal={pal} icon="🌡️" label="온도 기록"  onPress={() => navigateSafe('Temp')}       color="#00ACC1" />
+          <Shortcut pal={pal} icon="💰" label="마감 정산"  onPress={() => navigateSafe('Closing')}    color="#E8950A" locked={isStaff} />
+          <Shortcut pal={pal} icon="🥩" label="숙성 관리"  onPress={() => navigateSafe('Aging')}      color="#C0392B" locked={isStaff} />
+          <Shortcut pal={pal} icon="📚" label="교육일지"   onPress={() => navigateSafe('Education')}  color="#7C3AED" locked={isStaff} />
+          <Shortcut pal={pal} icon="📊" label="세무리포트" onPress={() => navigateSafe('TaxReport')}  color="#00ACC1" locked={isStaff} />
         </View>
 
-        {/* ── 출력하기 버튼 ── */}
-        <TouchableOpacity style={styles.printBigBtn} onPress={() => setPrintModal(true)} activeOpacity={0.85}>
-          <Text style={{ fontSize: 32 }}>🖨️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.printBigLabel}>출력하기</Text>
-            <Text style={styles.printBigDesc}>위생·온도·숙성·보건증·교육일지·세무리포트 PDF 출력</Text>
-          </View>
-          <View style={styles.printBigBadge}>
-            <Text style={styles.printBigBadgeText}>PDF</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* ── 서류 목록 ── */}
-        <Text style={[styles.sectionLabel, { color: pal.t2 }]}>관리 서류 현황</Text>
+        {/* ── PDF 출력 목록 ── */}
+        <Text style={[styles.sectionLabel, { color: pal.t2 }]}>PDF 출력</Text>
         {DOCS.map(doc => {
           const locked = isStaff && OWNER_ONLY.includes(doc.screen);
+          const planBadge =
+            doc.id === 'education' ? { label: '베이직', color: '#27AE60' } :
+            doc.id === 'tax'       ? { label: '프로',   color: '#C0392B' } : null;
           return (
           <TouchableOpacity
             key={doc.id}
@@ -215,14 +206,39 @@ export default function DocumentScreen({ navigation }) {
               <Text style={[styles.docTitle, { color: pal.tx }]}>{doc.title}</Text>
               <Text style={[styles.docDesc, { color: pal.t3 }]}>{doc.desc}</Text>
             </View>
-            <View style={[styles.docBadge, { backgroundColor: doc.color + '20' }]}>
-              <Text style={[styles.docBadgeText, { color: doc.color }]}>
-                {locked ? '🔒 사장 전용' : '보기 →'}
-              </Text>
-            </View>
+            {planBadge && !locked ? (
+              <View style={[styles.planBadge, { backgroundColor: planBadge.color + '18', borderColor: planBadge.color + '40' }]}>
+                <Text style={[styles.planBadgeText, { color: planBadge.color }]}>{planBadge.label}</Text>
+              </View>
+            ) : (
+              <View style={[styles.docBadge, { backgroundColor: locked ? pal.bd + '20' : doc.color + '20' }]}>
+                <Text style={[styles.docBadgeText, { color: locked ? pal.t3 : doc.color }]}>
+                  {locked ? '🔒 사장' : '›'}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
           );
         })}
+
+        {/* 출력 전용 CTA 버튼 */}
+        <TouchableOpacity style={[styles.printBigBtn, { marginTop: spacing.sm }]} onPress={() => setPrintModal(true)} activeOpacity={0.85}>
+          <Text style={{ fontSize: 28 }}>🖨️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.printBigLabel}>PDF 일괄 출력</Text>
+            <Text style={styles.printBigDesc}>위생·온도·숙성·보건증·교육·세무 PDF 생성·공유</Text>
+          </View>
+          <View style={styles.printBigBadge}>
+            <Text style={styles.printBigBadgeText}>PDF</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* 플랜 안내 */}
+        <View style={[styles.planNotice, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+          <Text style={[styles.planNoticeText, { color: pal.t3 }]}>
+            ⚠️ 교육일지는 베이직, 세무리포트는 프로 플랜에서 출력 가능합니다
+          </Text>
+        </View>
       </ScrollView>
 
       {/* ── 출력 로딩 오버레이 ── */}
@@ -289,7 +305,7 @@ const Shortcut = ({ icon, label, onPress, color, pal, locked }) => (
     activeOpacity={0.8}
   >
     <View style={[styles.shortcutIcon, { backgroundColor: (locked ? pal.bd : color) + '20' }]}>
-      <Text style={{ fontSize: 34 }}>{locked ? '🔒' : icon}</Text>
+      <Text style={{ fontSize: 26 }}>{locked ? '🔒' : icon}</Text>
     </View>
     <Text style={[styles.shortcutLabel, { color: locked ? pal.t3 : pal.tx }]}>{label}</Text>
   </TouchableOpacity>
@@ -305,11 +321,11 @@ const styles = StyleSheet.create({
 
   shortcutGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   shortcut: {
-    width: '47%', borderRadius: radius.lg,
-    borderWidth: 1.5, padding: spacing.md, alignItems: 'center', gap: spacing.sm, ...shadow.sm,
+    width: '31%', borderRadius: radius.md,
+    borderWidth: 1, padding: spacing.md, alignItems: 'center', gap: 6, ...shadow.sm,
   },
-  shortcutIcon: { width: 64, height: 64, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  shortcutLabel: { fontSize: fontSize.md, fontWeight: '800', textAlign: 'center' },
+  shortcutIcon: { width: 52, height: 52, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  shortcutLabel: { fontSize: fontSize.xs, fontWeight: '800', textAlign: 'center' },
 
   printBigBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
@@ -349,4 +365,13 @@ const styles = StyleSheet.create({
   printSelectDesc: { fontSize: fontSize.xs },
   printBtn: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: radius.sm, alignItems: 'center', minWidth: 60 },
   printBtnText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '900' },
+
+  // 플랜 뱃지 + 안내
+  planBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, borderWidth: 1 },
+  planBadgeText: { fontSize: fontSize.xxs, fontWeight: '900' },
+  planNotice: {
+    borderRadius: radius.sm, borderWidth: 1,
+    padding: spacing.md, marginTop: spacing.sm,
+  },
+  planNoticeText: { fontSize: fontSize.xs, lineHeight: 20, textAlign: 'center' },
 });
