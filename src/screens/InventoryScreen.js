@@ -86,17 +86,34 @@ export default function InventoryScreen() {
 }
 
 // ── 재고 현황 탭 ──────────────────────────────────────────
+const FILTER_CHIPS = ['전체', '임박', '한우', '수입육'];
+
 function StockTab({ meat, setMeat, critical, suppliers }) {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
   const [modal, setModal] = useState(false);
   const [supplierPicker, setSupplierPicker] = useState(false);
   const [form, setForm] = useState({ cut: '', origin: '', qty: '', buyPrice: '', sellPrice: '', expire: '', supplierId: '', supplierName: '' });
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('전체');
 
   const activeItems = meat.filter(m => !m.sold);
   const soldItems   = meat.filter(m => m.sold);
   const totalValue  = activeItems.reduce((s, m) => s + (m.qty || 0) * (m.buyPrice || 0), 0);
   const lossRisk    = activeItems.filter(m => (m.dday ?? 99) <= 3).reduce((s, m) => s + (m.qty || 0) * (m.buyPrice || 0), 0);
+
+  // 검색 + 필터 적용
+  const filteredItems = activeItems.filter(item => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || item.cut?.toLowerCase().includes(q) || item.origin?.toLowerCase().includes(q);
+    const dday = item.dday ?? 99;
+    const matchFilter =
+      filter === '전체' ? true :
+      filter === '임박' ? dday <= 7 :
+      filter === '한우' ? (item.origin || '').includes('한우') :
+      filter === '수입육' ? !(item.origin || '').includes('한우') : true;
+    return matchSearch && matchFilter;
+  });
 
   const handleAdd = () => {
     if (!form.cut || !form.qty) { Alert.alert('입력 오류', '부위명과 중량을 입력해주세요.'); return; }
@@ -154,10 +171,40 @@ function StockTab({ meat, setMeat, critical, suppliers }) {
         </View>
 
         {critical.length > 0 && (
-          <View style={{ paddingHorizontal: spacing.md }}>
+          <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.sm }}>
             <AlertBox type="error" icon="🚨" title="소비기한 임박" message={critical.map(m => m.cut).join(', ')} />
           </View>
         )}
+
+        {/* 검색 + 필터 */}
+        <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.sm }}>
+          <View style={[styles.searchBar, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+            <Text style={{ fontSize: 16, marginRight: 6 }}>🔍</Text>
+            <TextInput
+              style={[styles.searchInput, { color: pal.tx }]}
+              placeholder="부위, 원산지 검색..."
+              placeholderTextColor={pal.t3}
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <Text style={{ color: pal.t3, fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }} contentContainerStyle={{ gap: 8 }}>
+            {FILTER_CHIPS.map(chip => (
+              <TouchableOpacity
+                key={chip}
+                style={[styles.filterChip, filter === chip && { backgroundColor: pal.ac, borderColor: pal.ac }]}
+                onPress={() => setFilter(chip)}
+              >
+                <Text style={[styles.filterChipText, { color: filter === chip ? '#fff' : pal.t2 }]}>{chip}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
         <View style={{ padding: spacing.md }}>
         {activeItems.length === 0 && (
@@ -180,44 +227,101 @@ function StockTab({ meat, setMeat, critical, suppliers }) {
           </View>
         )}
 
-        {activeItems.map(item => (
-          <View key={item.id} style={[styles.meatCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-            <GaugeBar
-              label={item.cut}
-              sub={`${item.origin} · 매입가 ${item.buyPrice.toLocaleString()}원/kg`}
-              value={item.qty}
-              max={20}
-              unit="kg"
-              dday={item.dday}
-              height={14}
-            />
-            <View style={styles.priceRow}>
-              <Text style={[styles.priceLabel, { color: pal.t3 }]}>매입가</Text>
-              <Text style={[styles.priceVal,   { color: pal.t2 }]}>{item.buyPrice.toLocaleString()}원</Text>
-              <Text style={[styles.priceLabel, { color: pal.t3 }]}>권장 판매가</Text>
-              <Text style={[styles.priceVal,   { color: pal.a2 }]}>{item.sellPrice.toLocaleString()}원</Text>
-              {item.dday <= 3 && (
-                <>
-                  <Text style={[styles.priceLabel, { color: pal.rd }]}>손실위험</Text>
-                  <Text style={[styles.priceVal, { color: pal.rd }]}>
-                    -{((item.qty * item.buyPrice) / 10000).toFixed(1)}만원
-                  </Text>
-                </>
-              )}
-            </View>
-            <TouchableOpacity
-              style={[styles.soldBtn, { borderTopColor: pal.bd }]}
-              onPress={() => handleSold(item.id)}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.soldBtnText, { color: pal.gn }]}>판매 완료 처리 →</Text>
-            </TouchableOpacity>
+        {filteredItems.length === 0 && activeItems.length > 0 && (
+          <View style={styles.emptyBox}>
+            <Text style={[styles.emptyText, { color: pal.t3 }]}>검색 결과가 없습니다</Text>
           </View>
-        ))}
+        )}
 
-        <PrimaryBtn label="+ 재고 추가" onPress={() => setModal(true)} color={pal.a2} style={{ marginTop: spacing.sm }} />
+        {filteredItems.map(item => {
+          const dday  = item.dday ?? 99;
+          const ddayColor = dday <= 2 ? pal.rd : dday <= 7 ? pal.a2 : pal.gn;
+          const ddayLabel = dday <= 0 ? '만료' : dday >= 90 ? '여유' : `D-${dday}`;
+          const grade = item.grade || (item.origin?.match(/1\+\+|1\+|1|2|3/) || [''])[0] || '—';
+          const isKorean = (item.origin || '').includes('한우') || (item.origin || '').includes('국내산');
+          const gradeColor = ['1++', 'A++'].includes(grade) ? pal.ac : grade === '1+' ? pal.a2 : isKorean ? pal.tx : pal.cyan;
+          const marginPct = item.buyPrice > 0 && item.sellPrice > 0
+            ? Math.round((item.sellPrice - item.buyPrice) / item.buyPrice * 100) : null;
+          return (
+            <TouchableOpacity
+              key={item.id}
+              style={[styles.meatCard, { backgroundColor: pal.s1, borderColor: pal.bd, borderLeftColor: ddayColor, borderLeftWidth: 4 }]}
+              activeOpacity={0.85}
+            >
+              {/* 카드 상단: 등급 박스 | 부위명 + 원산지 | D-day + 중량 */}
+              <View style={styles.cardTopRow}>
+                {/* 등급 박스 */}
+                <View style={[styles.gradeBox, { backgroundColor: gradeColor + '18', borderColor: gradeColor + '40' }]}>
+                  <Text style={[styles.gradeText, { color: gradeColor }]} numberOfLines={1}>{grade}</Text>
+                  <Text style={[styles.gradeType, { color: pal.t3 }]}>{isKorean ? '한우' : '수입'}</Text>
+                </View>
+                {/* 이름 + 원산지 */}
+                <View style={styles.cardMain}>
+                  <Text style={[styles.cardName, { color: pal.tx }]} numberOfLines={1}>{item.cut}</Text>
+                  <Text style={[styles.cardDetail, { color: pal.t2 }]} numberOfLines={1}>
+                    {item.origin} · 판매가 {item.sellPrice?.toLocaleString()}원/kg
+                  </Text>
+                  {item.supplierName ? (
+                    <Text style={[styles.cardSupplier, { color: pal.t3 }]}>🏪 {item.supplierName}</Text>
+                  ) : null}
+                </View>
+                {/* D-day + 중량 */}
+                <View style={styles.cardRight}>
+                  <View style={[styles.ddayPill, { backgroundColor: ddayColor + '18', borderColor: ddayColor + '40' }]}>
+                    <Text style={[styles.ddayText, { color: ddayColor }]}>{ddayLabel}</Text>
+                  </View>
+                  <Text style={[styles.cardQty, { color: pal.tx }]}>{item.qty}<Text style={{ color: pal.t3, fontSize: fontSize.xxs }}> kg</Text></Text>
+                </View>
+              </View>
+
+              {/* 가격 + 마진 행 */}
+              <View style={[styles.cardPriceRow, { borderTopColor: pal.bd + '60' }]}>
+                <View style={styles.priceStatBox}>
+                  <Text style={[styles.priceStatLabel, { color: pal.t3 }]}>매입가</Text>
+                  <Text style={[styles.priceStatVal, { color: pal.t2 }]}>{item.buyPrice?.toLocaleString()}원</Text>
+                </View>
+                <View style={[styles.priceStatBox, { borderLeftWidth: 1, borderLeftColor: pal.bd + '50' }]}>
+                  <Text style={[styles.priceStatLabel, { color: pal.t3 }]}>판매가</Text>
+                  <Text style={[styles.priceStatVal, { color: pal.a2 }]}>{item.sellPrice?.toLocaleString()}원</Text>
+                </View>
+                {marginPct !== null && (
+                  <View style={[styles.priceStatBox, { borderLeftWidth: 1, borderLeftColor: pal.bd + '50' }]}>
+                    <Text style={[styles.priceStatLabel, { color: pal.t3 }]}>마진</Text>
+                    <Text style={[styles.priceStatVal, { color: marginPct >= 30 ? pal.gn : pal.a2 }]}>+{marginPct}%</Text>
+                  </View>
+                )}
+                {dday <= 3 && (
+                  <View style={[styles.priceStatBox, { borderLeftWidth: 1, borderLeftColor: pal.rd + '40' }]}>
+                    <Text style={[styles.priceStatLabel, { color: pal.rd }]}>손실위험</Text>
+                    <Text style={[styles.priceStatVal, { color: pal.rd }]}>-{((item.qty * item.buyPrice) / 10000).toFixed(1)}만</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* 판매 완료 버튼 */}
+              <TouchableOpacity
+                style={[styles.soldBtn, { borderTopColor: pal.bd + '60' }]}
+                onPress={() => handleSold(item.id)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.soldBtnText, { color: pal.gn }]}>✓ 판매 완료 처리</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          );
+        })}
+
         </View>
       </ScrollView>
+
+      {/* FAB: 재고 추가 */}
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: pal.a2 }]}
+        onPress={() => setModal(true)}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.fabIcon}>+</Text>
+        <Text style={styles.fabLabel}>재고 추가</Text>
+      </TouchableOpacity>
 
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: pal.bg }}>
@@ -920,12 +1024,54 @@ const styles = StyleSheet.create({
   summaryVal:   { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 2 },
   summaryLabel: { fontSize: fontSize.xxs, fontWeight: '600', textAlign: 'center' },
 
-  meatCard: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
+  // 검색 바 + 필터 칩
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: radius.md, borderWidth: 1,
+    paddingHorizontal: spacing.md, paddingVertical: 10,
+  },
+  searchInput: { flex: 1, fontSize: fontSize.sm, fontWeight: '500', paddingVertical: 0 },
+  filterChip: {
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 20, borderWidth: 1.5,
+    borderColor: 'transparent', backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  filterChipText: { fontSize: fontSize.xs, fontWeight: '700' },
+
+  // 새 카드 스타일
+  meatCard: { borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.sm, overflow: 'hidden', ...shadow.sm },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: spacing.md },
+  gradeBox: {
+    width: 46, minHeight: 46, borderRadius: radius.sm, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  gradeText: { fontSize: fontSize.xs, fontWeight: '900', textAlign: 'center' },
+  gradeType: { fontSize: 9, fontWeight: '700', textAlign: 'center', marginTop: 1 },
+  cardMain: { flex: 1, gap: 2 },
+  cardName:     { fontSize: fontSize.md, fontWeight: '900' },
+  cardDetail:   { fontSize: fontSize.xs, fontWeight: '500' },
+  cardSupplier: { fontSize: fontSize.xxs, marginTop: 1 },
+  cardRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
+  ddayPill: {
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 20, borderWidth: 1.5,
+  },
+  ddayText: { fontSize: fontSize.xs, fontWeight: '900' },
+  cardQty:  { fontSize: fontSize.md, fontWeight: '900' },
+
+  cardPriceRow: {
+    flexDirection: 'row', borderTopWidth: 1,
+  },
+  priceStatBox: { flex: 1, alignItems: 'center', paddingVertical: 8 },
+  priceStatLabel: { fontSize: 9, fontWeight: '700', marginBottom: 2 },
+  priceStatVal: { fontSize: fontSize.xs, fontWeight: '900' },
+
+  // 기존 호환용
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
   priceLabel: { fontSize: fontSize.xxs },
   priceVal:   { fontSize: fontSize.sm, fontWeight: '800' },
 
-  soldBtn:     { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, alignItems: 'center' },
+  soldBtn:     { paddingVertical: 11, borderTopWidth: 1, alignItems: 'center' },
   soldBtnText: { fontSize: fontSize.sm, fontWeight: '800' },
 
   emptyBox:  { alignItems: 'center', paddingVertical: 60 },
@@ -1054,4 +1200,15 @@ const styles = StyleSheet.create({
   supplierHistRow:     { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   supplierHistMonth:   { fontSize: fontSize.xs, fontWeight: '600' },
   supplierHistAmt:     { fontSize: fontSize.xs, fontWeight: '800' },
+
+  // FAB
+  fab: {
+    position: 'absolute', bottom: 24, right: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingVertical: 14, paddingHorizontal: 20,
+    borderRadius: 30, ...shadow.md,
+    elevation: 6,
+  },
+  fabIcon:  { color: '#fff', fontSize: 22, fontWeight: '900', lineHeight: 24 },
+  fabLabel: { color: '#fff', fontSize: fontSize.sm, fontWeight: '900' },
 });
