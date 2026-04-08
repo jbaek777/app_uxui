@@ -268,16 +268,52 @@ ${rf('.gitignore', 1000)}
   },
 };
 
+// ── 사용 가능한 모델 자동 탐색 ──────────────────────────────
+async function findAvailableModel() {
+  const candidates = [
+    'claude-opus-4-5',
+    'claude-sonnet-4-5',
+    'claude-haiku-4-5',
+    'claude-3-5-sonnet-20241022',
+    'claude-3-5-haiku-20241022',
+    'claude-3-haiku-20240307',
+    'claude-3-sonnet-20240229',
+  ];
+  for (const model of candidates) {
+    try {
+      await anthropic.messages.create({
+        model,
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'hi' }],
+      });
+      console.log(`✅ 사용 가능한 모델: ${model}`);
+      return model;
+    } catch (e) {
+      if (e.status === 404) {
+        console.log(`  ✗ ${model} — 없음`);
+      } else {
+        // 404 외 오류(권한 등)면 그 모델은 존재하는 것
+        console.log(`✅ 사용 가능한 모델: ${model} (${e.status})`);
+        return model;
+      }
+    }
+  }
+  throw new Error('사용 가능한 Claude 모델을 찾을 수 없습니다. API 키와 플랜을 확인하세요.');
+}
+
 // ── 메인 실행 ────────────────────────────────────────────────
 async function main() {
   const cfg = AGENTS[AGENT_TYPE];
   console.log(`\n🤖 [${cfg.title}] 시작\n`);
 
+  // 0) 사용 가능한 모델 탐색
+  const MODEL = await findAvailableModel();
+
   // 1) Claude API 호출
   let result;
   try {
     const response = await anthropic.messages.create({
-      model:      'claude-3-5-sonnet-latest',
+      model:      MODEL,
       max_tokens: 2048,
       system:     cfg.system,
       messages:   [{ role: 'user', content: `분석 대상:\n\n${cfg.context()}` }],
