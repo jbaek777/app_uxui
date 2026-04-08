@@ -34,7 +34,7 @@ if (MISSING.length > 0) {
 
 const TODAY   = new Date().toISOString().split('T')[0];
 const REPO    = process.cwd();
-const DB_ID   = process.env.NOTION_DATABASE_ID;
+const DB_ID   = (process.env.NOTION_DATABASE_ID || '').trim().replace(/\n/g, '');
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
@@ -277,7 +277,7 @@ async function main() {
   let result;
   try {
     const response = await anthropic.messages.create({
-      model:      'claude-3-5-sonnet-20241022',
+      model:      'claude-3-5-sonnet-latest',
       max_tokens: 2048,
       system:     cfg.system,
       messages:   [{ role: 'user', content: `분석 대상:\n\n${cfg.context()}` }],
