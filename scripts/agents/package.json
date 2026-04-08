@@ -1,0 +1,16 @@
+{
+  "name": "meatbig-ai-agents",
+  "version": "1.0.0",
+  "description": "MeatBig AI 자동화 에이전트 팀",
+  "main": "run-agent.js",
+  "scripts": {
+    "validation": "node run-agent.js validation",
+    "planning":   "node run-agent.js planning",
+    "design":     "node run-agent.js design",
+    "security":   "node run-agent.js security"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@notionhq/client": "^2.2.15"
+  }
+}
