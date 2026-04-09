@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
   tabBarScroll: { borderBottomWidth: 1, flexGrow: 0 },
   tabBarContent: { flexDirection: 'row' },
   tab: { paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent', minWidth: 80 },
-  tabText: { fontSize: 13, fontWeight: '600' },
+  tabText: { fontSize: fontSize.sm, fontWeight: '600' },
   tabTextActive: { fontWeight: '900' },
 
   // 2×2 그리드
