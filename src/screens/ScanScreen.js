@@ -499,7 +499,6 @@ export default function ScanScreen({ navigation }) {
           </View>
         )}
       </Modal>
-      </>}
     </View>
   );
 }
