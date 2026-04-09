@@ -34,8 +34,9 @@ const DEMO_DATA = {
   '위생교육 이수증': { '성명': '홍길동', '교육명': '식육위생교육', '이수일': '2026.03.24', '유효기한': '2027.03.24', '발급기관': '한국식품안전관리인증원', '이수시간': '8시간' },
 };
 
-const API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY || '';
-const HAS_API_KEY = API_KEY.length > 10;
+const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || '';
+const HAS_API_KEY = GOOGLE_API_KEY.length > 10;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}`;
 
 // OCR 결과에서 소비기한 계산 (도축일 기준 14일)
 function calcExpire(slaughterDate) {
