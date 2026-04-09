@@ -12,9 +12,9 @@ import { PrimaryBtn, OutlineBtn, StatusBadge } from '../components/UI';
 
 const OFFLINE_QUEUE_KEY = '@meatbig_scan_queue';
 const SCAN_HISTORY_KEY = '@meatbig_scan_history';
+const MTRACE_KEY_STORAGE = '@meatbig_mtrace_api_key';
 
 // ─── 축산물이력제 API (data.go.kr 발급) ──────────────────
-const MTRACE_KEY = process.env.EXPO_PUBLIC_MTRACE_API_KEY || '';
 const MTRACE_BASE = 'https://api.mtrace.go.kr/mtrace/api';
 
 // 날짜 포맷 변환 (20221015 → 2022.10.15)
@@ -25,8 +25,8 @@ function fmtDate(val) {
 }
 
 // 실제 API 호출 (소 이력 조회)
-async function fetchMtrace(traceNo) {
-  const url = `${MTRACE_BASE}/cattleIndvdlQryApi?tno=${traceNo}&apiKey=${encodeURIComponent(MTRACE_KEY)}&_type=json`;
+async function fetchMtrace(traceNo, apiKey) {
+  const url = `${MTRACE_BASE}/cattleIndvdlQryApi?tno=${traceNo}&apiKey=${encodeURIComponent(apiKey)}&_type=json`;
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort(), 8000);
   try {
@@ -72,27 +72,23 @@ const MOCK_TRACE_DB = {
   },
 };
 
-async function lookupTrace(traceNo) {
+async function lookupTrace(traceNo, apiKey = '') {
   const clean = traceNo.replace(/\D/g, '');
 
   // API 키 없으면 Mock 데이터로 폴백
-  if (!MTRACE_KEY) {
-    await new Promise(r => setTimeout(r, 600));
-    return MOCK_TRACE_DB[clean] || {
-      traceNo: clean, animalType: '데모 모드', grade: 'N/A',
-      birthDate: 'N/A', farmName: 'API 키 미설정 — data.go.kr에서 발급 필요',
-      slaughterDate: 'N/A', slaughterPlace: 'N/A', weight: 'N/A', inspection: 'N/A',
-    };
+  if (!apiKey) {
+    await new Promise(r => setTimeout(r, 400));
+    return MOCK_TRACE_DB[clean] || null;
   }
 
   // 실제 API 조회
-  const result = await fetchMtrace(clean);
+  const result = await fetchMtrace(clean, apiKey);
   if (result) return result;
 
   // 조회 결과 없음 (미등록 이력번호)
   return {
     traceNo: clean, animalType: '이력 없음', grade: 'N/A',
-    birthDate: 'N/A', farmName: '해당 이력번호가 등록되지 않았습니다',
+    birthDate: 'N/A', farmName: '등록되지 않은 이력번호입니다',
     slaughterDate: 'N/A', slaughterPlace: 'N/A', weight: 'N/A', inspection: 'N/A',
   };
 }
@@ -125,17 +121,22 @@ export default function ScanScreen({ navigation }) {
   const [isOnline, setIsOnline] = useState(true);
   const [manualInput, setManualInput] = useState('');
   const [manualLoading, setManualLoading] = useState(false);
+  const [mtraceKey, setMtraceKey] = useState('');
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
 
-  // 앱 시작 시 히스토리 + 큐 불러오기
+  // 앱 시작 시 히스토리 + 큐 + API 키 불러오기
   useEffect(() => {
     (async () => {
       try {
-        const [hist, queue] = await Promise.all([
+        const [hist, queue, savedKey] = await Promise.all([
           AsyncStorage.getItem(SCAN_HISTORY_KEY),
           AsyncStorage.getItem(OFFLINE_QUEUE_KEY),
+          AsyncStorage.getItem(MTRACE_KEY_STORAGE),
         ]);
         if (hist) setHistory(JSON.parse(hist));
         if (queue) setPendingQueue(JSON.parse(queue));
+        if (savedKey) setMtraceKey(savedKey);
       } catch (_) {}
     })();
   }, []);
@@ -175,16 +176,39 @@ export default function ScanScreen({ navigation }) {
     }
   }, [pendingQueue, syncing]);
 
+  const saveApiKey = async () => {
+    const trimmed = keyInput.trim();
+    if (!trimmed) {
+      Alert.alert('입력 오류', 'API 키를 입력해주세요.');
+      return;
+    }
+    await AsyncStorage.setItem(MTRACE_KEY_STORAGE, trimmed);
+    setMtraceKey(trimmed);
+    setShowKeyModal(false);
+    setKeyInput('');
+    Alert.alert('저장 완료', 'API 키가 저장되었습니다.\n이제 실제 이력 데이터를 조회할 수 있습니다.');
+  };
+
   const handleManualLookup = async () => {
     const clean = manualInput.replace(/\D/g, '');
     if (clean.length < 5) {
       Alert.alert('입력 오류', '이력번호를 정확히 입력해주세요.');
       return;
     }
+    if (!mtraceKey) {
+      Alert.alert(
+        'API 키 필요',
+        'data.go.kr에서 축산물이력제 API 키를 발급받아 설정해야 실제 데이터를 조회할 수 있습니다.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: 'API 키 설정', onPress: () => { setKeyInput(''); setShowKeyModal(true); } },
+        ]
+      );
+      return;
+    }
     setManualLoading(true);
     try {
-      // lookupTrace는 항상 호출 (API 키 없으면 mock 반환, 키 있으면 실제 API)
-      const info = await lookupTrace(clean);
+      const info = await lookupTrace(clean, mtraceKey);
       const online = await checkOnline();
       setIsOnline(online);
       const entry = { ...info, rawData: clean, scanTime: new Date().toLocaleString('ko-KR'), synced: true };
@@ -206,8 +230,19 @@ export default function ScanScreen({ navigation }) {
     setScanning(false);
     setLoading(true);
     try {
-      // lookupTrace는 항상 호출 (API 키 없으면 mock 반환)
-      const info = await lookupTrace(data);
+      if (!mtraceKey) {
+        setLoading(false);
+        Alert.alert(
+          'API 키 필요',
+          `스캔된 번호: ${data}\n\ndata.go.kr에서 API 키를 발급받아 설정해야 실제 데이터를 조회할 수 있습니다.`,
+          [
+            { text: '취소', style: 'cancel' },
+            { text: 'API 키 설정', onPress: () => { setKeyInput(''); setShowKeyModal(true); } },
+          ]
+        );
+        return;
+      }
+      const info = await lookupTrace(data, mtraceKey);
       const online = await checkOnline();
       setIsOnline(online);
       const entry = { ...info, rawData: data, scanTime: new Date().toLocaleString('ko-KR'), synced: true };
@@ -293,11 +328,26 @@ export default function ScanScreen({ navigation }) {
               }
             </TouchableOpacity>
           )}
-          {/* 배너: 데모 모드 */}
-          {!MTRACE_KEY && (
-            <View style={[styles.offlineBanner, { backgroundColor: pal.pu + '12', borderColor: pal.pu + '40', marginBottom: spacing.sm }]}>
+          {/* 배너: API 키 미설정 */}
+          {!mtraceKey ? (
+            <TouchableOpacity
+              style={[styles.offlineBanner, { backgroundColor: pal.pu + '12', borderColor: pal.pu + '40', marginBottom: spacing.sm }]}
+              onPress={() => { setKeyInput(''); setShowKeyModal(true); }}
+              activeOpacity={0.7}
+            >
               <Text style={{ fontSize: 14 }}>🔑</Text>
-              <Text style={[styles.offlineBannerText, { color: pal.pu }]}>데모 모드 — data.go.kr에서 API 키 발급 후 실제 조회 가능</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.offlineBannerText, { color: pal.pu, marginBottom: 2 }]}>API 키 미설정 — 실제 이력 조회 불가</Text>
+                <Text style={{ fontSize: fontSize.xxs, color: pal.pu + 'aa' }}>탭하여 data.go.kr API 키 입력 →</Text>
+              </View>
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.offlineBanner, { backgroundColor: pal.gn + '12', borderColor: pal.gn + '40', marginBottom: spacing.sm }]}>
+              <Text style={{ fontSize: 14 }}>✅</Text>
+              <Text style={[styles.offlineBannerText, { color: pal.gn }]}>API 키 설정됨 — 실제 이력 조회 가능</Text>
+              <TouchableOpacity onPress={() => { setKeyInput(mtraceKey); setShowKeyModal(true); }}>
+                <Text style={{ fontSize: fontSize.xxs, color: pal.t3 }}>변경</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -471,6 +521,34 @@ export default function ScanScreen({ navigation }) {
             </ScrollView>
           </View>
         )}
+      </Modal>
+
+      {/* API 키 설정 모달 */}
+      <Modal visible={showKeyModal} transparent animationType="fade">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <View style={styles.loadingOverlay}>
+            <View style={[styles.keyModalBox, { backgroundColor: pal.s1 }]}>
+              <Text style={[styles.keyModalTitle, { color: pal.tx }]}>🔑 Mtrace API 키 설정</Text>
+              <Text style={[styles.keyModalDesc, { color: pal.t2 }]}>
+                {'data.go.kr → 축산물이력제 API\n신청 후 발급받은 인증키를 입력하세요.'}
+              </Text>
+              <TextInput
+                style={[styles.keyInput, { color: pal.tx, borderColor: pal.bd, backgroundColor: pal.bg }]}
+                placeholder="인증키 붙여넣기"
+                placeholderTextColor={pal.t3}
+                value={keyInput}
+                onChangeText={setKeyInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+                multiline
+              />
+              <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+                <OutlineBtn label="취소" onPress={() => setShowKeyModal(false)} style={{ flex: 1 }} />
+                <PrimaryBtn label="저장" onPress={saveApiKey} style={{ flex: 1 }} />
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -689,6 +767,11 @@ const styles = StyleSheet.create({
   loadingOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   loadingBox: { borderRadius: radius.lg, padding: 32, alignItems: 'center', ...shadow.md },
   loadingText: { marginTop: 14, fontSize: fontSize.sm, fontWeight: '600' },
+
+  keyModalBox: { margin: spacing.lg, borderRadius: radius.lg, padding: spacing.lg, width: '90%', ...shadow.md },
+  keyModalTitle: { fontSize: fontSize.md, fontWeight: '900', marginBottom: spacing.sm },
+  keyModalDesc: { fontSize: fontSize.xs, lineHeight: 20, marginBottom: spacing.md },
+  keyInput: { borderWidth: 1.5, borderRadius: radius.sm, padding: spacing.sm, fontSize: fontSize.xs, minHeight: 60 },
 
   resultHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
