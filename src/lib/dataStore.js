@@ -9,10 +9,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 
 const KEYS = {
-  MEAT:    '@meatbig_meat_inventory',
-  STAFF:   '@meatbig_staff',
-  YIELD:   '@meatbig_yield_history',
-  SALES:   '@meatbig_sales_history',
+  MEAT:      '@meatbig_meat_inventory',
+  STAFF:     '@meatbig_staff',
+  YIELD:     '@meatbig_yield_history',
+  SALES:     '@meatbig_sales_history',
+  SUPPLIERS: '@meatbig_suppliers',
 };
 
 // ─── 매장 정보 헬퍼 ─────────────────────────────────────
@@ -31,6 +32,16 @@ export async function getStoreInfo() {
       region_dong: data.addrDong || '',
     };
   } catch { return {}; }
+}
+
+// ─── 타임아웃 헬퍼 ──────────────────────────────────────
+function withTimeout(promise, ms = 5000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), ms)
+    ),
+  ]);
 }
 
 // ─── 범용 헬퍼 ──────────────────────────────────────────
@@ -54,12 +65,11 @@ async function saveLocal(key, data) {
 
 export const meatStore = {
   load: async (fallback) => {
-    // 1) Supabase
+    // 1) Supabase (5초 타임아웃)
     try {
-      const { data, error } = await supabase
-        .from('meat_inventory')
-        .select('*')
-        .order('created_at', { ascending: true });
+      const { data, error } = await withTimeout(
+        supabase.from('meat_inventory').select('*').order('created_at', { ascending: true })
+      );
       if (!error && data && data.length > 0) {
         const mapped = data.map(r => ({
           id: r.id, cut: r.cut, origin: r.origin,
@@ -109,10 +119,9 @@ export const meatStore = {
 export const staffStore = {
   load: async (fallback) => {
     try {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .order('name');
+      const { data, error } = await withTimeout(
+        supabase.from('employees').select('*').order('name')
+      );
       if (!error && data && data.length > 0) {
         const mapped = data.map(r => ({
           id: r.id, name: r.name, role: r.role,
@@ -153,10 +162,9 @@ export const staffStore = {
 export const yieldStore = {
   load: async () => {
     try {
-      const { data, error } = await supabase
-        .from('yield_history')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data, error } = await withTimeout(
+        supabase.from('yield_history').select('*').order('created_at', { ascending: false })
+      );
       if (!error && data && data.length > 0) {
         const mapped = data.map(r => ({
           id: r.id, label: r.label,
@@ -246,11 +254,9 @@ export const expiryLogStore = {
 export const hygieneStore = {
   load: async (fallback = []) => {
     try {
-      const { data, error } = await supabase
-        .from('hygiene_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const { data, error } = await withTimeout(
+        supabase.from('hygiene_logs').select('*').order('created_at', { ascending: false }).limit(100)
+      );
       if (!error && data && data.length > 0) return data;
     } catch {}
     try {
@@ -275,6 +281,116 @@ export const hygieneStore = {
       const info = await getStoreInfo();
       await supabase.from('hygiene_logs').insert({ ...log, ...info });
     } catch (e) { console.log('hygieneStore.addLog error:', e.message); }
+  },
+};
+
+// ─── 거래처 ─────────────────────────────────────────────
+
+export const supplierStore = {
+  load: async () => {
+    try {
+      const { data, error } = await withTimeout(
+        supabase.from('suppliers').select('*').order('created_at', { ascending: true })
+      );
+      if (!error && data && data.length > 0) {
+        const mapped = data.map(r => ({ id: r.id, name: r.name, contact: r.contact, memo: r.memo }));
+        await saveLocal(KEYS.SUPPLIERS, mapped);
+        return mapped;
+      }
+    } catch {}
+    return (await loadLocal(KEYS.SUPPLIERS)) || [];
+  },
+  save: async (items) => {
+    await saveLocal(KEYS.SUPPLIERS, items);
+    try {
+      const info = await getStoreInfo();
+      await supabase.from('suppliers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (items.length > 0) {
+        const rows = items.map(s => ({ id: s.id, name: s.name, contact: s.contact, memo: s.memo, ...info }));
+        await supabase.from('suppliers').insert(rows);
+      }
+    } catch (e) { console.warn('[supplierStore] supabase sync error:', e); }
+  },
+};
+
+// ─── 온도 기록 ───────────────────────────────────────────
+
+export const tempStore = {
+  load: async () => {
+    try {
+      const { data, error } = await withTimeout(
+        supabase.from('temp_records').select('*').order('created_at', { ascending: false }).limit(100)
+      );
+      if (!error && data && data.length > 0) {
+        const mapped = data.map(r => ({
+          id: r.id, date: r.date, time: r.time,
+          temp: Number(r.temp), humidity: Number(r.humidity),
+          person: r.person, note: r.note, status: r.status,
+        }));
+        await saveLocal('@meatbig_temp_records', mapped);
+        return mapped;
+      }
+    } catch {}
+    return (await loadLocal('@meatbig_temp_records')) || [];
+  },
+  add: async (record) => {
+    const prev = (await loadLocal('@meatbig_temp_records')) || [];
+    const updated = [record, ...prev];
+    await saveLocal('@meatbig_temp_records', updated);
+    try {
+      const info = await getStoreInfo();
+      await supabase.from('temp_records').insert({ ...record, ...info });
+    } catch (e) { console.warn('[tempStore] supabase sync error:', e); }
+    return updated;
+  },
+  delete: async (id) => {
+    const prev = (await loadLocal('@meatbig_temp_records')) || [];
+    const updated = prev.filter(r => r.id !== id);
+    await saveLocal('@meatbig_temp_records', updated);
+    try {
+      await supabase.from('temp_records').delete().eq('id', id);
+    } catch (e) { console.warn('[tempStore] supabase delete error:', e); }
+    return updated;
+  },
+};
+
+// ─── 교육일지 ────────────────────────────────────────────
+
+export const educationStore = {
+  load: async () => {
+    try {
+      const { data, error } = await withTimeout(
+        supabase.from('education_logs').select('*').order('created_at', { ascending: false })
+      );
+      if (!error && data && data.length > 0) {
+        const mapped = data.map(r => ({
+          id: r.id, date: r.date, attendees: r.attendees,
+          topics: r.topics || [], notes: r.notes,
+        }));
+        await saveLocal('@meatbig_education_logs', mapped);
+        return mapped;
+      }
+    } catch {}
+    return (await loadLocal('@meatbig_education_logs')) || [];
+  },
+  add: async (log) => {
+    const prev = (await loadLocal('@meatbig_education_logs')) || [];
+    const updated = [log, ...prev];
+    await saveLocal('@meatbig_education_logs', updated);
+    try {
+      const info = await getStoreInfo();
+      await supabase.from('education_logs').insert({ ...log, topics: log.topics, ...info });
+    } catch (e) { console.warn('[educationStore] supabase sync error:', e); }
+    return updated;
+  },
+  delete: async (id) => {
+    const prev = (await loadLocal('@meatbig_education_logs')) || [];
+    const updated = prev.filter(l => l.id !== id);
+    await saveLocal('@meatbig_education_logs', updated);
+    try {
+      await supabase.from('education_logs').delete().eq('id', id);
+    } catch (e) { console.warn('[educationStore] supabase delete error:', e); }
+    return updated;
   },
 };
 

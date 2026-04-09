@@ -18,6 +18,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["expo", "start", "--clear", "--port", "8082"],
       "port": 8082
+    },
+    {
+      "name": "ui-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "ui-preview", "-p", "3333", "--no-clipboard"],
+      "port": 3333
     }
   ]
 }

@@ -145,6 +145,26 @@ export default function SettingsScreen({ route, navigation }) {
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}
     >
 
+      {/* ── 계정 프로필 카드 ── */}
+      <View style={[styles.profileCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+        <View style={[styles.profileAvatar, { backgroundColor: pal.ac + '25' }]}>
+          <Text style={[styles.profileAvatarText, { color: pal.ac }]}>
+            {(biz.bizName || 'M').charAt(0).toUpperCase()}
+          </Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.profileName, { color: pal.tx }]}>{biz.bizName || 'MeatBig 매장'}</Text>
+          <Text style={[styles.profileEmail, { color: pal.t3 }]}>{user?.email || '이메일 없음'}</Text>
+        </View>
+        <View style={[styles.profileBadge, {
+          backgroundColor: isPremium ? pal.gn + '20' : pal.ac + '20',
+        }]}>
+          <Text style={[styles.profileBadgeText, { color: isPremium ? pal.gn : pal.ac }]}>
+            {isTrial ? '체험 중' : isPremium ? (currentPlan.emoji + ' ' + currentPlan.name) : '무료 플랜'}
+          </Text>
+        </View>
+      </View>
+
       {/* 권한 관리 */}
       <SectionTitle icon="🔐" label="권한 관리" pal={pal} />
       <View style={[styles.card, { backgroundColor: pal.s1, borderColor: role === 'owner' ? pal.ac + '40' : pal.a2 + '60' }]}>
@@ -532,6 +552,23 @@ const NotifRow = ({ label, value, onChange, last, pal }) => (
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
+  // 계정 프로필 카드
+  profileCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    borderRadius: radius.lg, borderWidth: 1,
+    padding: spacing.md, marginBottom: spacing.md, ...shadow.sm,
+  },
+  profileAvatar: {
+    width: 52, height: 52, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  profileAvatarText: { fontSize: 24, fontWeight: '900' },
+  profileName:  { fontSize: fontSize.md, fontWeight: '900', marginBottom: 3 },
+  profileEmail: { fontSize: fontSize.xs },
+  profileBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  profileBadgeText: { fontSize: fontSize.xxs, fontWeight: '800' },
+
   sectionTitle: {
     fontSize: fontSize.xs,
     fontWeight: '800',
