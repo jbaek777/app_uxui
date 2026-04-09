@@ -121,11 +121,11 @@ export default function ScanScreen({ navigation }) {
   const [isOnline, setIsOnline] = useState(true);
   const [manualInput, setManualInput] = useState('');
   const [manualLoading, setManualLoading] = useState(false);
-  const [mtraceKey, setMtraceKey] = useState('');
+  const [mtraceKey, setMtraceKey] = useState(process.env.EXPO_PUBLIC_MTRACE_API_KEY || '');
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [keyInput, setKeyInput] = useState('');
 
-  // 앱 시작 시 히스토리 + 큐 + API 키 불러오기
+  // 앱 시작 시 히스토리 + 큐 + API 키 불러오기 (AsyncStorage가 있으면 우선)
   useEffect(() => {
     (async () => {
       try {
