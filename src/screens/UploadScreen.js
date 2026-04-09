@@ -142,6 +142,13 @@ export default function UploadScreen({ navigation }) {
       });
       clearTimeout(timer);
       const data = await response.json();
+      // 인증 오류 → 데모 모드로 자동 폴백
+      if (data.error?.type === 'authentication_error' || data.error?.message?.includes('x-api-key')) {
+        setResult(DEMO_DATA[docType] || { '서류명': docType, '날짜': new Date().toLocaleDateString('ko-KR') });
+        setIsDemo(true);
+        setLoading(false);
+        return;
+      }
       if (data.error) throw new Error(data.error.message);
       const raw = data.content?.[0]?.text || '';
       const match = raw.match(/\{[\s\S]*\}/);

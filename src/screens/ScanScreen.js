@@ -33,10 +33,15 @@ async function fetchMtrace(traceNo, apiKey) {
     const res = await fetch(url, { signal: ctrl.signal });
     clearTimeout(tid);
     const json = await res.json();
+    const header = json?.response?.header;
     const body = json?.response?.body;
-    if (!body || body.totalCount === 0) return null;
+    // resultCode가 '00'이 아니면 (인증오류, 서비스오류 등) null 반환
+    if (header?.resultCode && header.resultCode !== '00') return null;
+    // totalCount 0 체크 (숫자/문자열 둘 다 처리)
+    if (!body || Number(body.totalCount) === 0) return null;
     // item이 배열(복수)이거나 단일 객체일 수 있음
     const raw = body.items?.item;
+    if (!raw) return null;
     const item = Array.isArray(raw) ? raw[0] : raw;
     if (!item) return null;
     return {
@@ -78,7 +83,11 @@ async function lookupTrace(traceNo, apiKey = '') {
   // API 키 없으면 Mock 데이터로 폴백
   if (!apiKey) {
     await new Promise(r => setTimeout(r, 400));
-    return MOCK_TRACE_DB[clean] || null;
+    return MOCK_TRACE_DB[clean] || {
+      traceNo: clean, animalType: '조회 불가', grade: 'N/A',
+      birthDate: 'N/A', farmName: 'API 키를 설정해야 실제 데이터를 조회할 수 있습니다',
+      slaughterDate: 'N/A', slaughterPlace: 'N/A', weight: 'N/A', inspection: 'N/A',
+    };
   }
 
   // 실제 API 조회
