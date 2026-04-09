@@ -414,7 +414,7 @@ export default function ScanScreen({ navigation }) {
             style={{ flex: 1 }}
             facing="back"
             onBarcodeScanned={scanned ? undefined : handleBarcode}
-            barcodeScannerSettings={{ barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'datamatrix'] }}
+            barcodeScannerSettings={{ barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'code93', 'itf14', 'datamatrix', 'pdf417', 'upc_a', 'upc_e'] }}
           >
             <View style={styles.camOverlay}>
               <View style={styles.camTopBar}>
@@ -429,7 +429,7 @@ export default function ScanScreen({ navigation }) {
                   <View style={[styles.corner, styles.cornerBL]} />
                   <View style={[styles.corner, styles.cornerBR]} />
                 </View>
-                <Text style={styles.camHint}>바코드를 네모 안에 맞춰주세요</Text>
+                <Text style={styles.camHint}>바코드를 가이드 안에 수평으로 맞춰주세요</Text>
               </View>
             </View>
           </CameraView>
@@ -691,7 +691,7 @@ const styles = StyleSheet.create({
   camTopBar: { padding: spacing.md, paddingTop: 56 },
   camCloseBtn: { alignSelf: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', padding: 10, borderRadius: radius.sm },
   camCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scanFrame: { width: 240, height: 240, position: 'relative', marginBottom: 24 },
+  scanFrame: { width: 300, height: 130, position: 'relative', marginBottom: 24 },
   corner: { position: 'absolute', width: 30, height: 30, borderColor: '#e8950a', borderWidth: 3 },
   cornerTL: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
   cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
