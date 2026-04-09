@@ -183,29 +183,16 @@ export default function ScanScreen({ navigation }) {
     }
     setManualLoading(true);
     try {
+      // lookupTrace는 항상 호출 (API 키 없으면 mock 반환, 키 있으면 실제 API)
+      const info = await lookupTrace(clean);
       const online = await checkOnline();
       setIsOnline(online);
-      let info;
-      if (online) {
-        info = await lookupTrace(clean);
-      } else {
-        info = {
-          traceNo: clean, animalType: '오프라인 스캔',
-          grade: '—', birthDate: '—', farmName: '서버 미연결 (동기화 대기)',
-          slaughterDate: '—', slaughterPlace: '—', weight: '—', inspection: '—',
-        };
-      }
-      const entry = { ...info, rawData: clean, scanTime: new Date().toLocaleString('ko-KR'), synced: online };
+      const entry = { ...info, rawData: clean, scanTime: new Date().toLocaleString('ko-KR'), synced: true };
       setResult(entry);
       const newHistory = [entry, ...history.slice(0, 9)];
       setHistory(newHistory);
       await saveHistory(newHistory);
       setManualInput('');
-      if (!online) {
-        const newQueue = [entry, ...pendingQueue];
-        setPendingQueue(newQueue);
-        await saveQueue(newQueue);
-      }
     } catch {
       Alert.alert('오류', '이력 조회에 실패했습니다.');
     } finally {
@@ -219,30 +206,15 @@ export default function ScanScreen({ navigation }) {
     setScanning(false);
     setLoading(true);
     try {
+      // lookupTrace는 항상 호출 (API 키 없으면 mock 반환)
+      const info = await lookupTrace(data);
       const online = await checkOnline();
       setIsOnline(online);
-      let info;
-      if (online) {
-        info = await lookupTrace(data);
-      } else {
-        // 오프라인: 기본 정보만 저장하고 큐에 추가
-        info = {
-          traceNo: data.replace(/\D/g, ''), animalType: '오프라인 스캔',
-          grade: '—', birthDate: '—', farmName: '서버 미연결 (동기화 대기)',
-          slaughterDate: '—', slaughterPlace: '—', weight: '—', inspection: '—',
-        };
-      }
-      const entry = { ...info, rawData: data, scanTime: new Date().toLocaleString('ko-KR'), synced: online };
+      const entry = { ...info, rawData: data, scanTime: new Date().toLocaleString('ko-KR'), synced: true };
       setResult(entry);
       const newHistory = [entry, ...history.slice(0, 9)];
       setHistory(newHistory);
       await saveHistory(newHistory);
-
-      if (!online) {
-        const newQueue = [entry, ...pendingQueue];
-        setPendingQueue(newQueue);
-        await saveQueue(newQueue);
-      }
     } catch {
       Alert.alert('오류', '이력 조회에 실패했습니다.');
     } finally {
@@ -413,6 +385,7 @@ export default function ScanScreen({ navigation }) {
           <CameraView
             style={{ flex: 1 }}
             facing="back"
+            autofocus="on"
             onBarcodeScanned={scanned ? undefined : handleBarcode}
             barcodeScannerSettings={{ barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'code93', 'itf14', 'datamatrix', 'pdf417', 'upc_a', 'upc_e'] }}
           >
