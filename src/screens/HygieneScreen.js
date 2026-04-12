@@ -237,9 +237,12 @@ export default function HygieneScreen() {
             <Text style={[styles.emptyDesc, { color: pal.t3 }]}>위의 버튼을 눌러 오늘의 위생점검을 시작하세요</Text>
           </View>
         )}
-        {logs.map(log => (
+        {logs.map(log => {
+          const statusColor = log.status === 'pass' ? pal.gn : log.status === 'warning' ? pal.yw : pal.rd;
+          return (
           <TouchableOpacity key={log.id} activeOpacity={0.85} onPress={() => handleExportPDF(log)}>
-            <View style={[styles.logCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+            <View style={[styles.logCard, { backgroundColor: pal.s1, borderColor: pal.bd, overflow: 'hidden' }]}>
+              <View style={[styles.logAccent, { backgroundColor: statusColor }]} />
               <View style={styles.logTop}>
                 <View>
                   <Text style={[styles.logDate, { color: pal.tx }]}>{log.date} {log.time}</Text>
@@ -254,7 +257,8 @@ export default function HygieneScreen() {
               <Text style={[styles.pdfHint, { color: pal.t3 }]}>탭하여 PDF 내보내기 →</Text>
             </View>
           </TouchableOpacity>
-        ))}
+          );
+        })}
       </ScrollView>
 
       {/* 월 선택 모달 */}
@@ -400,7 +404,8 @@ export default function HygieneScreen() {
 
 function StatBox({ value, label, color, pal }) {
   return (
-    <View style={[styles.statBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+    <View style={[styles.statBox, { backgroundColor: pal.s1, borderColor: pal.bd, overflow: 'hidden' }]}>
+      <View style={[styles.statAccent, { backgroundColor: color }]} />
       <Text style={[styles.statVal, { color }]}>{value}</Text>
       <Text style={[styles.statLbl, { color: pal.t3 }]}>{label}</Text>
     </View>
@@ -508,22 +513,24 @@ function genHygieneLogHTML(log) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  statRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md },
-  statBox: { flex: 1, borderRadius: radius.md, borderWidth: 1, padding: spacing.md, alignItems: 'center', ...shadow.sm },
-  statVal: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 3 },
+  statRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, paddingBottom: spacing.sm },
+  statBox: { flex: 1, borderRadius: radius.md, borderWidth: 1, paddingTop: 16, paddingBottom: 12, paddingHorizontal: spacing.sm, alignItems: 'center' },
+  statAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 4 },
+  statVal: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 4 },
   statLbl: { fontSize: fontSize.xxs, fontWeight: '600', textAlign: 'center' },
 
   emptyBox: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.xl, alignItems: 'center', marginBottom: spacing.md },
   emptyTitle: { fontSize: fontSize.md, fontWeight: '800', marginBottom: 6 },
   emptyDesc: { fontSize: fontSize.sm, textAlign: 'center' },
 
-  logCard: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
-  logTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  logCard: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm },
+  logAccent: { position: 'absolute', top: 0, left: 0, bottom: 0, width: 4 },
+  logTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingLeft: 8 },
   logDate: { fontSize: fontSize.md, fontWeight: '700', marginBottom: 3 },
   logMeta: { fontSize: fontSize.xs },
   badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   badgeText: { fontSize: fontSize.xs, fontWeight: '800' },
-  pdfHint: { fontSize: 11, marginTop: 6, textAlign: 'right' },
+  pdfHint: { fontSize: 11, marginTop: 6, textAlign: 'right', paddingLeft: 8 },
 
   modalWrap: { flex: 1 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1 },

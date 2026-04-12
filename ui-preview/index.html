@@ -1,0 +1,2523 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MeatBig UI 개선안</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #111827;
+  --s1: #1F2937;
+  --s2: #374151;
+  --bd: #2D3748;
+  --ac: #DC2626;
+  --ac2: #EF4444;
+  --gn: #10B981;
+  --a2: #F59E0B;
+  --cyan: #06B6D4;
+  --tx: #F9FAFB;
+  --t2: #9CA3AF;
+  --t3: #6B7280;
+  --rd: #EF4444;
+  --pu: #8B5CF6;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: #0A0E1A;
+  font-family: 'Noto Sans KR', -apple-system, sans-serif;
+  display: flex; flex-direction: column; align-items: center;
+  min-height: 100vh; padding: 32px 16px 60px;
+  background-image: radial-gradient(ellipse at 20% 20%, rgba(220,38,38,0.05) 0%, transparent 60%),
+                    radial-gradient(ellipse at 80% 80%, rgba(6,182,212,0.04) 0%, transparent 60%);
+}
+
+/* ── 스튜디오 헤더 ── */
+.studio-header { text-align:center; margin-bottom:32px; }
+.studio-logo {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--s1); border: 1px solid var(--bd);
+  border-radius: 16px; padding: 10px 20px; margin-bottom: 12px;
+}
+.studio-logo .dot { width:10px; height:10px; border-radius:50%; background:var(--ac); }
+.studio-logo span { font-size:15px; font-weight:800; color:var(--tx); letter-spacing:2px; }
+.studio-header p { font-size:13px; color:var(--t3); }
+
+/* ── 화면 탭 ── */
+.screen-tabs {
+  display: flex; gap: 6px; margin-bottom: 28px;
+  background: var(--s1); padding: 5px; border-radius: 16px;
+  border: 1px solid var(--bd);
+  flex-wrap: wrap; justify-content: center; max-width: 520px;
+}
+.screen-tab {
+  padding: 9px 14px; border-radius: 11px; border: none;
+  background: transparent; color: var(--t2);
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: all .2s; font-family: 'Noto Sans KR', sans-serif;
+  white-space: nowrap;
+}
+.screen-tab:hover { color: var(--tx); }
+.screen-tab.active { background: var(--ac); color: #fff; }
+
+/* ── 폰 프레임 ── */
+.phone-outer {
+  background: linear-gradient(145deg, #2A2A3E, #1A1A2A);
+  border-radius: 54px; padding: 12px;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.phone-frame {
+  width: 375px; height: 812px;
+  background: var(--bg); border-radius: 44px;
+  overflow: hidden; position: relative;
+}
+
+/* 다이나믹 아일랜드 */
+.dynamic-island {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  width: 120px; height: 34px; background: #000;
+  border-radius: 20px; z-index: 100;
+}
+
+/* 상태바 */
+.status-bar {
+  height: 52px; padding: 16px 24px 0;
+  display: flex; justify-content: space-between; align-items: center;
+  position: relative; z-index: 50;
+}
+.status-time { font-size: 16px; font-weight: 700; color: var(--tx); }
+.status-icons { display:flex; gap:5px; align-items:center; color:var(--tx); font-size:13px; }
+
+/* ── 화면 ── */
+.screen { display:none; height: calc(812px - 52px); flex-direction:column; }
+.screen.active { display:flex; }
+.screen-body { flex:1; overflow-y:auto; overflow-x:hidden; }
+.screen-body::-webkit-scrollbar { width:0; }
+
+/* ── 헤더 ── */
+.nav-header {
+  padding: 4px 20px 16px;
+  display: flex; justify-content:space-between; align-items:center;
+}
+.nav-title { font-size: 22px; font-weight: 900; color: var(--tx); }
+.nav-sub { font-size: 12px; color: var(--t3); margin-top:2px; }
+.nav-btn {
+  width:38px; height:38px; border-radius:12px;
+  background:var(--s1); border:1px solid var(--bd);
+  display:flex; align-items:center; justify-content:center; font-size:18px;
+}
+
+/* 뒤로가기 헤더 */
+.back-header {
+  padding: 8px 20px 12px;
+  display: flex; align-items: center; gap: 10px;
+}
+.back-btn {
+  width:36px; height:36px; border-radius:11px;
+  background:var(--s1); border:1px solid var(--bd);
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; cursor:pointer; flex-shrink:0;
+}
+.back-title { font-size:18px; font-weight:900; color:var(--tx); }
+
+/* ── 탭바 ── */
+.tab-bar {
+  height: 80px; background: var(--s1);
+  border-top: 1px solid var(--bd);
+  display: flex; align-items: center; justify-content: space-around;
+  padding: 0 8px 12px; flex-shrink:0;
+}
+.tab-item {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; gap:4px; cursor:pointer;
+  padding: 8px 4px; border-radius:14px;
+  transition: all .2s; opacity:0.45;
+}
+.tab-item.active { opacity:1; }
+.tab-icon-wrap {
+  width:44px; height:30px;
+  display:flex; align-items:center; justify-content:center;
+}
+.tab-item.active .tab-icon-wrap {
+  background: rgba(220,38,38,0.12);
+  border-radius: 10px;
+}
+.tab-icon { font-size:20px; line-height:1; }
+.tab-label { font-size:10px; font-weight:700; color:var(--tx); }
+
+/* ══════════════════════════════
+   1. 로그인
+══════════════════════════════ */
+#screen-1 .screen-body {
+  background: var(--bg);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding: 32px 28px;
+  gap: 0;
+}
+.login-brand { text-align:center; margin-bottom:48px; }
+.login-brand-icon {
+  width:72px; height:72px; background:var(--ac);
+  border-radius:20px; display:flex; align-items:center; justify-content:center;
+  font-size:36px; margin:0 auto 20px;
+  box-shadow: 0 12px 40px rgba(220,38,38,0.35);
+}
+.login-brand h1 {
+  font-size:32px; font-weight:900; color:var(--tx);
+  letter-spacing:3px;
+}
+.login-brand h1 em { color:var(--ac); font-style:normal; }
+.login-brand p { font-size:13px; color:var(--t2); margin-top:8px; font-weight:500; }
+
+.login-fields { width:100%; display:flex; flex-direction:column; gap:12px; margin-bottom:20px; }
+.field-group { display:flex; flex-direction:column; gap:6px; }
+.field-label { font-size:12px; font-weight:700; color:var(--t2); }
+.field-input {
+  width:100%; padding:15px 16px;
+  background:var(--s1); border:1.5px solid var(--bd);
+  border-radius:14px; color:var(--tx);
+  font-size:15px; font-family:'Noto Sans KR',sans-serif;
+  outline:none; transition:border-color .2s;
+}
+.field-input::placeholder { color:var(--t3); }
+.field-input:focus { border-color:var(--ac); }
+
+.login-cta {
+  width:100%; padding:17px;
+  background:var(--ac); border:none; border-radius:14px;
+  color:#fff; font-size:16px; font-weight:800;
+  font-family:'Noto Sans KR',sans-serif;
+  cursor:pointer; margin-bottom:16px;
+  box-shadow:0 6px 24px rgba(220,38,38,0.35);
+}
+.login-switch { text-align:center; font-size:13px; color:var(--t2); margin-bottom:28px; }
+.login-switch a { color:var(--cyan); font-weight:700; }
+
+.login-tip {
+  width:100%; background:rgba(6,182,212,0.08);
+  border:1px solid rgba(6,182,212,0.2); border-radius:12px;
+  padding:12px 14px; display:flex; gap:10px; align-items:flex-start;
+}
+.login-tip-icon { font-size:16px; flex-shrink:0; margin-top:1px; }
+.login-tip span { font-size:12px; color:var(--cyan); line-height:1.6; font-weight:500; }
+
+/* ══════════════════════════════
+   2. 홈
+══════════════════════════════ */
+.home-body { padding:0 20px 20px; }
+
+/* 인사 섹션 */
+.greeting {
+  padding: 8px 0 20px;
+  border-bottom: 1px solid var(--bd);
+  margin-bottom: 20px;
+}
+.greeting-date { font-size:12px; color:var(--t3); font-weight:600; margin-bottom:6px; }
+.greeting-text { font-size:24px; font-weight:900; color:var(--tx); line-height:1.3; }
+.greeting-text em { color:var(--ac); font-style:normal; }
+
+/* 오늘 요약 3칸 */
+.today-stats {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:8px; margin-bottom:24px;
+}
+.stat-box {
+  background:var(--s1); border-radius:14px;
+  border:1px solid var(--bd); padding:14px 10px;
+  display:flex; flex-direction:column; gap:6px;
+}
+.stat-icon { font-size:20px; }
+.stat-value { font-size:18px; font-weight:900; color:var(--tx); line-height:1; }
+.stat-label { font-size:11px; color:var(--t3); font-weight:600; }
+
+/* 섹션 타이틀 */
+.sec-title {
+  font-size:13px; font-weight:800; color:var(--t2);
+  margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;
+}
+.sec-title a { font-size:11px; color:var(--ac); font-weight:700; cursor:pointer; }
+
+/* 점검 카드 */
+.check-list { display:flex; flex-direction:column; gap:8px; margin-bottom:24px; }
+.check-item {
+  background:var(--s1); border-radius:14px; border:1px solid var(--bd);
+  padding:14px 16px; display:flex; align-items:center; gap:14px;
+}
+.check-dot {
+  width:8px; height:8px; border-radius:50%; flex-shrink:0;
+}
+.check-item-text { flex:1; }
+.check-item-text strong { font-size:14px; font-weight:700; color:var(--tx); display:block; }
+.check-item-text span { font-size:12px; color:var(--t3); margin-top:2px; display:block; }
+.check-chip {
+  font-size:11px; font-weight:800; padding:4px 10px; border-radius:8px;
+}
+
+/* 재고 게이지 */
+.gauge-list { background:var(--s1); border-radius:14px; border:1px solid var(--bd); padding:16px; margin-bottom:24px; }
+.gauge-item { margin-bottom:14px; }
+.gauge-item:last-child { margin-bottom:0; }
+.gauge-meta { display:flex; justify-content:space-between; margin-bottom:6px; }
+.gauge-meta strong { font-size:13px; font-weight:700; color:var(--tx); }
+.gauge-meta span { font-size:12px; color:var(--t3); }
+.gauge-bar { height:5px; background:var(--bd); border-radius:3px; overflow:hidden; }
+.gauge-fill { height:100%; border-radius:3px; }
+
+/* 손실 알림 */
+.loss-banner {
+  background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2);
+  border-radius:14px; padding:16px; display:flex; gap:14px; align-items:center;
+  margin-bottom:24px;
+}
+.loss-left { flex:1; }
+.loss-label { font-size:12px; color:var(--rd); font-weight:700; margin-bottom:4px; }
+.loss-value { font-size:24px; font-weight:900; color:var(--rd); }
+.loss-sub { font-size:11px; color:var(--t3); margin-top:4px; }
+.loss-right { font-size:28px; }
+
+/* 빠른 실행 그리드 */
+.quick-grid {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:8px; margin-bottom:16px;
+}
+.quick-btn {
+  background:var(--s1); border-radius:14px; border:1px solid var(--bd);
+  padding:14px 8px; display:flex; flex-direction:column;
+  align-items:center; gap:8px; cursor:pointer;
+  transition: all .2s;
+}
+.quick-btn:hover { border-color:var(--ac); }
+.quick-btn-icon { font-size:22px; }
+.quick-btn-label { font-size:11px; font-weight:700; color:var(--tx); text-align:center; line-height:1.3; }
+
+/* ══════════════════════════════
+   3. 재고
+══════════════════════════════ */
+.inv-header { padding: 4px 20px 0; }
+.inv-search {
+  width:100%; padding:12px 16px;
+  background:var(--s1); border:1.5px solid var(--bd);
+  border-radius:12px; color:var(--tx);
+  font-size:14px; font-family:'Noto Sans KR',sans-serif;
+  outline:none; margin-bottom:12px;
+}
+.inv-filter-row { display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; }
+.inv-filter-row::-webkit-scrollbar { height:0; }
+.filter-chip {
+  padding:6px 14px; border-radius:20px;
+  border:1.5px solid var(--bd); background:var(--s1);
+  font-size:12px; font-weight:700; color:var(--t2);
+  white-space:nowrap; cursor:pointer; transition:all .2s;
+  font-family:'Noto Sans KR',sans-serif;
+}
+.filter-chip.active { background:var(--ac); border-color:var(--ac); color:#fff; }
+
+/* 재고 내부 탭 */
+.inv-inner-tabs {
+  display:flex; gap:0; margin:10px 20px 0;
+  background:var(--s1); border-radius:12px; border:1px solid var(--bd);
+  overflow:hidden;
+}
+.inv-inner-tab {
+  flex:1; padding:9px 4px; text-align:center;
+  font-size:11px; font-weight:700; color:var(--t3);
+  cursor:pointer; transition:all .2s;
+  border-right:1px solid var(--bd);
+  font-family:'Noto Sans KR',sans-serif;
+}
+.inv-inner-tab:last-child { border-right:none; }
+.inv-inner-tab.active { background:var(--ac); color:#fff; }
+
+/* 재고 요약바 */
+.inv-summary-bar {
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:1px; background:var(--bd); border-radius:14px;
+  overflow:hidden; margin:12px 20px 0; border:1px solid var(--bd);
+}
+.inv-sumbox {
+  background:var(--s1); padding:12px 8px; text-align:center;
+}
+.inv-sumbox .sv { font-size:17px; font-weight:900; color:var(--tx); }
+.inv-sumbox .sl { font-size:10px; color:var(--t3); font-weight:600; margin-top:3px; }
+
+/* 재고 리스트 */
+.inv-list { padding:12px 20px; display:flex; flex-direction:column; gap:8px; }
+.inv-card {
+  background:var(--s1); border-radius:14px; border:1px solid var(--bd);
+  padding:14px 16px; display:flex; align-items:center; gap:12px;
+}
+.inv-grade {
+  width:44px; height:44px; border-radius:12px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-size:11px; font-weight:900; line-height:1.3;
+  flex-shrink:0;
+}
+.inv-main { flex:1; min-width:0; }
+.inv-name { font-size:15px; font-weight:800; color:var(--tx); }
+.inv-detail { font-size:11px; color:var(--t3); margin-top:3px; }
+.inv-right { text-align:right; flex-shrink:0; }
+.exp-pill {
+  font-size:11px; font-weight:800; padding:4px 10px;
+  border-radius:8px; display:inline-block; margin-bottom:5px;
+}
+.inv-qty { font-size:13px; font-weight:700; color:var(--t2); }
+
+/* FAB */
+.fab {
+  position:absolute; bottom:88px; right:20px;
+  width:52px; height:52px; background:var(--ac);
+  border-radius:16px; display:flex; align-items:center; justify-content:center;
+  font-size:26px; color:#fff;
+  box-shadow:0 6px 24px rgba(220,38,38,0.45);
+  z-index:50; cursor:pointer;
+}
+
+/* 판매내역 */
+.sales-group { padding:0 20px; margin-bottom:8px; }
+.sales-group-date { font-size:11px; font-weight:800; color:var(--t3); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+.sales-item {
+  background:var(--s1); border-radius:12px; border:1px solid var(--bd);
+  padding:12px 14px; display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:6px;
+}
+.sales-item-left .si-name { font-size:14px; font-weight:700; color:var(--tx); }
+.sales-item-left .si-detail { font-size:11px; color:var(--t3); margin-top:2px; }
+.sales-item-right { text-align:right; }
+.sales-item-right .si-price { font-size:14px; font-weight:800; color:var(--tx); }
+.sales-item-right .si-margin { font-size:11px; color:var(--gn); margin-top:2px; }
+
+/* 수율계산기 */
+.yield-calc { padding:12px 20px; }
+.yield-form { background:var(--s1); border-radius:14px; border:1px solid var(--bd); padding:16px; margin-bottom:12px; }
+.yield-row { display:flex; gap:10px; margin-bottom:12px; align-items:flex-end; }
+.yield-field { flex:1; }
+.yield-field label { font-size:11px; font-weight:700; color:var(--t3); display:block; margin-bottom:6px; }
+.yield-input {
+  width:100%; padding:10px 12px;
+  background:var(--bg); border:1px solid var(--bd);
+  border-radius:10px; color:var(--tx);
+  font-size:14px; font-family:'Noto Sans KR',sans-serif;
+  outline:none;
+}
+.yield-result {
+  background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2);
+  border-radius:10px; padding:12px 14px; text-align:center;
+}
+.yield-result-val { font-size:22px; font-weight:900; color:var(--gn); }
+.yield-result-label { font-size:11px; color:var(--t3); margin-top:2px; }
+
+/* 소비기한 탭 */
+.exp-mgmt-list { padding:12px 20px; display:flex; flex-direction:column; gap:8px; }
+.exp-mgmt-item {
+  background:var(--s1); border-radius:12px; border:1px solid var(--bd);
+  padding:12px 14px; display:flex; justify-content:space-between; align-items:center;
+}
+.exp-mgmt-item .em-name { font-size:14px; font-weight:700; color:var(--tx); }
+.exp-mgmt-item .em-detail { font-size:11px; color:var(--t3); margin-top:2px; }
+.exp-edit-btn {
+  padding:5px 12px; border-radius:8px;
+  background:rgba(220,38,38,0.12); color:var(--ac);
+  font-size:11px; font-weight:700; border:1px solid rgba(220,38,38,0.25);
+  cursor:pointer; font-family:'Noto Sans KR',sans-serif;
+}
+
+/* 거래처 탭 */
+.vendor-list { padding:12px 20px; display:flex; flex-direction:column; gap:8px; }
+.vendor-card {
+  background:var(--s1); border-radius:14px; border:1px solid var(--bd); padding:14px 16px;
+}
+.vendor-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+.vendor-name { font-size:14px; font-weight:800; color:var(--tx); }
+.vendor-monthly { font-size:12px; font-weight:700; color:var(--cyan); }
+.vendor-bottom { display:flex; justify-content:space-between; }
+.vendor-contact { font-size:11px; color:var(--t3); }
+.vendor-memo { font-size:11px; color:var(--t2); }
+
+/* ══════════════════════════════
+   4. 구독
+══════════════════════════════ */
+.paywall-body { padding:0 20px 20px; }
+.paywall-hero {
+  text-align:center; padding:16px 0 24px;
+  border-bottom:1px solid var(--bd); margin-bottom:20px;
+}
+.paywall-hero h2 { font-size:22px; font-weight:900; color:var(--tx); }
+.paywall-hero p { font-size:13px; color:var(--t2); margin-top:8px; line-height:1.6; }
+
+.cycle-row {
+  display:flex; background:var(--s1); border-radius:12px;
+  padding:3px; border:1px solid var(--bd); margin-bottom:20px;
+}
+.cycle-opt {
+  flex:1; padding:9px; text-align:center;
+  font-size:13px; font-weight:700; color:var(--t2);
+  border-radius:9px; cursor:pointer; transition:all .2s;
+  font-family:'Noto Sans KR',sans-serif;
+}
+.cycle-opt.active { background:var(--ac); color:#fff; }
+
+.plan-list { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
+.plan-box {
+  background:var(--s1); border-radius:16px; border:1.5px solid var(--bd);
+  padding:18px; position:relative; transition:border-color .2s;
+}
+.plan-box.best { border-color:var(--ac); }
+.best-tag {
+  position:absolute; top:-11px; left:50%; transform:translateX(-50%);
+  background:var(--ac); color:#fff; font-size:11px; font-weight:800;
+  padding:3px 14px; border-radius:20px; white-space:nowrap;
+}
+.plan-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.plan-name-row { display:flex; align-items:center; gap:8px; }
+.plan-emoji { font-size:20px; }
+.plan-name { font-size:16px; font-weight:900; color:var(--tx); }
+.plan-pricing {}
+.plan-amount { font-size:22px; font-weight:900; color:var(--ac); }
+.plan-period { font-size:11px; color:var(--t3); }
+.plan-feats { display:flex; flex-direction:column; gap:6px; }
+.feat-row { display:flex; gap:8px; align-items:center; font-size:13px; }
+.feat-row.yes { color:var(--tx); }
+.feat-row.no { color:var(--t3); opacity:.6; }
+.feat-check { font-size:13px; width:16px; flex-shrink:0; }
+
+.paywall-cta {
+  width:100%; padding:18px; background:var(--ac);
+  border:none; border-radius:14px; color:#fff;
+  font-size:17px; font-weight:900;
+  font-family:'Noto Sans KR',sans-serif;
+  box-shadow:0 8px 28px rgba(220,38,38,0.35);
+  cursor:pointer; margin-bottom:10px;
+}
+.paywall-fine { text-align:center; font-size:11px; color:var(--t3); }
+
+/* ══════════════════════════════
+   5. 설정
+══════════════════════════════ */
+.settings-body { padding:0 20px 20px; }
+
+.profile-card {
+  background:var(--s1); border-radius:16px; border:1px solid var(--bd);
+  padding:18px; display:flex; gap:14px; align-items:center; margin-bottom:8px;
+}
+.avatar {
+  width:52px; height:52px; background:var(--ac);
+  border-radius:16px; display:flex; align-items:center; justify-content:center;
+  font-size:22px; font-weight:900; color:#fff; flex-shrink:0;
+}
+.profile-info h3 { font-size:16px; font-weight:800; color:var(--tx); }
+.profile-info p { font-size:12px; color:var(--t3); margin-top:3px; }
+.profile-info .email { font-size:11px; color:var(--t3); margin-top:2px; }
+
+.sub-card {
+  background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25);
+  border-radius:14px; padding:14px 16px;
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;
+}
+.sub-info h4 { font-size:14px; font-weight:800; color:var(--gn); }
+.sub-info p { font-size:11px; color:var(--t3); margin-top:2px; }
+.sub-pill { background:var(--gn); color:#fff; font-size:12px; font-weight:800; padding:5px 14px; border-radius:20px; }
+
+.settings-group { margin-bottom:20px; }
+.group-label { font-size:11px; font-weight:800; color:var(--t3); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; }
+.settings-list { background:var(--s1); border-radius:14px; border:1px solid var(--bd); overflow:hidden; }
+.settings-item {
+  display:flex; align-items:center; gap:14px;
+  padding:15px 16px; border-bottom:1px solid var(--bd);
+}
+.settings-item:last-child { border-bottom:none; }
+.si-icon {
+  width:36px; height:36px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;
+}
+.si-text { flex:1; }
+.si-text strong { font-size:14px; font-weight:700; color:var(--tx); display:block; }
+.si-text span { font-size:11px; color:var(--t3); margin-top:2px; display:block; }
+.si-right { color:var(--t3); font-size:18px; }
+
+.toggle {
+  width:44px; height:26px; border-radius:13px; background:var(--ac);
+  position:relative; cursor:pointer; flex-shrink:0;
+}
+.toggle::after {
+  content:''; position:absolute; top:3px; right:3px;
+  width:20px; height:20px; background:#fff; border-radius:50%;
+  transition:all .2s;
+}
+.toggle.off { background:var(--s2); }
+.toggle.off::after { right:auto; left:3px; }
+
+.logout-btn {
+  width:100%; padding:15px;
+  background:rgba(239,68,68,0.08);
+  border:1.5px solid rgba(239,68,68,0.2);
+  border-radius:14px; color:var(--rd);
+  font-size:15px; font-weight:800;
+  font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+}
+
+/* ══════════════════════════════
+   6. 조회
+══════════════════════════════ */
+.lookup-body { padding: 0 20px 20px; }
+.lookup-input-wrap {
+  position: relative; margin-bottom: 12px;
+}
+.lookup-input {
+  width: 100%; padding: 15px 52px 15px 16px;
+  background: var(--s1); border: 2px solid var(--bd);
+  border-radius: 14px; color: var(--tx);
+  font-size: 15px; font-family: 'Noto Sans KR', sans-serif;
+  outline: none; transition: border-color .2s;
+}
+.lookup-input::placeholder { color: var(--t3); }
+.lookup-input:focus { border-color: var(--ac); }
+.lookup-search-btn {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  width: 32px; height: 32px; background: var(--ac); border: none; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer;
+}
+.lookup-hint {
+  background: rgba(6,182,212,0.07); border: 1px solid rgba(6,182,212,0.18);
+  border-radius: 12px; padding: 11px 14px;
+  font-size: 12px; color: var(--cyan); margin-bottom: 12px; line-height: 1.6;
+}
+.offline-banner {
+  background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);
+  border-radius:10px; padding:9px 14px; margin-bottom:14px;
+  display:flex; align-items:center; gap:8px;
+  font-size:12px; color:var(--a2); font-weight:700;
+}
+.lookup-result-card {
+  background: var(--s1); border: 1.5px solid var(--ac);
+  border-radius: 16px; padding: 18px; margin-bottom: 16px;
+}
+.lookup-result-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+}
+.lookup-result-header h3 { font-size: 16px; font-weight: 900; color: var(--tx); }
+.lookup-ok-pill {
+  background: rgba(16,185,129,0.15); color: var(--gn);
+  font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 20px;
+  border: 1px solid rgba(16,185,129,0.3);
+}
+.lookup-rows { display: flex; flex-direction: column; gap: 10px; }
+.lookup-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 10px; border-bottom: 1px solid var(--bd);
+}
+.lookup-row:last-child { border-bottom: none; padding-bottom: 0; }
+.lookup-row .lk { font-size: 12px; color: var(--t3); }
+.lookup-row .lv { font-size: 13px; font-weight: 700; color: var(--tx); }
+.lookup-row .lv.grade { color: var(--ac); font-size: 15px; font-weight: 900; }
+
+.scan-aging-btn {
+  width:100%; padding:14px; background:var(--s1);
+  border:1.5px solid var(--ac); border-radius:14px;
+  color:var(--ac); font-size:14px; font-weight:800;
+  font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+  margin-bottom:16px; display:flex; align-items:center; justify-content:center; gap:8px;
+}
+
+.recent-title { font-size: 12px; font-weight: 800; color: var(--t3); margin-bottom: 10px; letter-spacing: 0.5px; }
+.recent-list { display: flex; flex-direction: column; gap: 6px; }
+.recent-item {
+  background: var(--s1); border: 1px solid var(--bd); border-radius: 12px;
+  padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+}
+.recent-item .ri-no { font-size: 13px; font-weight: 700; color: var(--tx); }
+.recent-item .ri-info { font-size: 11px; color: var(--t3); margin-top: 2px; }
+.recent-item .ri-date { font-size: 11px; color: var(--t3); }
+
+/* 카메라 프리뷰 */
+.camera-preview {
+  width:100%; height:150px; background:#000; border-radius:14px;
+  margin-bottom:12px; display:flex; align-items:center; justify-content:center;
+  position:relative; overflow:hidden; border:1.5px solid var(--bd);
+}
+.camera-preview .cam-guide {
+  width:180px; height:60px; border:2px solid var(--ac);
+  border-radius:8px; position:relative;
+}
+.camera-preview .cam-label {
+  position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+  font-size:11px; color:var(--t2); white-space:nowrap;
+}
+
+/* ══════════════════════════════
+   7. 서류
+══════════════════════════════ */
+.docs-body { padding: 0 20px 20px; }
+.doc-card {
+  background: var(--s1); border: 1px solid var(--bd); border-radius: 16px;
+  padding: 18px; display: flex; gap: 14px; align-items: center; margin-bottom: 10px;
+  cursor: pointer; transition: border-color .2s;
+}
+.doc-card:hover { border-color: var(--ac); }
+.doc-icon-box {
+  width: 48px; height: 48px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center; font-size: 22px;
+  flex-shrink: 0;
+}
+.doc-info { flex: 1; }
+.doc-info h4 { font-size: 15px; font-weight: 800; color: var(--tx); }
+.doc-info p { font-size: 11px; color: var(--t3); margin-top: 4px; line-height: 1.5; }
+.doc-badge {
+  font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 8px;
+  white-space: nowrap;
+}
+.doc-arrow { color: var(--t3); font-size: 18px; }
+
+.docs-notice {
+  background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2);
+  border-radius: 12px; padding: 12px 14px; margin-top: 4px;
+  font-size: 12px; color: var(--a2); line-height: 1.6;
+}
+
+/* ══════════════════════════════
+   8. 숙성관리
+══════════════════════════════ */
+.aging-tabs {
+  display:flex; margin:4px 20px 16px; background:var(--s1);
+  border-radius:12px; padding:3px; border:1px solid var(--bd);
+}
+.aging-tab {
+  flex:1; padding:9px; text-align:center;
+  font-size:13px; font-weight:700; color:var(--t3);
+  border-radius:9px; cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif;
+}
+.aging-tab.active { background:var(--ac); color:#fff; }
+
+.aging-list { padding:0 20px; display:flex; flex-direction:column; gap:10px; }
+.aging-card {
+  background:var(--s1); border-radius:16px; border:1px solid var(--bd); padding:16px;
+}
+.aging-card-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+.aging-card-name { font-size:16px; font-weight:800; color:var(--tx); }
+.aging-card-since { font-size:11px; color:var(--t3); margin-top:2px; }
+.aging-dday {
+  font-size:20px; font-weight:900; color:var(--a2);
+  background:rgba(245,158,11,0.12); border-radius:10px;
+  padding:4px 12px;
+}
+.aging-dday.done { color:var(--gn); background:rgba(16,185,129,0.12); }
+.aging-progress { margin-bottom:12px; }
+.aging-progress-bar { height:8px; background:var(--bd); border-radius:4px; overflow:hidden; margin-bottom:6px; }
+.aging-progress-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,var(--a2),var(--ac)); }
+.aging-progress-meta { display:flex; justify-content:space-between; font-size:11px; color:var(--t3); }
+.aging-complete-btn {
+  width:100%; padding:10px; background:rgba(16,185,129,0.1);
+  border:1px solid rgba(16,185,129,0.3); border-radius:10px;
+  color:var(--gn); font-size:13px; font-weight:700;
+  font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+}
+.aging-pdf-btn {
+  width:100%; padding:10px; background:rgba(6,182,212,0.1);
+  border:1px solid rgba(6,182,212,0.25); border-radius:10px;
+  color:var(--cyan); font-size:13px; font-weight:700;
+  font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+}
+
+/* ══════════════════════════════
+   9. 위생일지
+══════════════════════════════ */
+.hygiene-date-bar {
+  margin:0 20px 16px; padding:12px 16px;
+  background:var(--s1); border-radius:12px; border:1px solid var(--bd);
+  display:flex; justify-content:space-between; align-items:center;
+}
+.hygiene-date-bar .hd-label { font-size:13px; font-weight:700; color:var(--tx); }
+.hygiene-date-bar .hd-date { font-size:12px; color:var(--t3); }
+.hygiene-list { padding:0 20px; display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+.hygiene-item {
+  background:var(--s1); border-radius:12px; border:1px solid var(--bd);
+  padding:13px 16px; display:flex; align-items:center; justify-content:space-between;
+}
+.hygiene-item-label { font-size:13px; font-weight:600; color:var(--tx); }
+.hygiene-ox {
+  display:flex; gap:6px;
+}
+.hox-btn {
+  width:36px; height:28px; border-radius:8px;
+  font-size:13px; font-weight:800; border:none;
+  cursor:pointer; font-family:'Noto Sans KR',sans-serif;
+  display:flex; align-items:center; justify-content:center;
+}
+.hox-o { background:rgba(16,185,129,0.15); color:var(--gn); border:1.5px solid rgba(16,185,129,0.35); }
+.hox-o.selected { background:var(--gn); color:#fff; }
+.hox-x { background:rgba(239,68,68,0.12); color:var(--rd); border:1.5px solid rgba(239,68,68,0.3); }
+.hox-x.selected { background:var(--rd); color:#fff; }
+
+.hygiene-save-row { padding:0 20px; display:flex; gap:8px; }
+.hygiene-save-btn {
+  flex:1; padding:14px; background:var(--ac);
+  border:none; border-radius:12px; color:#fff;
+  font-size:14px; font-weight:800; cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif;
+}
+.hygiene-pdf-btn {
+  flex:1; padding:14px; background:var(--s1);
+  border:1px solid var(--bd); border-radius:12px; color:var(--t2);
+  font-size:14px; font-weight:800; cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif;
+}
+
+/* ══════════════════════════════
+   10. 온도관리
+══════════════════════════════ */
+.temp-cards { padding:0 20px; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+.temp-card {
+  background:var(--s1); border-radius:14px; border:1px solid var(--bd);
+  padding:14px 10px; text-align:center;
+}
+.temp-card.warning { border-color:var(--rd); background:rgba(239,68,68,0.06); }
+.temp-card-label { font-size:11px; color:var(--t3); font-weight:600; margin-bottom:6px; }
+.temp-card-val { font-size:20px; font-weight:900; color:var(--tx); }
+.temp-card.warning .temp-card-val { color:var(--rd); }
+.temp-card-unit { font-size:11px; color:var(--t3); margin-top:2px; }
+.temp-card-status { font-size:10px; font-weight:700; margin-top:4px; }
+.temp-card .normal { color:var(--gn); }
+.temp-card .alert { color:var(--rd); }
+
+.temp-log-title { font-size:12px; font-weight:800; color:var(--t3); padding:0 20px; margin-bottom:8px; letter-spacing:0.5px; }
+.temp-log-list { padding:0 20px; display:flex; flex-direction:column; gap:6px; }
+.temp-log-item {
+  background:var(--s1); border-radius:12px; border:1px solid var(--bd);
+  padding:11px 14px; display:flex; justify-content:space-between; align-items:center;
+}
+.temp-log-item.alert-row { border-color:rgba(239,68,68,0.35); background:rgba(239,68,68,0.04); }
+.tl-left .tl-time { font-size:13px; font-weight:700; color:var(--tx); }
+.tl-left .tl-loc { font-size:11px; color:var(--t3); margin-top:1px; }
+.tl-right { text-align:right; }
+.tl-val { font-size:14px; font-weight:900; color:var(--tx); }
+.tl-val.warn { color:var(--rd); }
+.tl-diff { font-size:10px; color:var(--t3); margin-top:2px; }
+
+/* ══════════════════════════════
+   11. 마감정산
+══════════════════════════════ */
+.closing-summary {
+  margin:0 20px 16px; padding:18px; border-radius:16px;
+  background:linear-gradient(135deg,rgba(220,38,38,0.15),rgba(220,38,38,0.05));
+  border:1px solid rgba(220,38,38,0.25);
+  text-align:center;
+}
+.closing-summary .cs-label { font-size:12px; color:var(--t3); margin-bottom:6px; }
+.closing-summary .cs-amount { font-size:32px; font-weight:900; color:var(--tx); }
+.closing-summary .cs-sub { font-size:12px; color:var(--t3); margin-top:4px; }
+
+.closing-list { padding:0 20px; display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+.closing-item {
+  background:var(--s1); border-radius:12px; border:1px solid var(--bd);
+  padding:12px 14px; display:flex; justify-content:space-between; align-items:center;
+}
+.ci-name { font-size:13px; font-weight:700; color:var(--tx); }
+.ci-calc { font-size:11px; color:var(--t3); margin-top:2px; }
+.ci-price { font-size:14px; font-weight:800; color:var(--tx); }
+
+.closing-loss-section {
+  margin:0 20px 16px; padding:14px 16px;
+  background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.2);
+  border-radius:14px;
+}
+.cls-title { font-size:12px; font-weight:800; color:var(--rd); margin-bottom:10px; }
+.cls-item { display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px; }
+.cls-item .cl-name { color:var(--t2); }
+.cls-item .cl-val { color:var(--rd); font-weight:700; }
+
+.closing-margin {
+  margin:0 20px 16px; padding:14px 16px;
+  background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25);
+  border-radius:14px; display:flex; justify-content:space-between; align-items:center;
+}
+.cm-label { font-size:13px; font-weight:700; color:var(--gn); }
+.cm-value { font-size:20px; font-weight:900; color:var(--gn); }
+
+.closing-pdf-btn {
+  margin:0 20px; width:calc(100% - 40px); padding:14px;
+  background:var(--ac); border:none; border-radius:12px;
+  color:#fff; font-size:15px; font-weight:800;
+  font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+}
+
+/* ══════════════════════════════
+   12. 직원보건증
+══════════════════════════════ */
+.staff-list { padding:0 20px; display:flex; flex-direction:column; gap:10px; }
+.staff-card {
+  background:var(--s1); border-radius:16px; border:1px solid var(--bd); padding:16px;
+}
+.staff-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+.staff-info .sf-name { font-size:16px; font-weight:800; color:var(--tx); }
+.staff-info .sf-role { font-size:12px; color:var(--t3); margin-top:2px; }
+.staff-badges { display:flex; flex-direction:column; gap:4px; align-items:flex-end; }
+.staff-badge {
+  font-size:10px; font-weight:800; padding:3px 10px;
+  border-radius:8px; white-space:nowrap;
+}
+.staff-badge.ok { background:rgba(16,185,129,0.12); color:var(--gn); border:1px solid rgba(16,185,129,0.25); }
+.staff-badge.warn { background:rgba(245,158,11,0.12); color:var(--a2); border:1px solid rgba(245,158,11,0.25); }
+.staff-badge.danger { background:rgba(239,68,68,0.12); color:var(--rd); border:1px solid rgba(239,68,68,0.25); }
+.staff-exp-rows { display:flex; flex-direction:column; gap:6px; }
+.staff-exp-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; }
+.staff-exp-row .ser-label { color:var(--t3); }
+.staff-exp-row .ser-val { color:var(--tx); font-weight:600; }
+.staff-exp-row .ser-dday { font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px; }
+
+.staff-pdf-btn {
+  margin:12px 20px 0; width:calc(100% - 40px); padding:13px;
+  background:var(--s1); border:1px solid var(--bd); border-radius:12px;
+  color:var(--t2); font-size:14px; font-weight:800;
+  font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+}
+
+/* ══════════════════════════════
+   13. 세무리포트
+══════════════════════════════ */
+.tax-year-row {
+  margin:0 20px 16px; display:flex; gap:8px;
+}
+.tax-year-btn {
+  flex:1; padding:10px; background:var(--s1);
+  border:1.5px solid var(--bd); border-radius:12px;
+  color:var(--t3); font-size:13px; font-weight:700;
+  font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+}
+.tax-year-btn.active { background:rgba(220,38,38,0.12); border-color:var(--ac); color:var(--ac); }
+
+.tax-vat-card {
+  margin:0 20px 16px; padding:16px; border-radius:14px;
+  background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.25);
+}
+.tax-vat-title { font-size:12px; font-weight:800; color:var(--pu); margin-bottom:10px; }
+.tax-vat-row { display:flex; justify-content:space-between; margin-bottom:6px; }
+.tax-vat-row .tvr-l { font-size:12px; color:var(--t3); }
+.tax-vat-row .tvr-r { font-size:13px; font-weight:700; color:var(--tx); }
+.tax-vat-total { border-top:1px solid rgba(139,92,246,0.2); margin-top:8px; padding-top:8px; display:flex; justify-content:space-between; }
+.tax-vat-total .tvt-l { font-size:13px; font-weight:800; color:var(--pu); }
+.tax-vat-total .tvt-r { font-size:16px; font-weight:900; color:var(--pu); }
+
+.tax-table-wrap { padding:0 20px; margin-bottom:16px; }
+.tax-table-title { font-size:12px; font-weight:800; color:var(--t3); margin-bottom:8px; letter-spacing:0.5px; }
+.tax-table {
+  width:100%; border-collapse:collapse; font-size:11px;
+}
+.tax-table th {
+  background:var(--s2); color:var(--t3); font-weight:700;
+  padding:8px 6px; text-align:right; border-bottom:1px solid var(--bd);
+}
+.tax-table th:first-child { text-align:left; border-radius:8px 0 0 0; }
+.tax-table th:last-child { border-radius:0 8px 0 0; }
+.tax-table td {
+  background:var(--s1); color:var(--tx);
+  padding:8px 6px; text-align:right; border-bottom:1px solid var(--bd);
+}
+.tax-table td:first-child { color:var(--t2); text-align:left; font-weight:600; }
+.tax-table tr:last-child td { border-bottom:none; }
+.tax-table .positive { color:var(--gn); }
+.tax-table .negative { color:var(--rd); }
+
+.tax-csv-btn {
+  margin:0 20px; width:calc(100% - 40px); padding:13px;
+  background:var(--s1); border:1.5px solid var(--bd); border-radius:12px;
+  color:var(--t2); font-size:14px; font-weight:800;
+  font-family:'Noto Sans KR',sans-serif; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+}
+</style>
+</head>
+<body>
+
+<div class="studio-header">
+  <div class="studio-logo">
+    <div class="dot"></div>
+    <span>MEATBIG</span>
+    <div class="dot" style="background:var(--cyan)"></div>
+  </div>
+  <p>UI 개선안 미리보기 · 화면을 선택하세요</p>
+</div>
+
+<div class="screen-tabs">
+  <button class="screen-tab" onclick="go(1)">로그인</button>
+  <button class="screen-tab active" onclick="go(2)">홈</button>
+  <button class="screen-tab" onclick="go(6)">조회</button>
+  <button class="screen-tab" onclick="go(8)">숙성관리</button>
+  <button class="screen-tab" onclick="go(3)">재고</button>
+  <button class="screen-tab" onclick="go(7)">서류</button>
+  <button class="screen-tab" onclick="go(9)">위생일지</button>
+  <button class="screen-tab" onclick="go(10)">온도관리</button>
+  <button class="screen-tab" onclick="go(11)">마감정산</button>
+  <button class="screen-tab" onclick="go(12)">직원보건증</button>
+  <button class="screen-tab" onclick="go(13)">세무리포트</button>
+  <button class="screen-tab" onclick="go(14)">교육일지</button>
+  <button class="screen-tab" onclick="go(4)">구독</button>
+  <button class="screen-tab" onclick="go(5)">설정</button>
+</div>
+
+<div class="phone-outer">
+<div class="phone-frame">
+  <div class="dynamic-island"></div>
+
+  <!-- 상태바 -->
+  <div class="status-bar">
+    <span class="status-time">9:41</span>
+    <div class="status-icons"><span>●●●</span><span style="margin-left:4px">WiFi 🔋</span></div>
+  </div>
+
+  <!-- ① 로그인 -->
+  <div class="screen" id="screen-1">
+    <div class="screen-body" style="background:linear-gradient(160deg,#111827 0%,#1a2035 50%,#111827 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 28px;">
+      <div class="login-brand">
+        <div class="login-brand-icon">🥩</div>
+        <h1>MEAT<em>BIG</em></h1>
+        <p>정육점 관리의 모든 것</p>
+      </div>
+      <div class="login-fields">
+        <div class="field-group">
+          <div class="field-label">이메일</div>
+          <input class="field-input" type="email" placeholder="example@email.com">
+        </div>
+        <div class="field-group">
+          <div class="field-label">비밀번호</div>
+          <input class="field-input" type="password" placeholder="6자 이상 입력">
+        </div>
+      </div>
+      <button class="login-cta">로그인</button>
+      <div class="login-switch">계정이 없으신가요? <a href="#">회원가입</a></div>
+      <div class="login-tip">
+        <div class="login-tip-icon">☁️</div>
+        <span>계정을 만들면 기기를 바꿔도<br>데이터가 자동으로 복원됩니다</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 홈 -->
+  <div class="screen active" id="screen-2">
+    <div class="screen-body">
+      <div class="home-body">
+        <!-- 인사 -->
+        <div class="greeting">
+          <div class="greeting-date">2026년 4월 9일 수요일</div>
+          <div class="greeting-text">안녕하세요,<br><em>사장님</em> 👋</div>
+        </div>
+
+        <!-- 오늘 요약 -->
+        <div class="today-stats">
+          <div class="stat-box">
+            <div class="stat-icon">📋</div>
+            <div class="stat-value" style="color:var(--a2)">2건</div>
+            <div class="stat-label">이력 미등록</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-icon">🧼</div>
+            <div class="stat-value" style="color:var(--rd)">미완료</div>
+            <div class="stat-label">위생점검</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-icon">🌡️</div>
+            <div class="stat-value" style="color:var(--gn)">정상</div>
+            <div class="stat-label">온도 상태</div>
+          </div>
+        </div>
+
+        <!-- 점검 현황 -->
+        <div class="sec-title">오늘의 필수 점검 <a onclick="go(7)">전체 보기</a></div>
+        <div class="check-list">
+          <div class="check-item">
+            <div class="check-dot" style="background:var(--a2)"></div>
+            <div class="check-item-text">
+              <strong>이력번호 미등록</strong>
+              <span>오늘 입고 한우 2건 대기 중</span>
+            </div>
+            <span class="check-chip" style="background:rgba(245,158,11,0.12);color:var(--a2)">2건</span>
+          </div>
+          <div class="check-item">
+            <div class="check-dot" style="background:var(--rd)"></div>
+            <div class="check-item-text">
+              <strong>위생점검</strong>
+              <span>오늘 오전 점검 미완료</span>
+            </div>
+            <span class="check-chip" style="background:rgba(239,68,68,0.12);color:var(--rd)">미완료</span>
+          </div>
+          <div class="check-item">
+            <div class="check-dot" style="background:var(--gn)"></div>
+            <div class="check-item-text">
+              <strong>냉장고 온도</strong>
+              <span>모든 냉장·냉동 정상 범위</span>
+            </div>
+            <span class="check-chip" style="background:rgba(16,185,129,0.12);color:var(--gn)">정상</span>
+          </div>
+        </div>
+
+        <!-- 재고 게이지 -->
+        <div class="sec-title">재고 현황 <a onclick="go(3)">재고 보기</a></div>
+        <div class="gauge-list">
+          <div class="gauge-item">
+            <div class="gauge-meta"><strong>한우등심</strong><span>8.5 / 10 kg · 85%</span></div>
+            <div class="gauge-bar"><div class="gauge-fill" style="width:85%;background:var(--gn)"></div></div>
+          </div>
+          <div class="gauge-item">
+            <div class="gauge-meta"><strong>삼겹살</strong><span>4.0 / 10 kg · 40%</span></div>
+            <div class="gauge-bar"><div class="gauge-fill" style="width:40%;background:var(--a2)"></div></div>
+          </div>
+          <div class="gauge-item">
+            <div class="gauge-meta"><strong>목심</strong><span>2.0 / 10 kg · 20%</span></div>
+            <div class="gauge-bar"><div class="gauge-fill" style="width:20%;background:var(--rd)"></div></div>
+          </div>
+        </div>
+
+        <!-- 손실 경고 -->
+        <div class="loss-banner">
+          <div class="loss-left">
+            <div class="loss-label">⚠️ 3일 내 소비기한 손실 예상</div>
+            <div class="loss-value">₩120,000</div>
+            <div class="loss-sub">한우등심 · 목심 · 삼겹살 3건</div>
+          </div>
+          <div class="loss-right">🚨</div>
+        </div>
+
+        <!-- 빠른 실행 -->
+        <div class="sec-title">빠른 실행</div>
+        <div class="quick-grid">
+          <div class="quick-btn" onclick="go(6)">
+            <div class="quick-btn-icon">🏷️</div>
+            <div class="quick-btn-label">이력조회</div>
+          </div>
+          <div class="quick-btn" onclick="go(3)">
+            <div class="quick-btn-icon">📦</div>
+            <div class="quick-btn-label">재고추가</div>
+          </div>
+          <div class="quick-btn" onclick="go(9)">
+            <div class="quick-btn-icon">🧼</div>
+            <div class="quick-btn-label">위생점검</div>
+          </div>
+          <div class="quick-btn" onclick="go(8)">
+            <div class="quick-btn-icon">🧊</div>
+            <div class="quick-btn-label">숙성관리</div>
+          </div>
+          <div class="quick-btn" onclick="go(11)">
+            <div class="quick-btn-icon">💰</div>
+            <div class="quick-btn-label">마감정산</div>
+          </div>
+          <div class="quick-btn" onclick="go(13)">
+            <div class="quick-btn-icon">📊</div>
+            <div class="quick-btn-label">세무리포트</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item active" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ③ 재고 -->
+  <div class="screen" id="screen-3" style="position:relative">
+    <div class="screen-body">
+      <div class="nav-header">
+        <div><div class="nav-title">재고 관리</div><div class="nav-sub">12종 · 총 ₩2,400,000</div></div>
+        <div class="nav-btn">🔔</div>
+      </div>
+
+      <!-- 내부 탭 -->
+      <div class="inv-inner-tabs">
+        <div class="inv-inner-tab active" onclick="showInvTab('status',this)">재고현황</div>
+        <div class="inv-inner-tab" onclick="showInvTab('sales',this)">판매내역</div>
+        <div class="inv-inner-tab" onclick="showInvTab('yield',this)">수율계산</div>
+        <div class="inv-inner-tab" onclick="showInvTab('expiry',this)">소비기한</div>
+        <div class="inv-inner-tab" onclick="showInvTab('vendor',this)">거래처</div>
+      </div>
+
+      <!-- 탭1: 재고현황 -->
+      <div id="inv-status">
+        <!-- 검색 + 필터 -->
+        <div class="inv-header" style="margin-top:12px">
+          <input class="inv-search" placeholder="🔍  부위, 원산지 검색...">
+          <div class="inv-filter-row">
+            <div class="filter-chip active">전체</div>
+            <div class="filter-chip">한우</div>
+            <div class="filter-chip">수입육</div>
+            <div class="filter-chip">임박</div>
+            <div class="filter-chip">숙성중</div>
+          </div>
+        </div>
+        <div class="inv-summary-bar">
+          <div class="inv-sumbox"><div class="sv">12</div><div class="sl">재고부위</div></div>
+          <div class="inv-sumbox"><div class="sv" style="color:var(--gn)">8</div><div class="sl">판매완료</div></div>
+          <div class="inv-sumbox"><div class="sv" style="color:var(--cyan)">2.4M</div><div class="sl">재고가치</div></div>
+          <div class="inv-sumbox"><div class="sv" style="color:var(--rd)">3</div><div class="sl">손실위험</div></div>
+        </div>
+        <div class="inv-list">
+          <div class="inv-card">
+            <div class="inv-grade" style="background:rgba(220,38,38,0.12);color:var(--ac)">A++<br>한우</div>
+            <div class="inv-main"><div class="inv-name">한우등심</div><div class="inv-detail">국내산 · 판매가 85,000원/kg</div></div>
+            <div class="inv-right"><div class="exp-pill" style="background:rgba(239,68,68,0.12);color:var(--rd)">D-3</div><div class="inv-qty">2.5 kg</div></div>
+          </div>
+          <div class="inv-card">
+            <div class="inv-grade" style="background:rgba(245,158,11,0.12);color:var(--a2)">1+<br>한우</div>
+            <div class="inv-main"><div class="inv-name">한우갈비</div><div class="inv-detail">국내산 · 판매가 62,000원/kg</div></div>
+            <div class="inv-right"><div class="exp-pill" style="background:rgba(245,158,11,0.12);color:var(--a2)">D-7</div><div class="inv-qty">3.2 kg</div></div>
+          </div>
+          <div class="inv-card">
+            <div class="inv-grade" style="background:rgba(16,185,129,0.12);color:var(--gn)">수입<br>냉장</div>
+            <div class="inv-main"><div class="inv-name">삼겹살</div><div class="inv-detail">미국산 · 판매가 24,000원/kg</div></div>
+            <div class="inv-right"><div class="exp-pill" style="background:rgba(16,185,129,0.12);color:var(--gn)">D-14</div><div class="inv-qty">5.0 kg</div></div>
+          </div>
+          <div class="inv-card">
+            <div class="inv-grade" style="background:rgba(220,38,38,0.12);color:var(--ac)">1<br>한우</div>
+            <div class="inv-main"><div class="inv-name">목심</div><div class="inv-detail">국내산 · 판매가 38,000원/kg</div></div>
+            <div class="inv-right"><div class="exp-pill" style="background:rgba(239,68,68,0.12);color:var(--rd)">D-2</div><div class="inv-qty">2.0 kg</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭2: 판매내역 -->
+      <div id="inv-sales" style="display:none; padding-top:12px;">
+        <div class="sales-group">
+          <div class="sales-group-date">오늘 · 3건</div>
+          <div class="sales-item">
+            <div class="sales-item-left"><div class="si-name">한우등심 1++</div><div class="si-detail">0.8kg × 85,000원/kg</div></div>
+            <div class="sales-item-right"><div class="si-price">₩68,000</div><div class="si-margin">마진 +35%</div></div>
+          </div>
+          <div class="sales-item">
+            <div class="sales-item-left"><div class="si-name">목심</div><div class="si-detail">1.2kg × 38,000원/kg</div></div>
+            <div class="sales-item-right"><div class="si-price">₩45,600</div><div class="si-margin">마진 +28%</div></div>
+          </div>
+          <div class="sales-item">
+            <div class="sales-item-left"><div class="si-name">삼겹살 (수입)</div><div class="si-detail">2.0kg × 24,000원/kg</div></div>
+            <div class="sales-item-right"><div class="si-price">₩48,000</div><div class="si-margin">마진 +22%</div></div>
+          </div>
+        </div>
+        <div class="sales-group">
+          <div class="sales-group-date">어제 · 2건</div>
+          <div class="sales-item">
+            <div class="sales-item-left"><div class="si-name">한우갈비</div><div class="si-detail">1.5kg × 62,000원/kg</div></div>
+            <div class="sales-item-right"><div class="si-price">₩93,000</div><div class="si-margin">마진 +31%</div></div>
+          </div>
+          <div class="sales-item">
+            <div class="sales-item-left"><div class="si-name">돼지목심</div><div class="si-detail">3.0kg × 18,000원/kg</div></div>
+            <div class="sales-item-right"><div class="si-price">₩54,000</div><div class="si-margin">마진 +20%</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭3: 수율계산기 -->
+      <div id="inv-yield" style="display:none;">
+        <div class="yield-calc">
+          <div class="yield-form">
+            <div class="yield-row">
+              <div class="yield-field">
+                <label>원재료 (kg)</label>
+                <input class="yield-input" type="number" value="10.0" placeholder="0.0">
+              </div>
+              <div class="yield-field">
+                <label>수율 (%)</label>
+                <input class="yield-input" type="number" value="72" placeholder="0">
+              </div>
+            </div>
+            <div class="yield-result">
+              <div class="yield-result-val">7.2 kg</div>
+              <div class="yield-result-label">출고 가능량 (손질 후)</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="font-size:11px;font-weight:800;color:var(--t3);margin-bottom:4px;">최근 수율 기록</div>
+            <div class="inv-card" style="padding:10px 14px;">
+              <div class="inv-main"><div class="inv-name" style="font-size:13px">한우등심</div><div class="inv-detail">원재료 12kg → 출고 8.6kg</div></div>
+              <div style="text-align:right;"><div style="font-size:14px;font-weight:800;color:var(--a2)">71.7%</div><div style="font-size:11px;color:var(--t3)">4.7 기록</div></div>
+            </div>
+            <div class="inv-card" style="padding:10px 14px;">
+              <div class="inv-main"><div class="inv-name" style="font-size:13px">목심</div><div class="inv-detail">원재료 8kg → 출고 6.0kg</div></div>
+              <div style="text-align:right;"><div style="font-size:14px;font-weight:800;color:var(--gn)">75.0%</div><div style="font-size:11px;color:var(--t3)">4.6 기록</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭4: 소비기한 -->
+      <div id="inv-expiry" style="display:none; padding-top:12px;">
+        <div class="exp-mgmt-list">
+          <div class="exp-mgmt-item">
+            <div><div class="em-name">한우등심 (A++)</div><div class="em-detail">2026.04.12 만료 · 수정 2회</div></div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;font-weight:800;color:var(--rd);background:rgba(239,68,68,0.1);padding:3px 8px;border-radius:6px">D-3</span><button class="exp-edit-btn">수정</button></div>
+          </div>
+          <div class="exp-mgmt-item">
+            <div><div class="em-name">목심 (1등급)</div><div class="em-detail">2026.04.11 만료 · 수정 1회</div></div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;font-weight:800;color:var(--rd);background:rgba(239,68,68,0.1);padding:3px 8px;border-radius:6px">D-2</span><button class="exp-edit-btn">수정</button></div>
+          </div>
+          <div class="exp-mgmt-item">
+            <div><div class="em-name">한우갈비 (1+)</div><div class="em-detail">2026.04.16 만료 · 수정 0회</div></div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;font-weight:800;color:var(--a2);background:rgba(245,158,11,0.1);padding:3px 8px;border-radius:6px">D-7</span><button class="exp-edit-btn">수정</button></div>
+          </div>
+          <div class="exp-mgmt-item">
+            <div><div class="em-name">삼겹살 (수입)</div><div class="em-detail">2026.04.23 만료 · 수정 0회</div></div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;font-weight:800;color:var(--gn);background:rgba(16,185,129,0.1);padding:3px 8px;border-radius:6px">D-14</span><button class="exp-edit-btn">수정</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭5: 거래처 -->
+      <div id="inv-vendor" style="display:none; padding-top:12px;">
+        <div class="vendor-list">
+          <div class="vendor-card">
+            <div class="vendor-top">
+              <div><div class="vendor-name">한우마을 직판장</div><div style="font-size:11px;color:var(--t3);margin-top:2px">국내산 한우 전문</div></div>
+              <div class="vendor-monthly">이번달 ₩1,200,000</div>
+            </div>
+            <div class="vendor-bottom">
+              <div class="vendor-contact">📞 010-1234-5678</div>
+              <div class="vendor-memo">주 2회 납품</div>
+            </div>
+          </div>
+          <div class="vendor-card">
+            <div class="vendor-top">
+              <div><div class="vendor-name">미국육류수입공사</div><div style="font-size:11px;color:var(--t3);margin-top:2px">수입육 · 냉동</div></div>
+              <div class="vendor-monthly" style="color:var(--a2)">이번달 ₩480,000</div>
+            </div>
+            <div class="vendor-bottom">
+              <div class="vendor-contact">📞 02-3456-7890</div>
+              <div class="vendor-memo">월 1회 정기배송</div>
+            </div>
+          </div>
+          <div class="vendor-card">
+            <div class="vendor-top">
+              <div><div class="vendor-name">제주흑돼지농장</div><div style="font-size:11px;color:var(--t3);margin-top:2px">돼지고기 전문</div></div>
+              <div class="vendor-monthly" style="color:var(--gn)">이번달 ₩320,000</div>
+            </div>
+            <div class="vendor-bottom">
+              <div class="vendor-contact">📞 064-987-6543</div>
+              <div class="vendor-memo">주문시 배송</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="fab">+</div>
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item active" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ④ 구독 -->
+  <div class="screen" id="screen-4">
+    <div class="screen-body">
+      <div class="paywall-body">
+        <div class="paywall-hero">
+          <h2>정육점 관리를<br>스마트하게</h2>
+          <p>14일 무료 체험 후 결정하세요<br>신용카드 없이 시작 가능</p>
+        </div>
+        <div class="cycle-row">
+          <div class="cycle-opt active">월간 결제</div>
+          <div class="cycle-opt">연간 결제 &nbsp;<span style="color:var(--gn);font-size:11px">20% 할인</span></div>
+        </div>
+        <div class="plan-list">
+          <div class="plan-box">
+            <div class="plan-top">
+              <div class="plan-name-row"><div class="plan-emoji">🆓</div><div class="plan-name">무료</div></div>
+              <div class="plan-pricing"><span class="plan-amount" style="color:var(--t2)">₩0</span><span class="plan-period">/월</span></div>
+            </div>
+            <div class="plan-feats">
+              <div class="feat-row yes"><span class="feat-check">✓</span>기본 재고 관리</div>
+              <div class="feat-row yes"><span class="feat-check">✓</span>이력번호 조회</div>
+              <div class="feat-row no"><span class="feat-check">✗</span>마진 분석</div>
+              <div class="feat-row no"><span class="feat-check">✗</span>PDF 출력</div>
+            </div>
+          </div>
+          <div class="plan-box best">
+            <div class="best-tag">🏆 가장 인기</div>
+            <div class="plan-top">
+              <div class="plan-name-row"><div class="plan-emoji">⭐</div><div class="plan-name">베이직</div></div>
+              <div class="plan-pricing"><span class="plan-amount">₩30,000</span><span class="plan-period">/월</span></div>
+            </div>
+            <div class="plan-feats">
+              <div class="feat-row yes"><span class="feat-check">✓</span>무료 기능 전체 포함</div>
+              <div class="feat-row yes"><span class="feat-check">✓</span>마진 대시보드</div>
+              <div class="feat-row yes"><span class="feat-check">✓</span>PDF 서류 출력</div>
+              <div class="feat-row yes"><span class="feat-check">✓</span>세무 리포트 · CSV</div>
+              <div class="feat-row no"><span class="feat-check">✗</span>직원 무제한 · 컨설팅</div>
+            </div>
+          </div>
+          <div class="plan-box">
+            <div class="plan-top">
+              <div class="plan-name-row"><div class="plan-emoji">🚀</div><div class="plan-name">프로</div></div>
+              <div class="plan-pricing"><span class="plan-amount">₩60,000</span><span class="plan-period">/월</span></div>
+            </div>
+            <div class="plan-feats">
+              <div class="feat-row yes"><span class="feat-check">✓</span>베이직 기능 전체</div>
+              <div class="feat-row yes"><span class="feat-check">✓</span>직원 무제한</div>
+              <div class="feat-row yes"><span class="feat-check">✓</span>전담 컨설팅</div>
+              <div class="feat-row yes"><span class="feat-check">✓</span>교육 콘텐츠</div>
+            </div>
+          </div>
+        </div>
+        <button class="paywall-cta">🎁 14일 무료 체험 시작</button>
+        <div class="paywall-fine">언제든지 취소 가능 · 자동 결제 없음</div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ⑤ 설정 -->
+  <div class="screen" id="screen-5">
+    <div class="screen-body">
+      <div class="nav-header">
+        <div class="nav-title">설정</div>
+      </div>
+      <div class="settings-body">
+        <div class="profile-card">
+          <div class="avatar">사</div>
+          <div class="profile-info">
+            <h3>한우직판장</h3>
+            <p>사업자번호 123-45-67890</p>
+            <div class="email">skystory1031@gmail.com</div>
+          </div>
+        </div>
+        <div class="sub-card">
+          <div class="sub-info">
+            <h4>베이직 구독 중</h4>
+            <p>2026.05.08 갱신 예정</p>
+          </div>
+          <div class="sub-pill">활성</div>
+        </div>
+
+        <div class="settings-group">
+          <div class="group-label">직원 관리</div>
+          <div class="settings-list">
+            <div class="settings-item">
+              <div class="si-icon" style="background:rgba(139,92,246,0.12)">👥</div>
+              <div class="si-text"><strong>직원 목록</strong><span>등록된 직원 3명</span></div>
+              <div class="si-right">›</div>
+            </div>
+            <div class="settings-item">
+              <div class="si-icon" style="background:rgba(6,182,212,0.12)">🔑</div>
+              <div class="si-text"><strong>초대 PIN</strong><span>직원 초대 코드</span></div>
+              <div class="si-right">›</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="group-label">알림</div>
+          <div class="settings-list">
+            <div class="settings-item">
+              <div class="si-icon" style="background:rgba(239,68,68,0.12)">🔔</div>
+              <div class="si-text"><strong>소비기한 알림</strong><span>D-2일 전 오전 8시</span></div>
+              <div class="toggle"></div>
+            </div>
+            <div class="settings-item">
+              <div class="si-icon" style="background:rgba(16,185,129,0.12)">🧼</div>
+              <div class="si-text"><strong>위생점검 알림</strong><span>매일 오전 9시</span></div>
+              <div class="toggle"></div>
+            </div>
+            <div class="settings-item">
+              <div class="si-icon" style="background:rgba(245,158,11,0.12)">🥩</div>
+              <div class="si-text"><strong>숙성 완료 알림</strong><span>완료 시 즉시</span></div>
+              <div class="toggle off"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="group-label">앱</div>
+          <div class="settings-list">
+            <div class="settings-item">
+              <div class="si-icon" style="background:rgba(255,255,255,0.06)">🌙</div>
+              <div class="si-text"><strong>다크 모드</strong><span>현재 다크</span></div>
+              <div class="toggle"></div>
+            </div>
+            <div class="settings-item">
+              <div class="si-icon" style="background:rgba(220,38,38,0.12)">💳</div>
+              <div class="si-text"><strong>구독 관리</strong><span>베이직 플랜</span></div>
+              <div class="si-right" onclick="go(4)" style="cursor:pointer">›</div>
+            </div>
+            <div class="settings-item">
+              <div class="si-icon" style="background:rgba(139,92,246,0.12)">📊</div>
+              <div class="si-text"><strong>세무 리포트</strong><span>월별 매출·부가세</span></div>
+              <div class="si-right" onclick="go(13)" style="cursor:pointer">›</div>
+            </div>
+          </div>
+        </div>
+
+        <button class="logout-btn">로그아웃</button>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item active" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ⑥ 조회·스캔 (이력조회 탭 + 서류OCR 탭) -->
+  <div class="screen" id="screen-6">
+    <!-- 헤더 타이틀 -->
+    <div style="padding:8px 20px 0;display:flex;justify-content:center;align-items:center;">
+      <div style="font-size:18px;font-weight:900;color:var(--tx);">🔍 조회 · 스캔</div>
+    </div>
+
+    <!-- 상단 2탭 (이력조회 / 서류OCR) -->
+    <div style="display:flex;border-bottom:2px solid var(--bd);margin:8px 0 0;">
+      <div id="scan-tab-trace" onclick="showScanTab('trace')"
+        style="flex:1;padding:12px;text-align:center;font-size:14px;font-weight:800;color:var(--ac);border-bottom:2px solid var(--ac);margin-bottom:-2px;cursor:pointer;">
+        🏷️ 이력 조회
+      </div>
+      <div id="scan-tab-ocr" onclick="showScanTab('ocr')"
+        style="flex:1;padding:12px;text-align:center;font-size:14px;font-weight:800;color:var(--t3);border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">
+        📷 서류 OCR
+      </div>
+    </div>
+
+    <div class="screen-body">
+
+      <!-- 탭1: 이력 조회 -->
+      <div id="scan-pane-trace" style="padding:16px 20px 20px;">
+
+        <!-- 이력번호 조회 카드 -->
+        <div style="background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:20px;margin-bottom:16px;text-align:center;">
+          <div style="font-size:24px;margin-bottom:8px;">🏷️</div>
+          <div style="font-size:16px;font-weight:900;color:var(--tx);margin-bottom:6px;">축산물 이력번호 조회</div>
+          <div style="font-size:12px;color:var(--t3);line-height:1.6;margin-bottom:16px;">바코드·QR코드를 스캔하면<br>도축 정보·등급·원산지를 즉시 확인합니다</div>
+          <button style="width:100%;padding:16px;background:var(--ac);border:none;border-radius:14px;color:#fff;font-size:16px;font-weight:800;font-family:'Noto Sans KR',sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(220,38,38,0.35);">
+            📷 바코드 스캔 시작
+          </button>
+        </div>
+
+        <!-- 직접 입력 -->
+        <div class="lookup-input-wrap" style="margin-bottom:12px;">
+          <input class="lookup-input" type="text" placeholder="이력번호 15자리 직접 입력">
+          <button class="lookup-search-btn">🔍</button>
+        </div>
+
+        <!-- 오프라인 큐 배너 -->
+        <div class="offline-banner" style="margin-bottom:16px;">
+          <span>📡</span>
+          <span>오프라인 3건 대기 중 — 네트워크 연결 시 자동 동기화</span>
+        </div>
+
+        <!-- 최근 조회 결과 -->
+        <div class="lookup-result-card" style="margin-bottom:12px;">
+          <div class="lookup-result-header">
+            <h3>002123456789012</h3>
+            <span class="lookup-ok-pill">✓ 정상</span>
+          </div>
+          <div class="lookup-rows">
+            <div class="lookup-row"><span class="lk">품종</span><span class="lv">한우 (Hanwoo)</span></div>
+            <div class="lookup-row"><span class="lk">등급</span><span class="lv grade">1++ (A)</span></div>
+            <div class="lookup-row"><span class="lk">원산지</span><span class="lv">국내산 (경북 안동)</span></div>
+            <div class="lookup-row"><span class="lk">도축일</span><span class="lv">2026.03.28</span></div>
+            <div class="lookup-row"><span class="lk">소비기한</span><span class="lv" style="color:var(--rd);">2026.04.11 (D-2)</span></div>
+          </div>
+        </div>
+        <button class="scan-aging-btn" onclick="go(8)">🧊 숙성관리로 등록 →</button>
+
+        <div class="recent-title" style="margin-top:16px;">최근 조회 내역</div>
+        <div class="recent-list">
+          <div class="recent-item"><div><div class="ri-no">002123456789012</div><div class="ri-info">한우 1++ · 경북 안동</div></div><div class="ri-date">오늘 09:12</div></div>
+          <div class="recent-item"><div><div class="ri-no">002098765432101</div><div class="ri-info">한우 1+ · 충남 홍성</div></div><div class="ri-date">어제 14:30</div></div>
+          <div class="recent-item"><div><div class="ri-no">001234567890123</div><div class="ri-info">육우 2 · 경기 이천</div></div><div class="ri-date">4.7 11:05</div></div>
+        </div>
+      </div>
+
+      <!-- 탭2: 서류 OCR -->
+      <div id="scan-pane-ocr" style="display:none;padding:16px 20px 20px;">
+
+        <!-- AI OCR 안내 배너 -->
+        <div style="background:rgba(124,58,237,0.1);border:1.5px solid rgba(124,58,237,0.3);border-radius:16px;padding:16px;margin-bottom:20px;display:flex;gap:14px;align-items:center;">
+          <div style="font-size:32px;flex-shrink:0;">🤖</div>
+          <div>
+            <div style="font-size:15px;font-weight:900;color:var(--tx);margin-bottom:4px;">AI 서류 자동 인식</div>
+            <div style="font-size:12px;color:#A78BFA;line-height:1.6;">서류를 촬영하면 텍스트를 읽어<br>재고 및 직원 데이터를 자동으로 저장합니다.</div>
+          </div>
+        </div>
+
+        <div style="font-size:12px;font-weight:800;color:var(--t3);margin-bottom:10px;letter-spacing:0.5px;">지원하는 서류 종류</div>
+
+        <!-- 거래명세서 -->
+        <div style="background:var(--s1);border:1px solid var(--bd);border-left:4px solid #3B82F6;border-radius:14px;padding:16px;margin-bottom:10px;">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <div style="font-size:24px;flex-shrink:0;">📄</div>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <div style="font-size:15px;font-weight:800;color:var(--tx);">거래명세서</div>
+                <span style="background:rgba(59,130,246,0.15);color:#60A5FA;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;border:1px solid rgba(59,130,246,0.3);">재고 연동</span>
+              </div>
+              <div style="font-size:12px;color:var(--t3);line-height:1.6;">부위·중량·단가 자동 추출<br>→ 재고 자동 등록</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 도축검사증명서 -->
+        <div style="background:var(--s1);border:1px solid var(--bd);border-left:4px solid #8B5CF6;border-radius:14px;padding:16px;margin-bottom:10px;">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <div style="font-size:24px;flex-shrink:0;">🔬</div>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <div style="font-size:15px;font-weight:800;color:var(--tx);">도축검사증명서</div>
+                <span style="background:rgba(139,92,246,0.15);color:#A78BFA;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;border:1px solid rgba(139,92,246,0.3);">재고 연동</span>
+              </div>
+              <div style="font-size:12px;color:var(--t3);line-height:1.6;">이력번호·도축일·원산지 추출<br>→ 소비기한 자동 계산 (+14일)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 보건증 -->
+        <div style="background:var(--s1);border:1px solid var(--bd);border-left:4px solid #10B981;border-radius:14px;padding:16px;margin-bottom:10px;">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <div style="font-size:24px;flex-shrink:0;">🏥</div>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <div style="font-size:15px;font-weight:800;color:var(--tx);">보건증</div>
+                <span style="background:rgba(16,185,129,0.15);color:#34D399;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.3);">직원 연동</span>
+              </div>
+              <div style="font-size:12px;color:var(--t3);line-height:1.6;">직원 이름·만료일 자동 추출<br>→ 직원 서류 자동 업데이트</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 위생교육이수증 -->
+        <div style="background:var(--s1);border:1px solid var(--bd);border-left:4px solid #06B6D4;border-radius:14px;padding:16px;margin-bottom:20px;">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <div style="font-size:24px;flex-shrink:0;">📋</div>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <div style="font-size:15px;font-weight:800;color:var(--tx);">위생교육이수증</div>
+                <span style="background:rgba(6,182,212,0.15);color:#22D3EE;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;border:1px solid rgba(6,182,212,0.3);">직원 연동</span>
+              </div>
+              <div style="font-size:12px;color:var(--t3);line-height:1.6;">이수일·만료일 자동 추출<br>→ 직원 교육 이력 업데이트</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OCR 시작 버튼 -->
+        <button style="width:100%;padding:18px;background:linear-gradient(135deg,#7C3AED,#6D28D9);border:none;border-radius:16px;color:#fff;font-size:16px;font-weight:900;font-family:'Noto Sans KR',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 8px 24px rgba(124,58,237,0.45);">
+          <span style="font-size:20px;">📷</span>
+          <div>
+            <div>서류 스캔 · AI OCR 시작</div>
+            <div style="font-size:11px;font-weight:500;opacity:0.85;margin-top:2px;">카메라로 촬영하거나 갤러리에서 선택</div>
+          </div>
+        </button>
+
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item active" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ⑦ 서류 -->
+  <div class="screen" id="screen-7">
+    <div class="nav-header">
+      <div>
+        <div class="nav-title">서류 출력</div>
+        <div class="nav-sub">법정 서류 PDF 생성 · 공유</div>
+      </div>
+      <div class="nav-btn">🖨️</div>
+    </div>
+    <div class="screen-body">
+      <div class="docs-body">
+
+        <!-- 바로가기 숏컷 6개 (실제 앱 DocumentScreen shortcutGrid) -->
+        <div style="margin-bottom:20px;">
+          <div class="sec-title" style="margin-bottom:10px;">바로가기</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+            <div onclick="go(9)"  style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;">
+              <div style="font-size:22px;margin-bottom:6px;">🧼</div>
+              <div style="font-size:11px;font-weight:700;color:var(--tx);">위생 일지</div>
+            </div>
+            <div onclick="go(10)" style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;">
+              <div style="font-size:22px;margin-bottom:6px;">🌡️</div>
+              <div style="font-size:11px;font-weight:700;color:var(--tx);">온도 기록</div>
+            </div>
+            <div onclick="go(11)" style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;">
+              <div style="font-size:22px;margin-bottom:6px;">💰</div>
+              <div style="font-size:11px;font-weight:700;color:var(--tx);">마감 정산</div>
+            </div>
+            <div onclick="go(8)"  style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;">
+              <div style="font-size:22px;margin-bottom:6px;">🥩</div>
+              <div style="font-size:11px;font-weight:700;color:var(--tx);">숙성 관리</div>
+            </div>
+            <div onclick="go(14)" style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;">
+              <div style="font-size:22px;margin-bottom:6px;">📚</div>
+              <div style="font-size:11px;font-weight:700;color:var(--tx);">교육일지</div>
+            </div>
+            <div onclick="go(13)" style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;">
+              <div style="font-size:22px;margin-bottom:6px;">📊</div>
+              <div style="font-size:11px;font-weight:700;color:var(--tx);">세무리포트</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PDF 출력 서류 목록 (실제 앱 DOCS 배열 6종) -->
+        <div class="sec-title" style="margin-bottom:10px;">PDF 출력</div>
+
+        <div class="doc-card" onclick="go(9)">
+          <div class="doc-icon-box" style="background:rgba(39,174,96,0.15)">🧼</div>
+          <div class="doc-info">
+            <h4>위생관리 점검표</h4>
+            <p>일일 위생·HACCP 점검 기록 · 식약처 서식</p>
+          </div>
+          <div class="doc-arrow">›</div>
+        </div>
+
+        <div class="doc-card" onclick="go(10)">
+          <div class="doc-icon-box" style="background:rgba(0,172,193,0.15)">🌡️</div>
+          <div class="doc-info">
+            <h4>온도관리 기록부</h4>
+            <p>냉장·숙성실 온도·습도 기록 · HACCP 필수</p>
+          </div>
+          <div class="doc-arrow">›</div>
+        </div>
+
+        <div class="doc-card" onclick="go(8)">
+          <div class="doc-icon-box" style="background:rgba(232,149,10,0.15)">🥩</div>
+          <div class="doc-info">
+            <h4>숙성 관리 대장</h4>
+            <p>드라이에이징 이력 및 수율 기록</p>
+          </div>
+          <div class="doc-arrow">›</div>
+        </div>
+
+        <div class="doc-card" onclick="go(12)">
+          <div class="doc-icon-box" style="background:rgba(142,68,173,0.15)">👥</div>
+          <div class="doc-info">
+            <h4>직원 보건증 현황</h4>
+            <p>보건증·위생교육 이수증 만료일 관리</p>
+          </div>
+          <div class="doc-arrow">›</div>
+        </div>
+
+        <div class="doc-card" onclick="go(14)">
+          <div class="doc-icon-box" style="background:rgba(124,58,237,0.15)">📚</div>
+          <div class="doc-info">
+            <h4>영업자 자체위생교육 일지</h4>
+            <p>월 1회 직원 위생교육 실시 기록</p>
+          </div>
+          <span class="doc-badge" style="background:rgba(16,185,129,0.12);color:var(--gn);border:1px solid rgba(16,185,129,0.25);">베이직</span>
+        </div>
+
+        <div class="doc-card" onclick="go(13)">
+          <div class="doc-icon-box" style="background:rgba(0,172,193,0.15)">📊</div>
+          <div class="doc-info">
+            <h4>세무 리포트</h4>
+            <p>연간 매출·매입·마진 요약 · 부가세 신고 참고용</p>
+          </div>
+          <span class="doc-badge" style="background:rgba(220,38,38,0.12);color:var(--ac);border:1px solid rgba(220,38,38,0.25);">프로</span>
+        </div>
+
+        <div class="docs-notice">
+          ⚠️ 교육일지는 베이직, 세무리포트는 프로 플랜에서 출력 가능합니다
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item active" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ⑧ 숙성관리 -->
+  <div class="screen" id="screen-8">
+    <div class="back-header">
+      <div class="back-btn" onclick="go(6)">←</div>
+      <div class="back-title">숙성관리</div>
+    </div>
+    <div class="screen-body">
+      <div class="aging-tabs">
+        <div class="aging-tab active" onclick="showAgingTab('ongoing',this)">숙성 중</div>
+        <div class="aging-tab" onclick="showAgingTab('done',this)">완료됨</div>
+      </div>
+
+      <!-- 숙성 중 -->
+      <div id="aging-ongoing">
+        <div class="aging-list">
+          <div class="aging-card">
+            <div class="aging-card-top">
+              <div>
+                <div class="aging-card-name">한우등심 (1++)</div>
+                <div class="aging-card-since">시작: 2026.04.02 · 목표: 21일 숙성</div>
+              </div>
+              <div class="aging-dday">D-14</div>
+            </div>
+            <div class="aging-progress">
+              <div class="aging-progress-bar"><div class="aging-progress-fill" style="width:33%"></div></div>
+              <div class="aging-progress-meta"><span>7일 경과</span><span>목표 21일</span></div>
+            </div>
+            <button class="aging-complete-btn">✓ 완료 처리</button>
+          </div>
+          <div class="aging-card">
+            <div class="aging-card-top">
+              <div>
+                <div class="aging-card-name">목심 (1등급)</div>
+                <div class="aging-card-since">시작: 2026.04.05 · 목표: 14일 숙성</div>
+              </div>
+              <div class="aging-dday">D-10</div>
+            </div>
+            <div class="aging-progress">
+              <div class="aging-progress-bar"><div class="aging-progress-fill" style="width:28%"></div></div>
+              <div class="aging-progress-meta"><span>4일 경과</span><span>목표 14일</span></div>
+            </div>
+            <button class="aging-complete-btn">✓ 완료 처리</button>
+          </div>
+          <div class="aging-card">
+            <div class="aging-card-top">
+              <div>
+                <div class="aging-card-name">한우채끝 (1+)</div>
+                <div class="aging-card-since">시작: 2026.04.07 · 목표: 7일 숙성</div>
+              </div>
+              <div class="aging-dday" style="color:var(--rd);background:rgba(239,68,68,0.12)">D-5</div>
+            </div>
+            <div class="aging-progress">
+              <div class="aging-progress-bar"><div class="aging-progress-fill" style="width:28%;background:linear-gradient(90deg,var(--gn),var(--a2))"></div></div>
+              <div class="aging-progress-meta"><span>2일 경과</span><span>목표 7일</span></div>
+            </div>
+            <button class="aging-complete-btn">✓ 완료 처리</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 완료됨 -->
+      <div id="aging-done" style="display:none;">
+        <div class="aging-list">
+          <div class="aging-card" style="border-color:rgba(16,185,129,0.3)">
+            <div class="aging-card-top">
+              <div>
+                <div class="aging-card-name">한우갈비 (1++)</div>
+                <div class="aging-card-since">2026.03.18 ~ 2026.04.04 · 17일 숙성</div>
+              </div>
+              <div class="aging-dday done">완료</div>
+            </div>
+            <div class="aging-progress">
+              <div class="aging-progress-bar"><div class="aging-progress-fill" style="width:100%;background:var(--gn)"></div></div>
+              <div class="aging-progress-meta"><span>17일 완료</span><span>목표 달성</span></div>
+            </div>
+            <button class="aging-pdf-btn">📄 PDF 출력</button>
+          </div>
+          <div class="aging-card" style="border-color:rgba(16,185,129,0.3)">
+            <div class="aging-card-top">
+              <div>
+                <div class="aging-card-name">부채살 (2등급)</div>
+                <div class="aging-card-since">2026.03.25 ~ 2026.04.01 · 7일 숙성</div>
+              </div>
+              <div class="aging-dday done">완료</div>
+            </div>
+            <div class="aging-progress">
+              <div class="aging-progress-bar"><div class="aging-progress-fill" style="width:100%;background:var(--gn)"></div></div>
+              <div class="aging-progress-meta"><span>7일 완료</span><span>목표 달성</span></div>
+            </div>
+            <button class="aging-pdf-btn">📄 PDF 출력</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item active" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ⑨ 위생일지 (실제 앱: 4카테고리 29항목 / O·△·X) -->
+  <div class="screen" id="screen-9">
+    <div class="back-header">
+      <div class="back-btn" onclick="go(7)">←</div>
+      <div class="back-title">자체위생관리점검표</div>
+    </div>
+    <div class="screen-body">
+      <div style="padding:12px 20px 0;">
+
+        <!-- 통계 3박스 -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 8px;text-align:center;">
+            <div style="font-size:18px;font-weight:900;color:var(--a2);">8건</div>
+            <div style="font-size:10px;color:var(--t3);font-weight:600;margin-top:3px;">이번 달</div>
+          </div>
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 8px;text-align:center;">
+            <div style="font-size:18px;font-weight:900;color:var(--gn);">7건</div>
+            <div style="font-size:10px;color:var(--t3);font-weight:600;margin-top:3px;">적합 판정</div>
+          </div>
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 8px;text-align:center;">
+            <div style="font-size:18px;font-weight:900;color:var(--ac);">88점</div>
+            <div style="font-size:10px;color:var(--t3);font-weight:600;margin-top:3px;">위생 점수</div>
+          </div>
+        </div>
+
+        <!-- 점검 시작 버튼 -->
+        <button onclick="showHygieneView('check')" style="width:100%;padding:16px;background:var(--ac);border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:800;font-family:'Noto Sans KR',sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(220,38,38,0.3);margin-bottom:16px;">
+          📋 자체위생관리점검 시작
+        </button>
+
+        <!-- 뷰 전환: 기록목록 / 점검진행 -->
+        <div id="hyg-view-logs">
+          <div style="font-size:12px;font-weight:800;color:var(--t3);margin-bottom:10px;">최근 점검 기록</div>
+
+          <!-- 점검 기록 카드들 -->
+          <div onclick="showHygieneView('check')" style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;margin-bottom:8px;cursor:pointer;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:14px;font-weight:700;color:var(--tx);">2026.04.09 09:15</div>
+                <div style="font-size:11px;color:var(--t3);margin-top:3px;">점검자: 김사장</div>
+              </div>
+              <div style="background:rgba(16,185,129,0.15);color:var(--gn);font-size:11px;font-weight:800;padding:4px 12px;border-radius:20px;border:1px solid rgba(16,185,129,0.3);">✅ 적합</div>
+            </div>
+            <div style="font-size:11px;color:var(--t3);margin-top:8px;text-align:right;">탭하여 PDF 내보내기 →</div>
+          </div>
+
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:14px;font-weight:700;color:var(--tx);">2026.04.08 08:50</div>
+                <div style="font-size:11px;color:var(--t3);margin-top:3px;">점검자: 이영희</div>
+              </div>
+              <div style="background:rgba(245,158,11,0.15);color:var(--a2);font-size:11px;font-weight:800;padding:4px 12px;border-radius:20px;border:1px solid rgba(245,158,11,0.3);">⚠ 보통</div>
+            </div>
+            <div style="font-size:11px;color:var(--t3);margin-top:8px;text-align:right;">탭하여 PDF 내보내기 →</div>
+          </div>
+
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:14px;font-weight:700;color:var(--tx);">2026.04.07 09:00</div>
+                <div style="font-size:11px;color:var(--t3);margin-top:3px;">점검자: 김사장</div>
+              </div>
+              <div style="background:rgba(16,185,129,0.15);color:var(--gn);font-size:11px;font-weight:800;padding:4px 12px;border-radius:20px;border:1px solid rgba(16,185,129,0.3);">✅ 적합</div>
+            </div>
+            <div style="font-size:11px;color:var(--t3);margin-top:8px;text-align:right;">탭하여 PDF 내보내기 →</div>
+          </div>
+        </div>
+
+        <!-- 점검 진행 화면 (29항목 / O·△·X) -->
+        <div id="hyg-view-check" style="display:none;">
+
+          <!-- 진행바 -->
+          <div style="background:var(--bd);border-radius:4px;height:5px;margin-bottom:14px;overflow:hidden;">
+            <div style="background:var(--ac);height:5px;width:50%;border-radius:4px;"></div>
+          </div>
+          <div style="font-size:11px;color:var(--t3);text-align:right;margin-bottom:12px;">2단계 / 4단계</div>
+
+          <!-- 카테고리 1: 개인위생 -->
+          <div style="background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);border-radius:12px;padding:10px 14px;margin-bottom:12px;">
+            <div style="font-size:13px;font-weight:800;color:var(--ac);">🙌 1단계 · 개인위생 (공통) — 5항목 ✅</div>
+          </div>
+
+          <!-- 카테고리 2: 작업전 (현재 진행) -->
+          <div style="font-size:13px;font-weight:800;color:var(--tx);margin-bottom:10px;">🔍 2단계 · 작업전 위생상태 — 9항목</div>
+
+          <!-- 항목들 (작업전 9개) — O·△·X 3단계 -->
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+            <div style="font-size:11px;font-weight:800;color:var(--t3);width:18px;text-align:center;">1</div>
+            <div style="flex:1;font-size:12px;color:var(--tx);line-height:1.5;">작업장 바닥, 벽 청결 상태</div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid #16a34a;background:rgba(22,163,74,0.15);color:#22c55e;font-size:13px;font-weight:900;cursor:pointer;">O</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">△</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">X</button>
+            </div>
+          </div>
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+            <div style="font-size:11px;font-weight:800;color:var(--t3);width:18px;text-align:center;">2</div>
+            <div style="flex:1;font-size:12px;color:var(--tx);line-height:1.5;">작업대 및 도마 세척·소독 상태</div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid #16a34a;background:rgba(22,163,74,0.15);color:#22c55e;font-size:13px;font-weight:900;cursor:pointer;">O</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">△</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">X</button>
+            </div>
+          </div>
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+            <div style="font-size:11px;font-weight:800;color:var(--t3);width:18px;text-align:center;">3</div>
+            <div style="flex:1;font-size:12px;color:var(--tx);line-height:1.5;">칼, 갈고리 등 기구류 세척·소독 상태</div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid #16a34a;background:rgba(22,163,74,0.15);color:#22c55e;font-size:13px;font-weight:900;cursor:pointer;">O</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">△</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">X</button>
+            </div>
+          </div>
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+            <div style="font-size:11px;font-weight:800;color:var(--t3);width:18px;text-align:center;">4</div>
+            <div style="flex:1;font-size:12px;color:var(--tx);line-height:1.5;">냉장·냉동 설비 온도 관리<br><span style="font-size:10px;color:var(--t3)">(냉장 0~10°C, 냉동 -18°C 이하)</span></div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">O</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid #d97706;background:rgba(217,119,6,0.15);color:#f59e0b;font-size:13px;font-weight:900;cursor:pointer;">△</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">X</button>
+            </div>
+          </div>
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+            <div style="font-size:11px;font-weight:800;color:var(--t3);width:18px;text-align:center;">5</div>
+            <div style="flex:1;font-size:12px;color:var(--tx);line-height:1.5;">에어커튼, 방충망 등 방충 시설 정상 작동</div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid #16a34a;background:rgba(22,163,74,0.15);color:#22c55e;font-size:13px;font-weight:900;cursor:pointer;">O</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">△</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">X</button>
+            </div>
+          </div>
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+            <div style="font-size:11px;font-weight:800;color:var(--t3);width:18px;text-align:center;">6</div>
+            <div style="flex:1;font-size:12px;color:var(--tx);line-height:1.5;">원료육 보관 적정 온도 유지 여부</div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid #16a34a;background:rgba(22,163,74,0.15);color:#22c55e;font-size:13px;font-weight:900;cursor:pointer;">O</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">△</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">X</button>
+            </div>
+          </div>
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+            <div style="font-size:11px;font-weight:800;color:var(--t3);width:18px;text-align:center;">7</div>
+            <div style="flex:1;font-size:12px;color:var(--tx);line-height:1.5;">유통기한 경과 또는 부패·변질 제품 없음</div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid #16a34a;background:rgba(22,163,74,0.15);color:#22c55e;font-size:13px;font-weight:900;cursor:pointer;">O</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">△</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">X</button>
+            </div>
+          </div>
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+            <div style="font-size:11px;font-weight:800;color:var(--t3);width:18px;text-align:center;">8</div>
+            <div style="flex:1;font-size:12px;color:var(--tx);line-height:1.5;">세제·소독제 라벨 부착 및 용도 분리 보관</div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">O</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">△</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">X</button>
+            </div>
+          </div>
+          <div style="background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+            <div style="font-size:11px;font-weight:800;color:var(--t3);width:18px;text-align:center;">9</div>
+            <div style="flex:1;font-size:12px;color:var(--tx);line-height:1.5;">방서 및 해충 흔적 없음</div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">O</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">△</button>
+              <button style="width:34px;height:34px;border-radius:8px;border:1.5px solid var(--bd);background:transparent;color:var(--t3);font-size:13px;font-weight:900;cursor:pointer;">X</button>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            <button onclick="showHygieneView('logs')" style="flex:1;padding:14px;background:var(--s1);border:1px solid var(--bd);border-radius:12px;color:var(--t2);font-size:13px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer;">← 이전</button>
+            <button style="flex:2;padding:14px;background:var(--ac);border:none;border-radius:12px;color:#fff;font-size:13px;font-weight:800;font-family:'Noto Sans KR',sans-serif;cursor:pointer;">다음 단계 →</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item active" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ⑩ 온도관리 -->
+  <div class="screen" id="screen-10">
+    <div class="back-header">
+      <div class="back-btn" onclick="go(7)">←</div>
+      <div class="back-title">온도관리 기록부</div>
+    </div>
+    <div class="screen-body">
+      <!-- 현재 온도 카드 3개 -->
+      <div class="temp-cards">
+        <div class="temp-card">
+          <div class="temp-card-label">냉장1</div>
+          <div class="temp-card-val">-2°</div>
+          <div class="temp-card-unit">기준 -2~5°C</div>
+          <div class="temp-card-status normal">정상</div>
+        </div>
+        <div class="temp-card warning">
+          <div class="temp-card-label">냉장2</div>
+          <div class="temp-card-val">7°</div>
+          <div class="temp-card-unit">기준 -2~5°C</div>
+          <div class="temp-card-status alert">⚠️ 초과</div>
+        </div>
+        <div class="temp-card">
+          <div class="temp-card-label">냉동</div>
+          <div class="temp-card-val">-18°</div>
+          <div class="temp-card-unit">기준 -18°C 이하</div>
+          <div class="temp-card-status normal">정상</div>
+        </div>
+        <div class="temp-card">
+          <div class="temp-card-label">숙성실</div>
+          <div class="temp-card-val">1°</div>
+          <div class="temp-card-unit">기준 0~4°C</div>
+          <div class="temp-card-status normal">정상</div>
+        </div>
+        <div class="temp-card">
+          <div class="temp-card-label">작업대</div>
+          <div class="temp-card-val">18°</div>
+          <div class="temp-card-unit">기준 ≤ 20°C</div>
+          <div class="temp-card-status normal">정상</div>
+        </div>
+        <div class="temp-card">
+          <div class="temp-card-label">진열장</div>
+          <div class="temp-card-val">4°</div>
+          <div class="temp-card-unit">기준 0~5°C</div>
+          <div class="temp-card-status normal">정상</div>
+        </div>
+      </div>
+
+      <div class="temp-log-title">시간대별 기록</div>
+      <div class="temp-log-list">
+        <div class="temp-log-item alert-row">
+          <div class="tl-left"><div class="tl-time">09:15</div><div class="tl-loc">냉장2</div></div>
+          <div class="tl-right"><div class="tl-val warn">7°C</div><div class="tl-diff">기준 초과 +2°C</div></div>
+        </div>
+        <div class="temp-log-item">
+          <div class="tl-left"><div class="tl-time">09:00</div><div class="tl-loc">냉장1</div></div>
+          <div class="tl-right"><div class="tl-val">-2°C</div><div class="tl-diff">기준 정상</div></div>
+        </div>
+        <div class="temp-log-item">
+          <div class="tl-left"><div class="tl-time">08:45</div><div class="tl-loc">냉동</div></div>
+          <div class="tl-right"><div class="tl-val">-18°C</div><div class="tl-diff">기준 정상</div></div>
+        </div>
+        <div class="temp-log-item">
+          <div class="tl-left"><div class="tl-time">08:30</div><div class="tl-loc">숙성실</div></div>
+          <div class="tl-right"><div class="tl-val">1°C</div><div class="tl-diff">기준 정상</div></div>
+        </div>
+        <div class="temp-log-item">
+          <div class="tl-left"><div class="tl-time">08:00</div><div class="tl-loc">전체 점검</div></div>
+          <div class="tl-right"><div class="tl-val" style="color:var(--gn)">이상없음</div><div class="tl-diff">개점 전 점검</div></div>
+        </div>
+      </div>
+      <div style="padding:12px 20px;">
+        <button style="width:100%;padding:13px;background:var(--s1);border:1px solid var(--bd);border-radius:12px;color:var(--t2);font-size:14px;font-weight:800;font-family:'Noto Sans KR',sans-serif;cursor:pointer;">
+          📄 온도기록부 PDF 출력
+        </button>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item active" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ⑪ 마감정산 -->
+  <div class="screen" id="screen-11">
+    <div class="back-header">
+      <div class="back-btn" onclick="go(7)">←</div>
+      <div class="back-title">마감 정산서</div>
+    </div>
+    <div class="screen-body">
+      <div class="closing-summary">
+        <div class="cs-label">2026년 4월 9일 · 오늘 매출 합계</div>
+        <div class="cs-amount">₩468,400</div>
+        <div class="cs-sub">총 8건 판매 완료</div>
+      </div>
+
+      <div style="font-size:12px;font-weight:800;color:var(--t3);padding:0 20px;margin-bottom:8px;letter-spacing:0.5px;">판매 내역</div>
+      <div class="closing-list">
+        <div class="closing-item">
+          <div><div class="ci-name">한우등심 A++</div><div class="ci-calc">2 kg × 85,000원/kg</div></div>
+          <div class="ci-price">₩170,000</div>
+        </div>
+        <div class="closing-item">
+          <div><div class="ci-name">한우갈비 1+</div><div class="ci-calc">1.5 kg × 62,000원/kg</div></div>
+          <div class="ci-price">₩93,000</div>
+        </div>
+        <div class="closing-item">
+          <div><div class="ci-name">삼겹살 (수입)</div><div class="ci-calc">3 kg × 24,000원/kg</div></div>
+          <div class="ci-price">₩72,000</div>
+        </div>
+        <div class="closing-item">
+          <div><div class="ci-name">목심 1등급</div><div class="ci-calc">2.5 kg × 38,000원/kg</div></div>
+          <div class="ci-price">₩95,000</div>
+        </div>
+        <div class="closing-item">
+          <div><div class="ci-name">돼지목심</div><div class="ci-calc">2.2 kg × 18,000원/kg</div></div>
+          <div class="ci-price">₩39,600</div>
+        </div>
+      </div>
+
+      <!-- 폐기/손실 -->
+      <div class="closing-loss-section">
+        <div class="cls-title">📋 폐기 · 손실</div>
+        <div class="cls-item"><span class="cl-name">한우등심 D-0 폐기</span><span class="cl-val">-₩42,500</span></div>
+        <div class="cls-item"><span class="cl-name">손질 로스 (1.2kg)</span><span class="cl-val">-₩18,000</span></div>
+      </div>
+
+      <!-- 마진 -->
+      <div class="closing-margin">
+        <div class="cm-label">총 마진</div>
+        <div class="cm-value">₩138,200 (29.5%)</div>
+      </div>
+
+      <button class="closing-pdf-btn">📄 마감정산서 PDF 출력</button>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item active" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ⑫ 직원보건증 -->
+  <div class="screen" id="screen-12">
+    <div class="back-header">
+      <div class="back-btn" onclick="go(7)">←</div>
+      <div class="back-title">직원 보건증 관리</div>
+    </div>
+    <div class="screen-body">
+      <div style="padding:0 20px 12px;">
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--a2);">
+          ⚠️ 위생교육 만료 임박 직원 1명 — 갱신 필요
+        </div>
+      </div>
+      <div class="staff-list">
+        <div class="staff-card">
+          <div class="staff-top">
+            <div class="staff-info">
+              <div class="sf-name">김철수</div>
+              <div class="sf-role">점장</div>
+            </div>
+            <div class="staff-badges">
+              <span class="staff-badge ok">보건증 D-182</span>
+              <span class="staff-badge ok">교육 D-90</span>
+            </div>
+          </div>
+          <div class="staff-exp-rows">
+            <div class="staff-exp-row">
+              <span class="ser-label">보건증 만료일</span>
+              <span class="ser-val">2026.10.08</span>
+            </div>
+            <div class="staff-exp-row">
+              <span class="ser-label">위생교육 만료일</span>
+              <span class="ser-val">2026.07.08</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="staff-card">
+          <div class="staff-top">
+            <div class="staff-info">
+              <div class="sf-name">이영희</div>
+              <div class="sf-role">직원</div>
+            </div>
+            <div class="staff-badges">
+              <span class="staff-badge warn">보건증 D-45</span>
+              <span class="staff-badge danger">교육 D-12</span>
+            </div>
+          </div>
+          <div class="staff-exp-rows">
+            <div class="staff-exp-row">
+              <span class="ser-label">보건증 만료일</span>
+              <span class="ser-val">2026.05.24</span>
+            </div>
+            <div class="staff-exp-row">
+              <span class="ser-label">위생교육 만료일</span>
+              <span class="ser-val">2026.04.21</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="staff-card">
+          <div class="staff-top">
+            <div class="staff-info">
+              <div class="sf-name">박민준</div>
+              <div class="sf-role">파트타임</div>
+            </div>
+            <div class="staff-badges">
+              <span class="staff-badge ok">보건증 D-210</span>
+              <span class="staff-badge ok">교육 D-150</span>
+            </div>
+          </div>
+          <div class="staff-exp-rows">
+            <div class="staff-exp-row">
+              <span class="ser-label">보건증 만료일</span>
+              <span class="ser-val">2026.11.05</span>
+            </div>
+            <div class="staff-exp-row">
+              <span class="ser-label">위생교육 만료일</span>
+              <span class="ser-val">2026.09.06</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="staff-pdf-btn">📄 보건증 현황 PDF 출력</button>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item active" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ⑬ 세무리포트 -->
+  <div class="screen" id="screen-13">
+    <div class="back-header">
+      <div class="back-btn" onclick="go(5)">←</div>
+      <div class="back-title">세무 리포트</div>
+    </div>
+    <div class="screen-body">
+      <!-- 연도 선택 -->
+      <div class="tax-year-row">
+        <button class="tax-year-btn">2024년</button>
+        <button class="tax-year-btn">2025년</button>
+        <button class="tax-year-btn active">2026년</button>
+      </div>
+
+      <!-- 부가세 요약 카드 -->
+      <div class="tax-vat-card">
+        <div class="tax-vat-title">부가세 요약 (2026 1기)</div>
+        <div class="tax-vat-row"><span class="tvr-l">매출세액 합계</span><span class="tvr-r">₩1,240,000</span></div>
+        <div class="tax-vat-row"><span class="tvr-l">매입세액 공제</span><span class="tvr-r">₩820,000</span></div>
+        <div class="tax-vat-total">
+          <span class="tvt-l">납부 예정 부가세</span>
+          <span class="tvt-r">₩420,000</span>
+        </div>
+      </div>
+
+      <!-- 월별 테이블 -->
+      <div class="tax-table-wrap">
+        <div class="tax-table-title">월별 매출·매입·마진</div>
+        <table class="tax-table">
+          <thead>
+            <tr>
+              <th>월</th>
+              <th>매출</th>
+              <th>매입</th>
+              <th>마진</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1월</td>
+              <td>3,120,000</td>
+              <td>2,210,000</td>
+              <td class="positive">910,000</td>
+            </tr>
+            <tr>
+              <td>2월</td>
+              <td>2,850,000</td>
+              <td>2,050,000</td>
+              <td class="positive">800,000</td>
+            </tr>
+            <tr>
+              <td>3월</td>
+              <td>3,480,000</td>
+              <td>2,380,000</td>
+              <td class="positive">1,100,000</td>
+            </tr>
+            <tr>
+              <td>4월</td>
+              <td>1,840,000</td>
+              <td>1,280,000</td>
+              <td class="positive">560,000</td>
+            </tr>
+            <tr>
+              <td style="color:var(--t3)">5월</td>
+              <td style="color:var(--t3)">—</td>
+              <td style="color:var(--t3)">—</td>
+              <td style="color:var(--t3)">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <button class="tax-csv-btn">
+        <span>⬇️</span> CSV 다운로드
+      </button>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item active" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+  <!-- ⑭ 교육일지 -->
+  <div class="screen" id="screen-14">
+    <div class="back-header">
+      <div class="back-btn" onclick="go(7)">←</div>
+      <div class="back-title">영업자 자체위생교육 일지</div>
+    </div>
+    <div class="screen-body">
+      <div style="padding:0 20px 20px;">
+
+        <!-- 교육 정보 카드 -->
+        <div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);border-radius:14px;padding:16px;margin-bottom:16px;">
+          <div style="font-size:12px;color:#A78BFA;font-weight:700;margin-bottom:8px;">2026년 4월 교육</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:15px;font-weight:800;color:var(--tx);">월례 위생교육</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:3px;">식품위생법 제41조 · 연 1회 의무</div>
+            </div>
+            <div style="background:#7C3AED;color:#fff;font-size:11px;font-weight:800;padding:4px 12px;border-radius:20px;">완료</div>
+          </div>
+        </div>
+
+        <!-- 교육 항목 리스트 -->
+        <div style="font-size:12px;font-weight:800;color:var(--t3);margin-bottom:8px;letter-spacing:0.5px;">교육 내용</div>
+        <div style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;margin-bottom:16px;">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--tx);">식품위생 법령 및 기준</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:2px;">30분</div>
+            </div>
+            <span style="color:var(--gn);font-size:18px;">✓</span>
+          </div>
+          <div style="padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--tx);">개인위생 및 식품취급</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:2px;">20분</div>
+            </div>
+            <span style="color:var(--gn);font-size:18px;">✓</span>
+          </div>
+          <div style="padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--tx);">HACCP 관리 기준</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:2px;">20분</div>
+            </div>
+            <span style="color:var(--gn);font-size:18px;">✓</span>
+          </div>
+          <div style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--tx);">축산물 이력제 실무</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:2px;">10분</div>
+            </div>
+            <span style="color:var(--gn);font-size:18px;">✓</span>
+          </div>
+        </div>
+
+        <!-- 참석자 서명 -->
+        <div style="font-size:12px;font-weight:800;color:var(--t3);margin-bottom:8px;letter-spacing:0.5px;">참석자 서명</div>
+        <div style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;margin-bottom:16px;">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:32px;height:32px;background:var(--ac);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;">사</div>
+              <div><div style="font-size:13px;font-weight:700;color:var(--tx);">김사장</div><div style="font-size:11px;color:var(--t3);">대표</div></div>
+            </div>
+            <div style="font-size:12px;color:var(--gn);font-weight:700;">서명완료</div>
+          </div>
+          <div style="padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:32px;height:32px;background:#0EA5E9;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;">이</div>
+              <div><div style="font-size:13px;font-weight:700;color:var(--tx);">이영희</div><div style="font-size:11px;color:var(--t3);">직원</div></div>
+            </div>
+            <div style="font-size:12px;color:var(--gn);font-weight:700;">서명완료</div>
+          </div>
+          <div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:32px;height:32px;background:#10B981;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;">박</div>
+              <div><div style="font-size:13px;font-weight:700;color:var(--tx);">박민준</div><div style="font-size:11px;color:var(--t3);">파트타임</div></div>
+            </div>
+            <div style="font-size:12px;color:var(--a2);font-weight:700;">서명 대기</div>
+          </div>
+        </div>
+
+        <!-- PDF 출력 버튼 -->
+        <button style="width:100%;padding:15px;background:rgba(124,58,237,0.12);border:1.5px solid rgba(124,58,237,0.35);border-radius:14px;color:#A78BFA;font-size:15px;font-weight:800;font-family:'Noto Sans KR',sans-serif;cursor:pointer;margin-bottom:8px;">
+          📄 교육일지 PDF 출력
+        </button>
+        <button onclick="go(7)" style="width:100%;padding:15px;background:var(--s1);border:1px solid var(--bd);border-radius:14px;color:var(--t2);font-size:14px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer;">
+          + 새 교육 기록 추가
+        </button>
+
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item" onclick="go(2)"><div class="tab-icon-wrap"><div class="tab-icon">🏠</div></div><div class="tab-label">홈</div></div>
+      <div class="tab-item" onclick="go(6)"><div class="tab-icon-wrap"><div class="tab-icon">🏷️</div></div><div class="tab-label">조회</div></div>
+      <div class="tab-item" onclick="go(3)"><div class="tab-icon-wrap"><div class="tab-icon">📦</div></div><div class="tab-label">재고</div></div>
+      <div class="tab-item active" onclick="go(7)"><div class="tab-icon-wrap"><div class="tab-icon">🖨️</div></div><div class="tab-label">서류</div></div>
+      <div class="tab-item" onclick="go(5)"><div class="tab-icon-wrap"><div class="tab-icon">⚙️</div></div><div class="tab-label">설정</div></div>
+    </div>
+  </div>
+
+</div><!-- phone-frame -->
+</div><!-- phone-outer -->
+
+<script>
+// 화면번호 → 상단탭 인덱스 매핑
+// 순서: 로그인(1), 홈(2), 조회(6), 숙성(8), 재고(3), 서류(7), 위생(9), 온도(10), 마감(11), 직원(12), 세무(13), 교육(14), 구독(4), 설정(5)
+const SCREEN_TAB_INDEX = {
+  1:0, 2:1, 6:2, 8:3, 3:4, 7:5, 9:6, 10:7, 11:8, 12:9, 13:10, 14:11, 4:12, 5:13
+};
+
+function go(n) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.screen-tab').forEach(t => t.classList.remove('active'));
+  const screen = document.getElementById('screen-' + n);
+  if (screen) screen.classList.add('active');
+  const tabIdx = SCREEN_TAB_INDEX[n];
+  const tabs = document.querySelectorAll('.screen-tab');
+  if (tabs[tabIdx] !== undefined) tabs[tabIdx].classList.add('active');
+}
+
+function showInvTab(tab, el) {
+  // 모든 inv 탭 콘텐츠 숨기기
+  ['status','sales','yield','expiry','vendor'].forEach(t => {
+    const el = document.getElementById('inv-' + t);
+    if (el) el.style.display = 'none';
+  });
+  const target = document.getElementById('inv-' + tab);
+  if (target) target.style.display = 'block';
+  // 탭 버튼 활성화
+  document.querySelectorAll('#screen-3 .inv-inner-tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+}
+
+function showHygieneView(view) {
+  document.getElementById('hyg-view-logs').style.display  = view === 'logs'  ? 'block' : 'none';
+  document.getElementById('hyg-view-check').style.display = view === 'check' ? 'block' : 'none';
+  if (view === 'check') document.querySelector('#screen-9 .screen-body').scrollTop = 0;
+}
+
+function showScanTab(tab) {
+  // 두 탭 패널 전환
+  document.getElementById('scan-pane-trace').style.display = tab === 'trace' ? 'block' : 'none';
+  document.getElementById('scan-pane-ocr').style.display   = tab === 'ocr'   ? 'block' : 'none';
+  // 탭 스타일 전환
+  const traceTab = document.getElementById('scan-tab-trace');
+  const ocrTab   = document.getElementById('scan-tab-ocr');
+  if (tab === 'trace') {
+    traceTab.style.color       = 'var(--ac)';
+    traceTab.style.borderBottom = '2px solid var(--ac)';
+    ocrTab.style.color          = 'var(--t3)';
+    ocrTab.style.borderBottom   = '2px solid transparent';
+  } else {
+    ocrTab.style.color          = '#A78BFA';
+    ocrTab.style.borderBottom   = '2px solid #7C3AED';
+    traceTab.style.color        = 'var(--t3)';
+    traceTab.style.borderBottom = '2px solid transparent';
+  }
+}
+
+function showAgingTab(tab, el) {
+  document.getElementById('aging-ongoing').style.display = tab === 'ongoing' ? 'block' : 'none';
+  document.getElementById('aging-done').style.display = tab === 'done' ? 'block' : 'none';
+  document.querySelectorAll('#screen-8 .aging-tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+}
+</script>
+</body>
+</html>

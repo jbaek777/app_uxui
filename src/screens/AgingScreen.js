@@ -158,17 +158,19 @@ export default function AgingScreen() {
             const isOpen = expanded === item.id;
             const barColor = p >= 100 ? pal.gn : p >= 70 ? pal.ac : pal.a2;
             const isDone = item.completed;
+            const accentColor = isDone ? pal.gn : p >= 100 ? pal.gn : p >= 70 ? pal.ac : pal.a2;
             return (
               <TouchableOpacity key={item.id}
                 style={[
                   styles.agingCard,
-                  { backgroundColor: pal.s1, borderColor: isOpen ? pal.ac : pal.bd },
+                  { backgroundColor: pal.s1, borderColor: isOpen ? accentColor : pal.bd },
                   isOpen && { borderWidth: 2 },
-                  isDone && { borderColor: pal.gn, borderWidth: 1.5, opacity: 0.85 },
+                  isDone && { opacity: 0.85 },
                 ]}
                 onPress={() => setExpanded(isOpen ? null : item.id)}
                 activeOpacity={0.85}>
 
+                <View style={[styles.cardAccentBar, { backgroundColor: accentColor }]} />
                 <View style={styles.cardHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.cardCut, { color: pal.tx }]}>{item.cut}</Text>
@@ -328,7 +330,8 @@ export default function AgingScreen() {
 }
 
 const StatMini = ({ label, value, color, pal }) => (
-  <View style={[styles.statMini, { backgroundColor: pal.s2, borderColor: pal.bd }]}>
+  <View style={[styles.statMini, { backgroundColor: pal.s1, borderColor: pal.bd, overflow: 'hidden' }]}>
+    <View style={[styles.statMiniAccent, { backgroundColor: color }]} />
     <Text style={[styles.statVal, { color }]}>{value}</Text>
     <Text style={[styles.statLbl, { color: pal.t3 }]}>{label}</Text>
   </View>
@@ -353,14 +356,15 @@ const FormField = ({ label, pal, ...props }) => (
 );
 
 const styles = StyleSheet.create({
-  statBar: { flexDirection: 'row', gap: spacing.sm, padding: spacing.sm, borderBottomWidth: 1 },
-  statMini: { flex: 1, borderRadius: radius.md, borderWidth: 1, padding: spacing.sm + 2, alignItems: 'center', ...shadow.sm },
-  statVal: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 3 },
+  statBar: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderBottomWidth: 1 },
+  statMini: { flex: 1, borderRadius: radius.md, borderWidth: 1, paddingTop: 16, paddingBottom: 12, paddingHorizontal: spacing.sm, alignItems: 'center' },
+  statMiniAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 4 },
+  statVal: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 4 },
   statLbl: { fontSize: fontSize.xxs, fontWeight: '600', textAlign: 'center' },
 
   segBar: { flexDirection: 'row', borderBottomWidth: 1 },
-  segBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
-  segText: { fontSize: fontSize.sm, fontWeight: '800' },
+  segBtn: { flex: 1, paddingVertical: 14, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
+  segText: { fontSize: fontSize.sm, fontWeight: '800', letterSpacing: 0.3 },
 
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1 },
   viewSwitch: { flexDirection: 'row', borderRadius: radius.sm, padding: 3 },
@@ -368,7 +372,8 @@ const styles = StyleSheet.create({
   viewBtnText: { fontSize: fontSize.sm, fontWeight: '600' },
   viewBtnTextActive: { fontWeight: '800' },
 
-  agingCard: { borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.sm, ...shadow.sm, overflow: 'hidden' },
+  agingCard: { borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.sm, overflow: 'hidden' },
+  cardAccentBar: { height: 4, width: '100%' },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', padding: spacing.md, paddingBottom: spacing.sm },
   cardCut: { fontSize: fontSize.lg, fontWeight: '800', marginBottom: 7 },
   cardBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

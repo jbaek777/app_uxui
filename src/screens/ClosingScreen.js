@@ -89,8 +89,9 @@ export default function ClosingScreen() {
 
         {/* 판매 내역 */}
         <View style={[styles.section, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+          <View style={[styles.sectionAccent, { backgroundColor: pal.a2 }]} />
           <View style={styles.sectionHead}>
-            <Text style={[styles.sectionTitle, { color: pal.tx }]}>🛒 판매 내역</Text>
+            <Text style={[styles.sectionTitle, { color: pal.tx }]}>판매 내역</Text>
             <TouchableOpacity style={[styles.addBtn, { borderColor: pal.a2 + '50', backgroundColor: pal.a2 + '15' }]} onPress={() => setModal(true)}>
               <Text style={[styles.addBtnText, { color: pal.a2 }]}>+ 추가</Text>
             </TouchableOpacity>
@@ -108,8 +109,9 @@ export default function ClosingScreen() {
 
         {/* 폐기 내역 */}
         <View style={[styles.section, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+          <View style={[styles.sectionAccent, { backgroundColor: pal.rd }]} />
           <View style={styles.sectionHead}>
-            <Text style={[styles.sectionTitle, { color: pal.tx }]}>🗑️ 폐기 내역</Text>
+            <Text style={[styles.sectionTitle, { color: pal.tx }]}>폐기 내역</Text>
             <TouchableOpacity style={[styles.addBtn, { backgroundColor: pal.rd + '20', borderColor: pal.rd + '40' }]}
               onPress={() => setWasteModal(true)}>
               <Text style={[styles.addBtnText, { color: pal.rd }]}>+ 폐기 등록</Text>
@@ -136,7 +138,10 @@ export default function ClosingScreen() {
 
         {/* 잔여 재고 */}
         <View style={[styles.section, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <Text style={[styles.sectionTitle, { color: pal.tx }]}>📦 잔여 재고</Text>
+          <View style={[styles.sectionAccent, { backgroundColor: pal.gn }]} />
+          <View style={styles.sectionHead}>
+            <Text style={[styles.sectionTitle, { color: pal.tx }]}>잔여 재고</Text>
+          </View>
           {(realMeat.length > 0 ? realMeat : initMeat.filter(m => !m.sold)).map(m => (
             <View key={m.id} style={[styles.stockRow, { borderBottomColor: pal.bd + '40' }]}>
               <Text style={[styles.stockCut, { color: pal.tx }]}>{m.cut}</Text>
@@ -144,6 +149,7 @@ export default function ClosingScreen() {
               <Text style={[styles.stockQty, { color: m.qty < 5 ? pal.rd : pal.gn }]}>{m.qty}kg</Text>
             </View>
           ))}
+          <View style={{ height: spacing.sm }} />
         </View>
 
         <PrimaryBtn
@@ -226,36 +232,38 @@ export default function ClosingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  heroCard: { borderRadius: radius.xl, padding: spacing.lg, marginBottom: spacing.lg, ...shadow.md },
-  heroLabel: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.7)', fontWeight: '700', marginBottom: 6 },
-  heroValue: { fontSize: 44, fontWeight: '900', color: '#fff', marginBottom: spacing.md },
-  heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  heroStat: { flex: 1, alignItems: 'center' },
-  heroStatVal: { fontSize: fontSize.lg, fontWeight: '900', color: '#fff' },
-  heroStatLabel: { fontSize: fontSize.xxs, color: 'rgba(255,255,255,0.7)', marginTop: 3 },
-  heroDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.3)' },
+  heroCard: { borderRadius: radius.xl, padding: spacing.lg, marginBottom: spacing.lg, overflow: 'hidden' },
+  heroLabel: { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: '700', marginBottom: 10, letterSpacing: 1 },
+  heroValue: { fontSize: 42, fontWeight: '900', color: '#fff', marginBottom: 20, letterSpacing: -1, lineHeight: 48 },
+  heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 14, padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  heroStat: { flex: 1, alignItems: 'center', paddingVertical: 6 },
+  heroStatVal: { fontSize: fontSize.md, fontWeight: '900', color: '#fff', letterSpacing: -0.5, marginBottom: 4 },
+  heroStatLabel: { fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: '600', lineHeight: 14 },
+  heroDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.2)' },
 
-  section: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.md, ...shadow.sm },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  sectionTitle: { fontSize: fontSize.md, fontWeight: '800' },
+  section: { borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.md, overflow: 'hidden' },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, paddingBottom: spacing.sm },
+  sectionTitle: { fontSize: fontSize.sm, fontWeight: '800' },
   addBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1.5 },
   addBtnText: { fontSize: fontSize.xs, fontWeight: '800' },
 
-  saleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1 },
+  saleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 1 },
   saleCut: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 3 },
   saleMeta: { fontSize: fontSize.xs },
   saleTotal: { fontSize: fontSize.md, fontWeight: '900' },
 
-  wasteRow: { paddingVertical: spacing.sm, borderBottomWidth: 1 },
+  wasteRow: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 1 },
   wasteCut: { fontSize: fontSize.sm, fontWeight: '700' },
   wasteMeta: { fontSize: fontSize.xs, marginTop: 2 },
   wasteVal: { fontSize: fontSize.xs, fontWeight: '700', marginTop: 3 },
-  wasteSummary: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing.sm, marginTop: spacing.sm },
+  wasteSummary: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing.sm, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.md },
   wasteSumLabel: { fontSize: fontSize.sm, fontWeight: '700' },
   wasteSumVal: { fontSize: fontSize.md, fontWeight: '900' },
-  emptyText: { fontSize: fontSize.sm, textAlign: 'center', paddingVertical: spacing.md },
+  emptyText: { fontSize: fontSize.sm, textAlign: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.md },
 
-  stockRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, gap: spacing.sm, borderBottomWidth: 1 },
+  sectionAccent: { height: 4, width: '100%' },
+
+  stockRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.md, gap: spacing.sm, borderBottomWidth: 1 },
   stockCut: { fontSize: fontSize.sm, fontWeight: '700', flex: 1 },
   stockOrigin: { fontSize: fontSize.xs },
   stockQty: { fontSize: fontSize.sm, fontWeight: '900' },

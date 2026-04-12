@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MeatBig — 전체 화면 미리보기</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:#F2F4F8; --white:#FFFFFF; --red:#B91C1C; --red2:#DC2626; --red3:#EF4444;
+  --red-s:rgba(185,28,28,0.08); --red-s2:rgba(185,28,28,0.14);
+  --ok:#15803D; --ok2:#16A34A; --ok-s:rgba(21,128,61,0.09);
+  --warn:#B45309; --warn2:#D97706; --warn-s:rgba(180,83,9,0.09);
+  --blue:#1D4ED8; --blue2:#2563EB; --blue-s:rgba(29,78,216,0.09);
+  --pur:#6D28D9; --pur-s:rgba(109,40,217,0.09);
+  --t1:#0F172A; --t2:#334155; --t3:#64748B; --t4:#94A3B8;
+  --border:#E2E8F0; --bg2:#F1F5F9; --bg3:#E8ECF2;
+  --sh:0 1px 2px rgba(15,23,42,0.04),0 3px 10px rgba(15,23,42,0.06);
+  --sh2:0 4px 20px rgba(15,23,42,0.10),0 1px 4px rgba(15,23,42,0.04);
+  --r:16px; --r2:20px;
+}
+body {
+  background:#C4CAD4;
+  background-image:radial-gradient(ellipse 80% 50% at 50% -5%,rgba(185,28,28,0.07) 0%,transparent 60%);
+  font-family:'Outfit','Noto Sans KR',sans-serif;
+  min-height:100vh; display:flex; flex-direction:column; align-items:center;
+  padding:32px 20px 80px;
+}
+
+/* ── 상단 네비 ── */
+.pg-title { font-size:14px; font-weight:800; color:#2D3748; margin-bottom:14px; letter-spacing:-0.3px; }
+.nav-bar {
+  display:flex; gap:6px; margin-bottom:22px; flex-wrap:wrap; justify-content:center;
+}
+.nav-btn {
+  padding:7px 14px; border-radius:20px; font-size:12px; font-weight:700;
+  cursor:pointer; transition:all 0.2s; border:none; outline:none;
+  background:rgba(255,255,255,0.55); color:#4A5568;
+  backdrop-filter:blur(8px);
+}
+.nav-btn.active { background:var(--red); color:#fff; box-shadow:0 4px 12px rgba(185,28,28,0.3); }
+.nav-btn:hover:not(.active) { background:rgba(255,255,255,0.8); }
+
+/* ── 디바이스 ── */
+.device {
+  width:390px; border-radius:52px; background:var(--bg); position:relative; overflow:hidden;
+  box-shadow:0 0 0 1px rgba(0,0,0,0.12),0 0 0 9px #AAAAAA,0 0 0 11px rgba(0,0,0,0.07),
+             0 32px 90px rgba(0,0,0,0.28),0 4px 16px rgba(0,0,0,0.10);
+}
+.island {
+  position:absolute; top:12px; left:50%; transform:translateX(-50%);
+  width:120px; height:34px; background:#080808; border-radius:20px; z-index:99;
+  display:flex; align-items:center; justify-content:space-between; padding:0 14px;
+}
+.is-pill { flex:1; height:8px; background:#111; border-radius:8px; }
+.is-cam { width:10px; height:10px; border-radius:50%; background:#111; border:1.5px solid #1a1a1a; }
+.screen {
+  height:844px; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; padding-top:52px; background:var(--bg);
+}
+.screen::-webkit-scrollbar { display:none; }
+.page { display:none; }
+.page.active { display:block; }
+
+/* ── 공통 상태바 ── */
+.sb {
+  padding:4px 22px 6px; display:flex; justify-content:space-between; align-items:center; background:var(--white);
+}
+.sb-time { font-size:15px; font-weight:700; color:var(--t1); letter-spacing:-0.3px; }
+.sb-r { display:flex; align-items:center; gap:5px; }
+.sb-sig { display:flex; align-items:flex-end; gap:2px; }
+.sb-sig span { width:3px; background:var(--t1); border-radius:1px; display:block; }
+.sb-batt { width:22px; height:12px; border:1.5px solid var(--t1); border-radius:3px; padding:1.5px; position:relative; display:flex; align-items:center; }
+.sb-batt::after { content:''; position:absolute; right:-4px; top:50%; transform:translateY(-50%); width:2px; height:5px; background:var(--t1); border-radius:0 1px 1px 0; }
+.sb-bf { height:100%; width:80%; background:var(--t1); border-radius:1px; }
+
+/* ── 공통 탭바 ── */
+.tabbar {
+  background:rgba(242,244,248,0.98); backdrop-filter:blur(24px);
+  border-top:1px solid var(--border); padding:10px 0 22px;
+  display:flex; justify-content:space-around;
+}
+.ti { display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; padding:4px 10px; border-radius:11px; }
+.ti-ic { color:var(--t4); }
+.ti-ic i { width:22px; height:22px; stroke-width:1.8; display:block; }
+.ti.on .ti-ic { color:var(--red); }
+.ti-lb { font-size:10px; font-weight:500; color:var(--t4); }
+.ti.on .ti-lb { font-weight:800; color:var(--red); }
+.ti-dot { width:4px; height:4px; border-radius:50%; background:var(--red); }
+
+/* ── 공통 섹션헤더 ── */
+.sec { padding:18px 20px 10px; display:flex; justify-content:space-between; align-items:center; }
+.sec-t { font-size:15px; font-weight:800; color:var(--t1); letter-spacing:-0.4px; }
+.sec-a { font-size:12px; font-weight:600; color:var(--red); display:flex; align-items:center; gap:1px; cursor:pointer; }
+.sec-a i { width:14px; height:14px; stroke-width:2.5; }
+
+/* ── 공통 카드/아이콘 ── */
+.card { background:var(--white); border-radius:var(--r); box-shadow:var(--sh); }
+.ic-box { display:flex; align-items:center; justify-content:center; border-radius:12px; flex-shrink:0; }
+.ic-box i { stroke-width:2; }
+.ic-r { background:var(--red-s); color:var(--red); }
+.ic-g { background:var(--ok-s); color:var(--ok2); }
+.ic-w { background:var(--warn-s); color:var(--warn2); }
+.ic-b { background:var(--blue-s); color:var(--blue2); }
+.ic-p { background:var(--pur-s); color:var(--pur); }
+.pill { font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; flex-shrink:0; white-space:nowrap; }
+.p-r { background:var(--red-s2); color:var(--red); }
+.p-g { background:var(--ok-s); color:var(--ok); }
+.p-w { background:var(--warn-s); color:var(--warn); }
+.p-b { background:var(--blue-s); color:var(--blue); }
+.p-gray { background:var(--bg3); color:var(--t3); }
+
+/* ── 게이지바 ── */
+.gauge { height:4px; background:var(--bg3); border-radius:10px; overflow:hidden; }
+.gf { height:100%; border-radius:10px; transform:scaleX(0); transform-origin:left; animation:gfill 0.9s cubic-bezier(0.16,1,0.3,1) forwards; }
+@keyframes gfill { to { transform:scaleX(1); } }
+.gf-r { background:linear-gradient(to right,var(--red),var(--red3)); }
+.gf-w { background:linear-gradient(to right,var(--warn),var(--warn2)); }
+.gf-g { background:linear-gradient(to right,var(--ok),var(--ok2)); }
+
+/* ─────────── 1. 홈 (DASHBOARD) ─────────── */
+.hdr-white { background:var(--white); border-bottom:1px solid var(--border); position:relative; }
+.hdr-white::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(to right,var(--red),var(--red2),var(--red3),transparent); }
+.hdr-top { padding:8px 20px; display:flex; justify-content:space-between; align-items:center; }
+.brand { display:flex; align-items:center; gap:9px; }
+.brand-ic { width:33px; height:33px; border-radius:10px; background:var(--red); display:flex; align-items:center; justify-content:center; color:#fff; box-shadow:0 3px 10px rgba(185,28,28,0.30); }
+.brand-ic i { width:17px; height:17px; stroke-width:2; }
+.brand-nm { font-size:16px; font-weight:800; color:var(--t1); letter-spacing:-0.5px; }
+.hdr-btn { width:34px; height:34px; border-radius:50%; background:var(--bg2); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--t2); position:relative; }
+.hdr-btn i { width:17px; height:17px; stroke-width:2; }
+.n-dot { position:absolute; top:6px; right:6px; width:7px; height:7px; background:var(--red); border-radius:50%; border:1.5px solid var(--white); }
+.hdr-info { padding:2px 20px 14px; }
+.hdr-date { font-size:11px; color:var(--t3); font-weight:500; margin-bottom:4px; }
+.hdr-store { font-size:22px; font-weight:900; color:var(--t1); letter-spacing:-0.8px; }
+.hdr-store em { color:var(--red); font-style:normal; }
+
+/* 검색 */
+.search-row { background:var(--white); padding:0 16px 12px; border-bottom:1px solid var(--border); }
+.search { background:var(--bg2); border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:9px; }
+.search i { width:16px; height:16px; flex-shrink:0; color:var(--t4); stroke-width:2.2; }
+.search span { font-size:13px; color:var(--t4); }
+
+/* 칩 */
+.chips { background:var(--white); padding:10px 16px 12px; display:flex; gap:7px; overflow-x:auto; scrollbar-width:none; border-bottom:1px solid var(--border); }
+.chips::-webkit-scrollbar { display:none; }
+.chip { flex-shrink:0; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.c-on { background:var(--t1); color:#fff; }
+.c-off { background:var(--bg2); color:var(--t3); }
+.c-warn { background:var(--warn-s); color:var(--warn); border:1px solid rgba(180,83,9,0.2); }
+
+/* 손실배너 */
+.loss-banner { margin:14px 16px 0; background:var(--white); border-radius:var(--r2); display:flex; box-shadow:var(--sh); border:1px solid var(--border); cursor:pointer; }
+.loss-stripe { width:4px; background:linear-gradient(to bottom,var(--red),var(--red3)); border-radius:var(--r2) 0 0 var(--r2); flex-shrink:0; }
+.loss-in { flex:1; padding:13px 14px; display:flex; align-items:center; gap:12px; }
+.loss-ic { width:42px; height:42px; border-radius:13px; background:var(--red-s); color:var(--red); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.loss-ic i { width:20px; height:20px; stroke-width:2; }
+.loss-tx { flex:1; }
+.loss-ttl { font-size:13px; font-weight:700; color:var(--t1); margin-bottom:3px; }
+.loss-sb { font-size:11px; color:var(--t3); line-height:1.4; }
+.loss-rc { text-align:right; flex-shrink:0; }
+.loss-am { font-size:16px; font-weight:900; color:var(--red); letter-spacing:-0.8px; margin-bottom:2px; }
+.loss-lb { font-size:10px; color:var(--t4); }
+
+/* stats */
+.stats-row { padding:14px 16px 0; display:flex; gap:9px; }
+.stat { flex:1; background:var(--white); border-radius:var(--r); padding:14px 12px; box-shadow:var(--sh); position:relative; overflow:hidden; cursor:pointer; }
+.stat::after { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:var(--r) var(--r) 0 0; }
+.st-r::after { background:var(--red); } .st-w::after { background:var(--warn2); } .st-g::after { background:var(--ok2); }
+.stat-ic { width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; margin-bottom:10px; }
+.stat-ic i { width:16px; height:16px; stroke-width:2.2; }
+.stat-n { font-size:28px; font-weight:900; letter-spacing:-1.5px; line-height:1; margin-bottom:5px; }
+.n-r{color:var(--red);} .n-w{color:var(--warn2);} .n-g{color:var(--ok2);}
+.stat-l { font-size:10px; color:var(--t3); font-weight:500; line-height:1.4; }
+
+/* 점검 */
+.checks { padding:0 16px; display:flex; flex-direction:column; gap:7px; }
+.ck { background:var(--white); border-radius:var(--r); padding:12px 14px 12px 16px; display:flex; align-items:center; gap:12px; box-shadow:var(--sh); cursor:pointer; position:relative; overflow:hidden; }
+.ck::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; }
+.ck-r::before{background:var(--red);} .ck-w::before{background:var(--warn2);} .ck-b::before{background:var(--blue2);}
+.ck-ic { width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.ck-ic i { width:18px; height:18px; stroke-width:2; }
+.ck-b2 { flex:1; }
+.ck-nm { font-size:13px; font-weight:700; color:var(--t1); margin-bottom:2px; }
+.ck-sb { font-size:11px; color:var(--t3); }
+
+/* inv 2열 */
+.inv-grid { padding:0 16px; display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+.ic-card { background:var(--white); border-radius:var(--r2); overflow:hidden; box-shadow:var(--sh); cursor:pointer; }
+.ic-photo { height:90px; position:relative; display:flex; align-items:center; justify-content:center; }
+.ic-photo::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,0.28) 100%); z-index:1; }
+.ph1{background:linear-gradient(150deg,#5C0000,#8B1A1A,#B02020,#C83232);}
+.ph2{background:linear-gradient(150deg,#5C1500,#8B2A10,#B04020,#C85030);}
+.ph3{background:linear-gradient(150deg,#5C2800,#8B3A10,#B05020,#C86030);}
+.ph4{background:linear-gradient(150deg,#3A1A00,#6B3010,#8B4820,#A86030);}
+.ic-photo-i { position:relative; z-index:3; color:#fff; opacity:0.4; }
+.ic-photo-i i { width:36px; height:36px; stroke-width:1.5; }
+.ic-bs { position:absolute; top:8px; left:8px; right:8px; display:flex; justify-content:space-between; align-items:flex-start; z-index:4; }
+.ic-gr { font-size:9px; font-weight:800; background:rgba(255,255,255,0.20); color:#fff; padding:3px 7px; border-radius:6px; backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.25); }
+.ic-dd { font-size:10px; font-weight:800; padding:3px 8px; border-radius:6px; }
+.dd-r{background:#fff;color:var(--red);} .dd-w{background:#fff;color:var(--warn);} .dd-g{background:rgba(255,255,255,0.2);color:#fff;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.25);}
+.ic-bd { padding:10px 12px 12px; }
+.ic-nm { font-size:13px; font-weight:800; color:var(--t1); margin-bottom:2px; letter-spacing:-0.3px; }
+.ic-qt { font-size:10px; color:var(--t3); margin-bottom:7px; }
+.ic-pr { font-size:14px; font-weight:900; color:var(--t1); letter-spacing:-0.5px; }
+
+/* 마진 */
+.mg-wrap { padding:0 16px; }
+.mg-tabs { display:flex; background:var(--bg2); border-radius:11px; padding:3px; gap:3px; margin-bottom:10px; }
+.mg-tab { flex:1; padding:8px 0; text-align:center; font-size:12px; font-weight:700; border-radius:9px; cursor:pointer; transition:all 0.2s; color:var(--t3); }
+.mg-tab.on { background:var(--white); color:var(--t1); box-shadow:var(--sh); }
+.mg-panel { display:none; flex-direction:column; gap:7px; }
+.mg-panel.show { display:flex; }
+.mg-row { background:var(--white); border-radius:var(--r); padding:11px 14px; display:flex; align-items:center; gap:11px; box-shadow:var(--sh); }
+.mg-rnk { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0; }
+.mr-g{background:var(--ok-s);color:var(--ok);} .mr-w{background:var(--warn-s);color:var(--warn);}
+.mg-nm { font-size:12px; font-weight:600; color:var(--t1); flex:1; }
+.mg-bw { flex:1.2; }
+.mg-bt { height:4px; background:var(--bg3); border-radius:10px; overflow:hidden; }
+.mg-bf { height:100%; border-radius:10px; transform:scaleX(0); transform-origin:left; animation:gfill 1s cubic-bezier(0.16,1,0.3,1) forwards; animation-delay:calc(var(--d)*1s); }
+@keyframes gfill{to{transform:scaleX(1);}}
+.mbf-g{background:linear-gradient(to right,var(--ok),var(--ok2));} .mbf-w{background:linear-gradient(to right,var(--warn),var(--warn2));}
+.mg-pc { font-size:15px; font-weight:900; min-width:38px; text-align:right; letter-spacing:-0.5px; }
+.mc-g{color:var(--ok);} .mc-w{color:var(--warn);}
+
+/* 빠른실행 */
+.qk-wrap { padding:0 16px 14px; }
+.qk-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+.qk { background:var(--white); border-radius:var(--r); padding:16px 8px; display:flex; flex-direction:column; align-items:center; gap:9px; cursor:pointer; box-shadow:var(--sh); transition:all 0.2s; position:relative; }
+.qk:active{transform:scale(0.93);}
+.qk.qk-main { background:var(--t1); box-shadow:0 6px 24px rgba(15,23,42,0.30); }
+.qk-ic { width:42px; height:42px; border-radius:13px; background:var(--bg2); color:var(--t2); display:flex; align-items:center; justify-content:center; }
+.qk-ic i { width:21px; height:21px; stroke-width:1.9; }
+.qk.qk-main .qk-ic { background:rgba(255,255,255,0.12); color:#fff; }
+.qk-lb { font-size:11px; font-weight:700; color:var(--t2); text-align:center; line-height:1.3; }
+.qk.qk-main .qk-lb { color:rgba(255,255,255,0.85); }
+.qk-bdg { position:absolute; top:7px; right:7px; background:var(--red); color:#fff; font-size:9px; font-weight:800; padding:2px 6px; border-radius:5px; }
+
+/* ─────────── 2. 재고 (INVENTORY) ─────────── */
+.inv-hdr { background:var(--white); border-bottom:1px solid var(--border); position:relative; }
+.inv-hdr::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(to right,var(--red),var(--red2),transparent); }
+.inv-hdr-top { padding:10px 20px; display:flex; justify-content:space-between; align-items:center; }
+.page-title { font-size:20px; font-weight:900; color:var(--t1); letter-spacing:-0.6px; }
+.add-btn { display:flex; align-items:center; gap:6px; background:var(--red); color:#fff; font-size:12px; font-weight:700; padding:8px 14px; border-radius:10px; cursor:pointer; box-shadow:0 3px 10px rgba(185,28,28,0.3); }
+.add-btn i { width:15px; height:15px; stroke-width:2.5; }
+.inv-mini-stats { padding:12px 16px; display:grid; grid-template-columns:1fr 1fr; gap:8px; border-bottom:1px solid var(--border); background:var(--white); }
+.mini-stat { background:var(--bg2); border-radius:12px; padding:11px 13px; }
+.ms-label { font-size:10px; color:var(--t3); font-weight:500; margin-bottom:4px; }
+.ms-val { font-size:20px; font-weight:900; color:var(--t1); letter-spacing:-0.8px; }
+.ms-val.r{color:var(--red);} .ms-val.g{color:var(--ok2);}
+.inv-list { padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
+.inv-card { background:var(--white); border-radius:var(--r); box-shadow:var(--sh); overflow:hidden; cursor:pointer; }
+.inv-card-inner { padding:13px 14px 13px 16px; display:flex; align-items:flex-start; gap:11px; }
+.inv-left-bar { position:absolute; left:0; top:0; bottom:0; width:3px; }
+.inv-card { position:relative; }
+.inv-card.urgent::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--red); border-radius:2px 0 0 2px; }
+.inv-card.warn::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--warn2); border-radius:2px 0 0 2px; }
+.inv-card.ok::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--ok2); border-radius:2px 0 0 2px; }
+.inv-grade-box { width:40px; height:40px; border-radius:11px; background:var(--red-s); color:var(--red); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; flex-shrink:0; letter-spacing:0.3px; }
+.inv-grade-box.g2{background:var(--warn-s);color:var(--warn);}
+.inv-grade-box.g3{background:var(--bg3);color:var(--t3);}
+.inv-info { flex:1; }
+.inv-nm { font-size:13px; font-weight:800; color:var(--t1); letter-spacing:-0.3px; margin-bottom:3px; }
+.inv-sub { font-size:11px; color:var(--t3); }
+.inv-right2 { text-align:right; flex-shrink:0; }
+.inv-wt { font-size:12px; font-weight:600; color:var(--t2); margin-bottom:4px; }
+.inv-price-row { padding:0 14px 12px 16px; display:flex; gap:0; border-top:1px solid var(--bg2); }
+.inv-pr-item { flex:1; text-align:center; padding:8px 0; }
+.inv-pr-item:not(:last-child) { border-right:1px solid var(--bg2); }
+.inv-pr-key { font-size:9px; color:var(--t4); margin-bottom:3px; }
+.inv-pr-val { font-size:12px; font-weight:700; color:var(--t1); }
+.inv-pr-val.margin-good{color:var(--ok2);}
+.inv-pr-val.margin-bad{color:var(--red);}
+.floor { height:14px; }
+
+/* ─────────── 3. 조회 (SCAN) ─────────── */
+.scan-tabs { display:flex; background:var(--white); border-bottom:1px solid var(--border); }
+.s-tab { flex:1; padding:12px 0; text-align:center; font-size:13px; font-weight:600; color:var(--t3); cursor:pointer; border-bottom:2px solid transparent; transition:all 0.2s; }
+.s-tab.on { color:var(--red); border-bottom-color:var(--red); font-weight:800; }
+.api-banner { margin:12px 16px 0; border-radius:12px; padding:11px 14px; display:flex; align-items:center; gap:10px; }
+.api-banner.ok-b { background:var(--ok-s); }
+.api-banner.warn-b { background:var(--pur-s); }
+.api-banner i { width:16px; height:16px; flex-shrink:0; stroke-width:2; }
+.api-txt { flex:1; }
+.api-ttl { font-size:12px; font-weight:700; }
+.api-sb2 { font-size:10px; margin-top:1px; }
+.scan-hero { margin:12px 16px 0; background:var(--white); border-radius:var(--r2); box-shadow:var(--sh); overflow:hidden; }
+.scan-hero-top { padding:18px 20px; text-align:center; background:linear-gradient(135deg,var(--t1) 0%,#1E293B 100%); }
+.scan-hero-ic { width:64px; height:64px; background:rgba(255,255,255,0.1); border-radius:20px; display:flex; align-items:center; justify-content:center; margin:0 auto 12px; }
+.scan-hero-ic i { width:32px; height:32px; color:#fff; stroke-width:1.8; }
+.scan-hero-ttl { font-size:15px; font-weight:800; color:#fff; margin-bottom:6px; letter-spacing:-0.3px; }
+.scan-hero-sb { font-size:11px; color:rgba(255,255,255,0.55); }
+.scan-hero-btn { margin:16px; background:var(--red); color:#fff; border-radius:13px; padding:14px; text-align:center; font-size:14px; font-weight:800; cursor:pointer; box-shadow:0 4px 16px rgba(185,28,28,0.35); letter-spacing:-0.3px; display:flex; align-items:center; justify-content:center; gap:8px; }
+.scan-hero-btn i { width:18px; height:18px; stroke-width:2.5; }
+.divider-or { padding:0 20px; display:flex; align-items:center; gap:12px; margin-top:16px; }
+.divider-or::before, .divider-or::after { content:''; flex:1; height:1px; background:var(--border); }
+.divider-or span { font-size:11px; color:var(--t4); font-weight:600; }
+.manual-wrap { margin:12px 16px 0; background:var(--white); border-radius:var(--r); box-shadow:var(--sh); padding:3px; display:flex; gap:0; }
+.manual-input { flex:1; padding:11px 14px; font-size:13px; color:var(--t1); background:transparent; font-family:'Outfit',sans-serif; }
+.manual-btn { background:var(--red); color:#fff; border-radius:13px; padding:10px 16px; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px; flex-shrink:0; }
+.manual-btn i { width:15px; height:15px; stroke-width:2.5; }
+.recent-list { padding:0 16px; display:flex; flex-direction:column; gap:7px; }
+.recent-item { background:var(--white); border-radius:var(--r); padding:12px 14px; display:flex; align-items:center; gap:12px; box-shadow:var(--sh); cursor:pointer; }
+.recent-ic { width:36px; height:36px; border-radius:10px; background:var(--bg2); color:var(--t3); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.recent-ic i { width:17px; height:17px; stroke-width:2; }
+.recent-nm { font-size:12px; font-weight:700; color:var(--t1); margin-bottom:2px; font-family:'Outfit',monospace; letter-spacing:0.5px; }
+.recent-info { font-size:10px; color:var(--t3); }
+.recent-time { font-size:10px; color:var(--t4); flex-shrink:0; }
+
+/* ─────────── 4. 서류 (DOCUMENTS) ─────────── */
+.doc-sc-grid { padding:16px 16px 0; display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+.sc-btn { background:var(--white); border-radius:var(--r); padding:14px 8px; display:flex; flex-direction:column; align-items:center; gap:8px; box-shadow:var(--sh); cursor:pointer; transition:transform 0.15s; position:relative; }
+.sc-btn:active{transform:scale(0.94);}
+.sc-ic { width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; }
+.sc-ic i { width:22px; height:22px; stroke-width:1.9; }
+.sc-lb { font-size:11px; font-weight:700; color:var(--t2); text-align:center; }
+.plan-bdg { position:absolute; top:7px; right:7px; font-size:8px; font-weight:800; padding:2px 5px; border-radius:4px; }
+.bdg-basic{background:#D1FAE5;color:#065F46;} .bdg-pro{background:#FEE2E2;color:#991B1B;}
+.doc-list { padding:0 16px; display:flex; flex-direction:column; gap:7px; }
+.doc-item { background:var(--white); border-radius:var(--r); padding:13px 15px; display:flex; align-items:center; gap:13px; box-shadow:var(--sh); cursor:pointer; }
+.doc-ic { width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.doc-ic i { width:20px; height:20px; stroke-width:2; }
+.doc-tx { flex:1; }
+.doc-nm { font-size:13px; font-weight:700; color:var(--t1); margin-bottom:2px; }
+.doc-sb { font-size:11px; color:var(--t3); }
+.bulk-btn { margin:14px 16px 0; background:var(--t1); border-radius:var(--r); padding:15px 18px; display:flex; align-items:center; gap:12px; box-shadow:0 6px 20px rgba(15,23,42,0.25); cursor:pointer; }
+.bulk-ic { width:44px; height:44px; border-radius:13px; background:rgba(255,255,255,0.12); display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; }
+.bulk-ic i { width:22px; height:22px; stroke-width:2; }
+.bulk-tx { flex:1; }
+.bulk-ttl { font-size:14px; font-weight:800; color:#fff; margin-bottom:2px; letter-spacing:-0.3px; }
+.bulk-sb { font-size:10px; color:rgba(255,255,255,0.55); }
+.bulk-arr i { width:18px; height:18px; color:rgba(255,255,255,0.4); stroke-width:2.5; }
+.plan-notice { margin:10px 16px 0; background:var(--warn-s); border:1px solid rgba(180,83,9,0.15); border-radius:12px; padding:11px 14px; display:flex; align-items:flex-start; gap:9px; }
+.plan-notice i { width:15px; height:15px; color:var(--warn); flex-shrink:0; stroke-width:2.5; margin-top:1px; }
+.plan-notice p { font-size:11px; color:var(--warn); font-weight:500; line-height:1.5; }
+
+/* ─────────── 5. 위생 (HYGIENE) ─────────── */
+.hg-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:14px 16px; background:var(--white); border-bottom:1px solid var(--border); }
+.hg-stat { text-align:center; }
+.hg-val { font-size:22px; font-weight:900; color:var(--t1); letter-spacing:-1px; margin-bottom:2px; }
+.hg-val.r{color:var(--red);} .hg-val.g{color:var(--ok2);}
+.hg-lbl { font-size:10px; color:var(--t3); }
+.hg-actions { padding:14px 16px; display:flex; gap:8px; border-bottom:1px solid var(--border); background:var(--white); }
+.hg-btn-p { flex:1; background:var(--red); color:#fff; border-radius:12px; padding:12px 0; text-align:center; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(185,28,28,0.28); display:flex; align-items:center; justify-content:center; gap:6px; }
+.hg-btn-p i { width:16px; height:16px; stroke-width:2.5; }
+.hg-btn-s { flex:1; background:var(--bg2); color:var(--t2); border-radius:12px; padding:12px 0; text-align:center; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+.hg-btn-s i { width:16px; height:16px; stroke-width:2; }
+.hg-list { padding:0 16px; display:flex; flex-direction:column; gap:8px; }
+.hg-card { background:var(--white); border-radius:var(--r); box-shadow:var(--sh); overflow:hidden; cursor:pointer; }
+.hg-card-hdr { padding:12px 15px; display:flex; align-items:center; gap:11px; }
+.hg-card-ic { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.hg-card-ic i { width:18px; height:18px; stroke-width:2; }
+.hg-card-body { flex:1; }
+.hg-card-date { font-size:12px; font-weight:700; color:var(--t1); margin-bottom:2px; }
+.hg-card-sb { font-size:11px; color:var(--t3); }
+.hg-card-foot { padding:8px 15px; border-top:1px solid var(--bg2); background:var(--bg2); display:flex; align-items:center; gap:6px; }
+.hg-card-foot i { width:13px; height:13px; stroke-width:2; }
+.hg-card-foot span { font-size:10px; color:var(--t3); font-weight:600; }
+
+/* ─────────── 6. 숙성 (AGING) ─────────── */
+.ag-stats { display:flex; background:var(--white); border-bottom:1px solid var(--border); }
+.ag-stat { flex:1; padding:14px 10px; text-align:center; }
+.ag-stat:not(:last-child) { border-right:1px solid var(--border); }
+.ag-val { font-size:22px; font-weight:900; color:var(--t1); letter-spacing:-1px; margin-bottom:2px; }
+.ag-val.r{color:var(--red);} .ag-val.b{color:var(--blue2);}
+.ag-lbl { font-size:10px; color:var(--t3); }
+.ag-seg { display:flex; background:var(--white); padding:10px 16px; gap:6px; border-bottom:1px solid var(--border); }
+.ag-seg-btn { flex:1; padding:8px 0; text-align:center; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.2s; }
+.ag-seg-btn.on { background:var(--red); color:#fff; box-shadow:0 3px 10px rgba(185,28,28,0.28); }
+.ag-seg-btn.off { background:var(--bg2); color:var(--t3); }
+.ag-list { padding:12px 16px; display:flex; flex-direction:column; gap:9px; }
+.ag-card { background:var(--white); border-radius:var(--r); box-shadow:var(--sh); overflow:hidden; cursor:pointer; }
+.ag-card-hdr { padding:13px 14px; display:flex; align-items:center; gap:10px; }
+.ag-grade { width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:900; flex-shrink:0; }
+.ag-grade.g1{background:var(--red-s);color:var(--red);}
+.ag-grade.g2{background:var(--warn-s);color:var(--warn);}
+.ag-grade.gf{background:var(--ok-s);color:var(--ok);}
+.ag-info { flex:1; }
+.ag-nm { font-size:13px; font-weight:800; color:var(--t1); letter-spacing:-0.3px; margin-bottom:3px; }
+.ag-meta { font-size:11px; color:var(--t3); }
+.ag-days { text-align:right; flex-shrink:0; }
+.ag-day-num { font-size:26px; font-weight:900; color:var(--t1); letter-spacing:-1.5px; line-height:1; }
+.ag-day-lbl { font-size:10px; color:var(--t3); text-align:right; }
+.ag-progress { padding:0 14px 13px; }
+.ag-bar-track { height:5px; background:var(--bg3); border-radius:10px; overflow:hidden; margin-bottom:5px; }
+.ag-bar-fill { height:100%; border-radius:10px; background:linear-gradient(to right,var(--red),var(--red3)); animation:gfill 0.9s cubic-bezier(0.16,1,0.3,1) forwards; transform:scaleX(0); transform-origin:left; }
+.ag-bar-fill.done{background:linear-gradient(to right,var(--ok),var(--ok2));}
+.ag-bar-fill.near{background:linear-gradient(to right,var(--warn),var(--warn2));}
+.ag-pct-row { display:flex; justify-content:space-between; align-items:center; }
+.ag-pct { font-size:11px; font-weight:700; color:var(--t3); }
+.ag-fab { position:absolute; bottom:84px; right:20px; width:52px; height:52px; background:var(--red); border-radius:18px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 6px 20px rgba(185,28,28,0.40); z-index:50; }
+.ag-fab i { width:24px; height:24px; color:#fff; stroke-width:2.5; }
+
+/* ─────────── 7. 정산 (CLOSING) ─────────── */
+.cl-hero { margin:14px 16px 0; background:linear-gradient(135deg,var(--t1) 0%,#1E293B 100%); border-radius:var(--r2); padding:20px; box-shadow:0 8px 28px rgba(15,23,42,0.28); position:relative; overflow:hidden; }
+.cl-hero::before { content:''; position:absolute; top:-30px; right:-30px; width:120px; height:120px; background:rgba(255,255,255,0.04); border-radius:50%; }
+.cl-lbl { font-size:11px; color:rgba(255,255,255,0.55); font-weight:600; margin-bottom:8px; letter-spacing:1px; text-transform:uppercase; }
+.cl-amount { font-size:40px; font-weight:900; color:#fff; letter-spacing:-1px; margin-bottom:20px; line-height:1.1; }
+.cl-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.cl-s { background:rgba(255,255,255,0.10); border-radius:12px; padding:14px 8px; text-align:center; border:1px solid rgba(255,255,255,0.08); }
+.cl-s-val { font-size:20px; font-weight:900; color:#fff; letter-spacing:-0.5px; line-height:1.1; margin-bottom:5px; }
+.cl-s-val.g{color:#4ADE80;} .cl-s-val.r{color:#FC8181;}
+.cl-s-lbl { font-size:10px; color:rgba(255,255,255,0.45); font-weight:600; line-height:1.3; }
+.cl-section { padding:0 16px; display:flex; flex-direction:column; gap:7px; }
+.cl-item { background:var(--white); border-radius:var(--r); padding:12px 14px; display:flex; align-items:center; gap:11px; box-shadow:var(--sh); cursor:pointer; }
+.cl-item-ic { width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.cl-item-ic i { width:18px; height:18px; stroke-width:2; }
+.cl-item-body { flex:1; }
+.cl-item-nm { font-size:13px; font-weight:700; color:var(--t1); margin-bottom:2px; }
+.cl-item-sb { font-size:11px; color:var(--t3); }
+.cl-item-amt { font-size:14px; font-weight:800; color:var(--t1); letter-spacing:-0.5px; flex-shrink:0; }
+.cl-item-amt.r{color:var(--red);}
+.cl-add-btn { margin:0 16px; background:var(--bg2); border-radius:12px; padding:11px 14px; display:flex; align-items:center; justify-content:center; gap:7px; cursor:pointer; border:1.5px dashed var(--border); }
+.cl-add-btn i { width:16px; height:16px; color:var(--t3); stroke-width:2.5; }
+.cl-add-btn span { font-size:12px; font-weight:600; color:var(--t3); }
+.cl-pdf-btn { margin:14px 16px 0; background:var(--red); border-radius:var(--r); padding:15px; text-align:center; color:#fff; font-size:14px; font-weight:800; cursor:pointer; box-shadow:var(--sh-r,0 6px 20px rgba(185,28,28,0.3)); display:flex; align-items:center; justify-content:center; gap:8px; letter-spacing:-0.3px; }
+.cl-pdf-btn i { width:18px; height:18px; stroke-width:2.5; }
+
+/* ─────────── 8. 설정 (SETTINGS) ─────────── */
+.stt-profile { margin:14px 16px 0; background:var(--white); border-radius:var(--r2); padding:20px; box-shadow:var(--sh); display:flex; gap:15px; align-items:center; }
+.stt-avatar { width:56px; height:56px; border-radius:18px; background:linear-gradient(135deg,var(--red),var(--red2)); display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:900; color:#fff; flex-shrink:0; box-shadow:0 4px 14px rgba(185,28,28,0.3); }
+.stt-info { flex:1; }
+.stt-nm { font-size:18px; font-weight:900; color:var(--t1); letter-spacing:-0.5px; margin-bottom:2px; }
+.stt-email { font-size:12px; color:var(--t3); margin-bottom:8px; }
+.stt-plan { font-size:11px; font-weight:800; padding:4px 10px; border-radius:20px; display:inline-block; background:linear-gradient(135deg,#4ADE80,#16A34A); color:#fff; }
+.stt-section { padding:0 16px; display:flex; flex-direction:column; gap:7px; }
+.stt-card { background:var(--white); border-radius:var(--r); box-shadow:var(--sh); overflow:hidden; }
+.stt-row { padding:13px 15px; display:flex; align-items:center; gap:12px; }
+.stt-row:not(:last-child) { border-bottom:1px solid var(--bg2); }
+.stt-row-ic { width:36px; height:36px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.stt-row-ic i { width:17px; height:17px; stroke-width:2; }
+.stt-row-body { flex:1; }
+.stt-row-nm { font-size:13px; font-weight:700; color:var(--t1); margin-bottom:1px; }
+.stt-row-sb { font-size:11px; color:var(--t3); }
+.stt-row-right { flex-shrink:0; }
+.toggle { width:44px; height:26px; border-radius:13px; position:relative; cursor:pointer; transition:background 0.2s; }
+.toggle.on { background:var(--ok2); } .toggle.off { background:var(--bg3); }
+.toggle-dot { position:absolute; top:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left 0.2s; box-shadow:0 1px 4px rgba(0,0,0,0.15); }
+.toggle.on .toggle-dot { left:21px; } .toggle.off .toggle-dot { left:3px; }
+.stt-chevron i { width:16px; height:16px; color:var(--t4); stroke-width:2.5; }
+.staff-item { padding:12px 15px; display:flex; align-items:center; gap:11px; }
+.staff-item:not(:last-child) { border-bottom:1px solid var(--bg2); }
+.staff-av { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:#fff; flex-shrink:0; }
+.staff-info { flex:1; }
+.staff-nm { font-size:13px; font-weight:700; color:var(--t1); }
+.staff-role { font-size:10px; color:var(--t3); margin-top:1px; }
+.staff-dots i { width:16px; height:16px; color:var(--t4); stroke-width:2; }
+</style>
+</head>
+<body>
+
+<div class="pg-title">🥩 MeatBig — 전체 화면 미리보기</div>
+
+<div class="nav-bar">
+  <button class="nav-btn active" onclick="sw(0,this)">🏠 홈</button>
+  <button class="nav-btn" onclick="sw(1,this)">📦 재고</button>
+  <button class="nav-btn" onclick="sw(2,this)">🔍 조회</button>
+  <button class="nav-btn" onclick="sw(3,this)">📄 서류</button>
+  <button class="nav-btn" onclick="sw(4,this)">🧼 위생</button>
+  <button class="nav-btn" onclick="sw(5,this)">🥩 숙성</button>
+  <button class="nav-btn" onclick="sw(6,this)">💰 정산</button>
+  <button class="nav-btn" onclick="sw(7,this)">⚙️ 설정</button>
+</div>
+
+<div class="device">
+  <div class="island"><div class="is-pill"></div><div class="is-cam"></div></div>
+  <div class="screen">
+
+  <!-- ══════════ PAGE 0: 홈 ══════════ -->
+  <div class="page active" id="p0">
+    <div class="sb"><span class="sb-time" id="clk">9:41</span><div class="sb-r"><div class="sb-sig"><span style="height:4px"></span><span style="height:7px"></span><span style="height:10px"></span><span style="height:13px"></span></div><div class="sb-batt"><div class="sb-bf"></div></div></div></div>
+    <div class="hdr-white">
+      <div class="hdr-top"><div class="brand"><div class="brand-ic"><i data-lucide="beef"></i></div><span class="brand-nm">MeatBig</span></div><div class="hdr-btn"><i data-lucide="bell"></i><div class="n-dot"></div></div></div>
+      <div class="hdr-info"><div class="hdr-date" id="dt">토요일, 4월 12일</div><div class="hdr-store">한우직판장 <em>사장님</em></div></div>
+    </div>
+    <div class="search-row"><div class="search"><i data-lucide="search"></i><span>재고명, 등급으로 검색...</span></div></div>
+    <div class="chips"><div class="chip c-on">전체</div><div class="chip c-off">한우</div><div class="chip c-off">수입육</div><div class="chip c-warn">⚠ 임박 3건</div><div class="chip c-off">숙성중</div></div>
+    <div class="loss-banner"><div class="loss-stripe"></div><div class="loss-in"><div class="loss-ic"><i data-lucide="triangle-alert"></i></div><div class="loss-tx"><div class="loss-ttl">3일 내 손실 위험 3건</div><div class="loss-sb">한우등심 D-1 · 목심 D-2 · 한우갈비 D-3</div></div><div class="loss-rc"><div class="loss-am">₩384,000</div><div class="loss-lbl">손실 예상액</div></div></div></div>
+    <div class="stats-row">
+      <div class="stat st-r"><div class="stat-ic ic-r"><i data-lucide="package"></i></div><div class="stat-n n-r">12</div><div class="stat-l">재고<br>종류</div></div>
+      <div class="stat st-w"><div class="stat-ic ic-w"><i data-lucide="clock-alert"></i></div><div class="stat-n n-w">3</div><div class="stat-l">소비기한<br>임박</div></div>
+      <div class="stat st-g"><div class="stat-ic ic-g"><i data-lucide="clipboard-check"></i></div><div class="stat-n n-g">2/3</div><div class="stat-l">오늘<br>점검</div></div>
+    </div>
+    <div class="sec"><span class="sec-t">오늘의 점검</span><span class="sec-a">전체보기 <i data-lucide="chevron-right"></i></span></div>
+    <div class="checks">
+      <div class="ck ck-r"><div class="ck-ic ic-r"><i data-lucide="scan-search"></i></div><div class="ck-b2"><div class="ck-nm">이력번호 조회</div><div class="ck-sb">미처리 항목 2건이 있어요</div></div><div class="pill p-r">2건 미완</div></div>
+      <div class="ck ck-w"><div class="ck-ic ic-w"><i data-lucide="shield-check"></i></div><div class="ck-b2"><div class="ck-nm">위생 점검</div><div class="ck-sb">오늘 점검을 완료해주세요</div></div><div class="pill p-w">미완료</div></div>
+      <div class="ck ck-b"><div class="ck-ic ic-b"><i data-lucide="thermometer"></i></div><div class="ck-b2"><div class="ck-nm">냉장고 온도</div><div class="ck-sb">오늘 기록을 입력해주세요</div></div><div class="pill p-b">기록 필요</div></div>
+    </div>
+    <div class="sec"><span class="sec-t">재고 현황</span><span class="sec-a">더보기 <i data-lucide="chevron-right"></i></span></div>
+    <div class="inv-grid">
+      <div class="ic-card"><div class="ic-photo ph1"><div class="ic-bs"><span class="ic-gr">1++</span><span class="ic-dd dd-r">D-1</span></div><div class="ic-photo-i"><i data-lucide="beef"></i></div></div><div class="ic-bd"><div class="ic-nm">한우 등심</div><div class="ic-qt">2.4kg · 냉장 2℃</div><div class="ic-pr">₩192,000</div><div class="gauge" style="margin-top:8px"><div class="gf gf-r" style="width:85%;animation-delay:.1s"></div></div></div></div>
+      <div class="ic-card"><div class="ic-photo ph2"><div class="ic-bs"><span class="ic-gr">1+</span><span class="ic-dd dd-r">D-2</span></div><div class="ic-photo-i"><i data-lucide="beef"></i></div></div><div class="ic-bd"><div class="ic-nm">목심</div><div class="ic-qt">4.1kg · 냉장 2℃</div><div class="ic-pr">₩98,000</div><div class="gauge" style="margin-top:8px"><div class="gf gf-r" style="width:72%;animation-delay:.2s"></div></div></div></div>
+      <div class="ic-card"><div class="ic-photo ph3"><div class="ic-bs"><span class="ic-gr">1+</span><span class="ic-dd dd-w">D-7</span></div><div class="ic-photo-i"><i data-lucide="beef"></i></div></div><div class="ic-bd"><div class="ic-nm">한우 갈비</div><div class="ic-qt">6.8kg · 냉장 2℃</div><div class="ic-pr">₩340,000</div><div class="gauge" style="margin-top:8px"><div class="gf gf-w" style="width:55%;animation-delay:.3s"></div></div></div></div>
+      <div class="ic-card"><div class="ic-photo ph4"><div class="ic-bs"><span class="ic-gr">수입</span><span class="ic-dd dd-g">D-14</span></div><div class="ic-photo-i"><i data-lucide="beef"></i></div></div><div class="ic-bd"><div class="ic-nm">삼겹살</div><div class="ic-qt">8.2kg · 냉장 1℃</div><div class="ic-pr">₩73,800</div><div class="gauge" style="margin-top:8px"><div class="gf gf-g" style="width:35%;animation-delay:.4s"></div></div></div></div>
+    </div>
+    <div class="sec"><span class="sec-t">마진 분석</span></div>
+    <div class="mg-wrap">
+      <div class="mg-tabs"><div class="mg-tab on" onclick="mgS('t',this)">상위 마진</div><div class="mg-tab" onclick="mgS('l',this)">주의 마진</div></div>
+      <div class="mg-panel show" id="mg-t"><div class="mg-row"><div class="mg-rnk mr-g">1</div><div class="mg-nm">한우 등심 1++</div><div class="mg-bw"><div class="mg-bt"><div class="mg-bf mbf-g" style="width:78%;--d:.06"></div></div></div><div class="mg-pc mc-g">38%</div></div><div class="mg-row"><div class="mg-rnk mr-g">2</div><div class="mg-nm">한우 안심 1+</div><div class="mg-bw"><div class="mg-bt"><div class="mg-bf mbf-g" style="width:64%;--d:.12"></div></div></div><div class="mg-pc mc-g">32%</div></div><div class="mg-row"><div class="mg-rnk mr-g">3</div><div class="mg-nm">한우 갈비 1+</div><div class="mg-bw"><div class="mg-bt"><div class="mg-bf mbf-g" style="width:56%;--d:.18"></div></div></div><div class="mg-pc mc-g">28%</div></div></div>
+      <div class="mg-panel" id="mg-l"><div class="mg-row"><div class="mg-rnk mr-w">!</div><div class="mg-nm">수입 삼겹살</div><div class="mg-bw"><div class="mg-bt"><div class="mg-bf mbf-w" style="width:20%;--d:.06"></div></div></div><div class="mg-pc mc-w">8%</div></div><div class="mg-row"><div class="mg-rnk mr-w">!</div><div class="mg-nm">수입 목심</div><div class="mg-bw"><div class="mg-bt"><div class="mg-bf mbf-w" style="width:26%;--d:.12"></div></div></div><div class="mg-pc mc-w">10%</div></div></div>
+    </div>
+    <div class="sec"><span class="sec-t">빠른 실행</span></div>
+    <div class="qk-wrap"><div class="qk-grid">
+      <div class="qk qk-main"><div class="qk-ic"><i data-lucide="scan-line"></i></div><span class="qk-lb">이력 스캔</span></div>
+      <div class="qk"><span class="qk-bdg">미완</span><div class="qk-ic ic-w"><i data-lucide="shield-check"></i></div><span class="qk-lb">위생 일지</span></div>
+      <div class="qk"><div class="qk-ic ic-r"><i data-lucide="beef"></i></div><span class="qk-lb">숙성 관리</span></div>
+      <div class="qk"><div class="qk-ic"><i data-lucide="file-text"></i></div><span class="qk-lb">서류 출력</span></div>
+      <div class="qk"><div class="qk-ic"><i data-lucide="calculator"></i></div><span class="qk-lb">마감 정산</span></div>
+      <div class="qk"><div class="qk-ic"><i data-lucide="package"></i></div><span class="qk-lb">재고 확인</span></div>
+    </div></div>
+    <div class="floor"></div>
+    <div class="tabbar"><div class="ti on"><div class="ti-ic"><i data-lucide="house"></i></div><span class="ti-lb">홈</span><div class="ti-dot"></div></div><div class="ti"><div class="ti-ic"><i data-lucide="package"></i></div><span class="ti-lb">재고</span></div><div class="ti"><div class="ti-ic"><i data-lucide="scan-search"></i></div><span class="ti-lb">조회</span></div><div class="ti"><div class="ti-ic"><i data-lucide="file-text"></i></div><span class="ti-lb">서류</span></div><div class="ti"><div class="ti-ic"><i data-lucide="settings-2"></i></div><span class="ti-lb">설정</span></div></div>
+  </div>
+
+  <!-- ══════════ PAGE 1: 재고 ══════════ -->
+  <div class="page" id="p1">
+    <div class="sb"><span class="sb-time" id="clk1">9:41</span><div class="sb-r"><div class="sb-sig"><span style="height:4px"></span><span style="height:7px"></span><span style="height:10px"></span><span style="height:13px"></span></div><div class="sb-batt"><div class="sb-bf"></div></div></div></div>
+    <div class="inv-hdr">
+      <div class="inv-hdr-top"><span class="page-title">재고 현황</span><div class="add-btn"><i data-lucide="plus"></i>재고 추가</div></div>
+      <div class="inv-mini-stats">
+        <div class="mini-stat"><div class="ms-label">총 재고</div><div class="ms-val">12<span style="font-size:14px;font-weight:600;color:var(--t3)">건</span></div></div>
+        <div class="mini-stat"><div class="ms-label">소비기한 임박</div><div class="ms-val r">3<span style="font-size:14px;font-weight:600;color:var(--red)">건</span></div></div>
+        <div class="mini-stat"><div class="ms-label">총 재고 가치</div><div class="ms-val" style="font-size:18px">₩1.82M</div></div>
+        <div class="mini-stat"><div class="ms-label">평균 마진율</div><div class="ms-val g">34<span style="font-size:14px;font-weight:600">%</span></div></div>
+      </div>
+      <div class="search-row" style="padding:10px 16px 12px;"><div class="search"><i data-lucide="search"></i><span>재고 검색...</span></div></div>
+      <div class="chips" style="padding:0 16px 12px;"><div class="chip c-on">전체</div><div class="chip c-off">한우</div><div class="chip c-off">수입육</div><div class="chip c-warn">임박</div><div class="chip c-off">냉동</div></div>
+    </div>
+    <div class="inv-list">
+      <div class="inv-card urgent">
+        <div class="inv-card-inner"><div class="inv-grade-box">1++</div><div class="inv-info"><div class="inv-nm">한우 등심</div><div class="inv-sub">원산지: 국내산 한우 · 냉장 2℃</div></div><div class="inv-right2"><div class="inv-wt">2.4 kg</div><div class="pill p-r">D-1</div></div></div>
+        <div class="inv-price-row"><div class="inv-pr-item"><div class="inv-pr-key">매입가</div><div class="inv-pr-val">₩85,000</div></div><div class="inv-pr-item"><div class="inv-pr-key">판매가</div><div class="inv-pr-val">₩142,000</div></div><div class="inv-pr-item"><div class="inv-pr-key">마진</div><div class="inv-pr-val margin-good">40%</div></div></div>
+      </div>
+      <div class="inv-card urgent">
+        <div class="inv-card-inner"><div class="inv-grade-box g2">1+</div><div class="inv-info"><div class="inv-nm">목심</div><div class="inv-sub">원산지: 국내산 한우 · 냉장 2℃</div></div><div class="inv-right2"><div class="inv-wt">4.1 kg</div><div class="pill p-r">D-2</div></div></div>
+        <div class="inv-price-row"><div class="inv-pr-item"><div class="inv-pr-key">매입가</div><div class="inv-pr-val">₩38,000</div></div><div class="inv-pr-item"><div class="inv-pr-key">판매가</div><div class="inv-pr-val">₩62,000</div></div><div class="inv-pr-item"><div class="inv-pr-key">마진</div><div class="inv-pr-val margin-good">39%</div></div></div>
+      </div>
+      <div class="inv-card warn">
+        <div class="inv-card-inner"><div class="inv-grade-box">1+</div><div class="inv-info"><div class="inv-nm">한우 갈비</div><div class="inv-sub">원산지: 국내산 한우 · 냉장 2℃</div></div><div class="inv-right2"><div class="inv-wt">6.8 kg</div><div class="pill p-w">D-7</div></div></div>
+        <div class="inv-price-row"><div class="inv-pr-item"><div class="inv-pr-key">매입가</div><div class="inv-pr-val">₩68,000</div></div><div class="inv-pr-item"><div class="inv-pr-key">판매가</div><div class="inv-pr-val">₩98,000</div></div><div class="inv-pr-item"><div class="inv-pr-key">마진</div><div class="inv-pr-val margin-good">31%</div></div></div>
+      </div>
+      <div class="inv-card ok">
+        <div class="inv-card-inner"><div class="inv-grade-box g3">수입</div><div class="inv-info"><div class="inv-nm">삼겹살</div><div class="inv-sub">원산지: 미국산 · 냉장 1℃</div></div><div class="inv-right2"><div class="inv-wt">8.2 kg</div><div class="pill p-g">D-14</div></div></div>
+        <div class="inv-price-row"><div class="inv-pr-item"><div class="inv-pr-key">매입가</div><div class="inv-pr-val">₩8,500</div></div><div class="inv-pr-item"><div class="inv-pr-key">판매가</div><div class="inv-pr-val">₩9,200</div></div><div class="inv-pr-item"><div class="inv-pr-key">마진</div><div class="inv-pr-val margin-bad">8%</div></div></div>
+      </div>
+    </div>
+    <div class="floor"></div>
+    <div class="tabbar"><div class="ti"><div class="ti-ic"><i data-lucide="house"></i></div><span class="ti-lb">홈</span></div><div class="ti on"><div class="ti-ic"><i data-lucide="package"></i></div><span class="ti-lb">재고</span><div class="ti-dot"></div></div><div class="ti"><div class="ti-ic"><i data-lucide="scan-search"></i></div><span class="ti-lb">조회</span></div><div class="ti"><div class="ti-ic"><i data-lucide="file-text"></i></div><span class="ti-lb">서류</span></div><div class="ti"><div class="ti-ic"><i data-lucide="settings-2"></i></div><span class="ti-lb">설정</span></div></div>
+  </div>
+
+  <!-- ══════════ PAGE 2: 조회 ══════════ -->
+  <div class="page" id="p2">
+    <div class="sb"><span class="sb-time">9:41</span><div class="sb-r"><div class="sb-sig"><span style="height:4px"></span><span style="height:7px"></span><span style="height:10px"></span><span style="height:13px"></span></div><div class="sb-batt"><div class="sb-bf"></div></div></div></div>
+    <div class="hdr-white" style="padding-bottom:0">
+      <div class="hdr-top"><div class="brand"><div class="brand-ic"><i data-lucide="scan-search"></i></div><span class="brand-nm">이력 조회</span></div></div>
+    </div>
+    <div class="scan-tabs"><div class="s-tab on">🏷️ 이력 조회</div><div class="s-tab">📄 서류 OCR</div></div>
+    <div class="api-banner ok-b"><i data-lucide="check-circle-2" style="color:var(--ok2)"></i><div class="api-txt"><div class="api-ttl" style="color:var(--ok)">✅ API 키 설정됨</div><div class="api-sb2" style="color:var(--ok)">실제 이력 조회 가능 상태입니다</div></div></div>
+    <div class="scan-hero">
+      <div class="scan-hero-top">
+        <div class="scan-hero-ic"><i data-lucide="scan-line"></i></div>
+        <div class="scan-hero-ttl">축산물 이력번호 조회</div>
+        <div class="scan-hero-sb">바코드·QR코드를 카메라로 스캔하거나<br>번호를 직접 입력하세요</div>
+      </div>
+      <div class="scan-hero-btn"><i data-lucide="camera"></i>바코드 스캔 시작</div>
+    </div>
+    <div class="divider-or"><span>또는 직접 입력</span></div>
+    <div class="manual-wrap"><input class="manual-input" placeholder="이력번호 15자리 입력..." style="border:none;outline:none;font-size:13px;font-family:'Outfit',sans-serif;color:var(--t1)"><div class="manual-btn"><i data-lucide="search"></i>조회</div></div>
+    <div class="sec"><span class="sec-t">최근 조회 내역</span><span class="sec-a">전체 <i data-lucide="chevron-right"></i></span></div>
+    <div class="recent-list">
+      <div class="recent-item"><div class="recent-ic"><i data-lucide="tag"></i></div><div style="flex:1"><div class="recent-nm">002123456789012</div><div class="recent-info">한우 등심 1++ · 국내산 · 합격</div></div><div class="recent-time">09:23</div></div>
+      <div class="recent-item"><div class="recent-ic"><i data-lucide="tag"></i></div><div style="flex:1"><div class="recent-nm">002198765432100</div><div class="recent-info">한우 갈비 1+ · 국내산 · 합격</div></div><div class="recent-time">어제</div></div>
+      <div class="recent-item"><div class="recent-ic"><i data-lucide="tag"></i></div><div style="flex:1"><div class="recent-nm">003411223344556</div><div class="recent-info">돼지 삼겹살 · 미국산 · 합격</div></div><div class="recent-time">어제</div></div>
+    </div>
+    <div class="floor"></div>
+    <div class="tabbar"><div class="ti"><div class="ti-ic"><i data-lucide="house"></i></div><span class="ti-lb">홈</span></div><div class="ti"><div class="ti-ic"><i data-lucide="package"></i></div><span class="ti-lb">재고</span></div><div class="ti on"><div class="ti-ic"><i data-lucide="scan-search"></i></div><span class="ti-lb">조회</span><div class="ti-dot"></div></div><div class="ti"><div class="ti-ic"><i data-lucide="file-text"></i></div><span class="ti-lb">서류</span></div><div class="ti"><div class="ti-ic"><i data-lucide="settings-2"></i></div><span class="ti-lb">설정</span></div></div>
+  </div>
+
+  <!-- ══════════ PAGE 3: 서류 ══════════ -->
+  <div class="page" id="p3">
+    <div class="sb"><span class="sb-time">9:41</span><div class="sb-r"><div class="sb-sig"><span style="height:4px"></span><span style="height:7px"></span><span style="height:10px"></span><span style="height:13px"></span></div><div class="sb-batt"><div class="sb-bf"></div></div></div></div>
+    <div class="hdr-white"><div class="hdr-top"><div class="brand"><div class="brand-ic"><i data-lucide="file-text"></i></div><span class="brand-nm">서류 관리</span></div></div></div>
+    <div class="doc-sc-grid">
+      <div class="sc-btn"><div class="sc-ic ic-b"><i data-lucide="shield-check"></i></div><span class="sc-lb">위생 일지</span></div>
+      <div class="sc-btn"><div class="sc-ic ic-b"><i data-lucide="thermometer"></i></div><span class="sc-lb">온도 기록</span></div>
+      <div class="sc-btn"><div class="sc-ic ic-r"><i data-lucide="calculator"></i></div><span class="sc-lb">마감 정산</span></div>
+      <div class="sc-btn"><div class="sc-ic ic-w"><i data-lucide="beef"></i></div><span class="sc-lb">숙성 관리</span></div>
+      <div class="sc-btn"><span class="plan-bdg bdg-basic">베이직</span><div class="sc-ic ic-g"><i data-lucide="book-open"></i></div><span class="sc-lb">교육 일지</span></div>
+      <div class="sc-btn"><span class="plan-bdg bdg-pro">프로</span><div class="sc-ic ic-p"><i data-lucide="chart-bar"></i></div><span class="sc-lb">세무 리포트</span></div>
+    </div>
+    <div class="sec"><span class="sec-t">서류 출력</span></div>
+    <div class="doc-list">
+      <div class="doc-item"><div class="doc-ic ic-b"><i data-lucide="shield-check"></i></div><div class="doc-tx"><div class="doc-nm">위생 점검표</div><div class="doc-sb">자체 위생 관리 점검 기록</div></div><div class="pill p-b">출력 가능</div></div>
+      <div class="doc-item"><div class="doc-ic ic-b"><i data-lucide="thermometer"></i></div><div class="doc-tx"><div class="doc-nm">냉장고 온도 기록</div><div class="doc-sb">일별 온도 측정 이력</div></div><div class="pill p-b">출력 가능</div></div>
+      <div class="doc-item"><div class="doc-ic ic-w"><i data-lucide="beef"></i></div><div class="doc-tx"><div class="doc-nm">숙성 관리 대장</div><div class="doc-sb">건식 숙성 이력 및 수율</div></div><div class="pill p-b">출력 가능</div></div>
+      <div class="doc-item"><div class="doc-ic ic-g"><i data-lucide="book-open"></i></div><div class="doc-tx"><div class="doc-nm">교육 일지</div><div class="doc-sb">위생 교육 이수 기록</div></div><div class="pill p-gray">베이직↑</div></div>
+      <div class="doc-item"><div class="doc-ic ic-p"><i data-lucide="chart-bar"></i></div><div class="doc-tx"><div class="doc-nm">세무 리포트</div><div class="doc-sb">월별 매출·원가·마진 분석</div></div><div class="pill p-gray">프로↑</div></div>
+    </div>
+    <div class="bulk-btn"><div class="bulk-ic"><i data-lucide="printer"></i></div><div class="bulk-tx"><div class="bulk-ttl">PDF 일괄 출력</div><div class="bulk-sb">위생·온도·숙성·교육·세무 PDF 생성 및 공유</div></div><div class="bulk-arr"><i data-lucide="chevron-right"></i></div></div>
+    <div class="plan-notice"><i data-lucide="triangle-alert"></i><p>교육일지는 베이직, 세무리포트는 프로 플랜에서 출력 가능합니다.</p></div>
+    <div class="floor"></div>
+    <div class="tabbar"><div class="ti"><div class="ti-ic"><i data-lucide="house"></i></div><span class="ti-lb">홈</span></div><div class="ti"><div class="ti-ic"><i data-lucide="package"></i></div><span class="ti-lb">재고</span></div><div class="ti"><div class="ti-ic"><i data-lucide="scan-search"></i></div><span class="ti-lb">조회</span></div><div class="ti on"><div class="ti-ic"><i data-lucide="file-text"></i></div><span class="ti-lb">서류</span><div class="ti-dot"></div></div><div class="ti"><div class="ti-ic"><i data-lucide="settings-2"></i></div><span class="ti-lb">설정</span></div></div>
+  </div>
+
+  <!-- ══════════ PAGE 4: 위생 ══════════ -->
+  <div class="page" id="p4">
+    <div class="sb"><span class="sb-time">9:41</span><div class="sb-r"><div class="sb-sig"><span style="height:4px"></span><span style="height:7px"></span><span style="height:10px"></span><span style="height:13px"></span></div><div class="sb-batt"><div class="sb-bf"></div></div></div></div>
+    <div class="hdr-white"><div class="hdr-top"><div class="brand"><div class="brand-ic"><i data-lucide="shield-check"></i></div><span class="brand-nm">위생 일지</span></div></div></div>
+    <div class="hg-stats">
+      <div class="hg-stat"><div class="hg-val">4</div><div class="hg-lbl">이번달 점검</div></div>
+      <div class="hg-stat"><div class="hg-val g">100%</div><div class="hg-lbl">통과율</div></div>
+      <div class="hg-stat"><div class="hg-val r">D-3</div><div class="hg-lbl">다음 점검</div></div>
+    </div>
+    <div class="hg-actions">
+      <div class="hg-btn-p"><i data-lucide="plus-circle"></i>새 점검 시작</div>
+      <div class="hg-btn-s"><i data-lucide="chart-bar"></i>월간 리포트</div>
+    </div>
+    <div class="sec"><span class="sec-t">점검 기록</span><span class="sec-a">전체보기 <i data-lucide="chevron-right"></i></span></div>
+    <div class="hg-list">
+      <div class="hg-card"><div class="hg-card-hdr"><div class="hg-card-ic ic-g"><i data-lucide="check-circle-2"></i></div><div class="hg-card-body"><div class="hg-card-date">2026.04.09 · 오전 09:12</div><div class="hg-card-sb">점검자: 김철수 · 전체 18항목</div></div><div class="pill p-g">통과</div></div><div class="hg-card-foot"><i data-lucide="file-down" style="color:var(--t3)"></i><span>탭하여 PDF 내보내기 →</span></div></div>
+      <div class="hg-card"><div class="hg-card-hdr"><div class="hg-card-ic ic-g"><i data-lucide="check-circle-2"></i></div><div class="hg-card-body"><div class="hg-card-date">2026.04.02 · 오전 09:40</div><div class="hg-card-sb">점검자: 김철수 · 전체 18항목</div></div><div class="pill p-g">통과</div></div><div class="hg-card-foot"><i data-lucide="file-down" style="color:var(--t3)"></i><span>탭하여 PDF 내보내기 →</span></div></div>
+      <div class="hg-card"><div class="hg-card-hdr"><div class="hg-card-ic ic-w"><i data-lucide="alert-circle"></i></div><div class="hg-card-body"><div class="hg-card-date">2026.03.26 · 오전 10:05</div><div class="hg-card-sb">점검자: 이영희 · 전체 18항목</div></div><div class="pill p-w">주의</div></div><div class="hg-card-foot"><i data-lucide="file-down" style="color:var(--t3)"></i><span>탭하여 PDF 내보내기 →</span></div></div>
+    </div>
+    <div class="floor"></div>
+    <div class="tabbar"><div class="ti"><div class="ti-ic"><i data-lucide="house"></i></div><span class="ti-lb">홈</span></div><div class="ti"><div class="ti-ic"><i data-lucide="package"></i></div><span class="ti-lb">재고</span></div><div class="ti"><div class="ti-ic"><i data-lucide="scan-search"></i></div><span class="ti-lb">조회</span></div><div class="ti"><div class="ti-ic"><i data-lucide="file-text"></i></div><span class="ti-lb">서류</span></div><div class="ti"><div class="ti-ic"><i data-lucide="settings-2"></i></div><span class="ti-lb">설정</span></div></div>
+  </div>
+
+  <!-- ══════════ PAGE 5: 숙성 ══════════ -->
+  <div class="page" id="p5">
+    <div class="sb"><span class="sb-time">9:41</span><div class="sb-r"><div class="sb-sig"><span style="height:4px"></span><span style="height:7px"></span><span style="height:10px"></span><span style="height:13px"></span></div><div class="sb-batt"><div class="sb-bf"></div></div></div></div>
+    <div class="hdr-white"><div class="hdr-top"><div class="brand"><div class="brand-ic" style="background:var(--warn);box-shadow:0 3px 10px rgba(180,83,9,0.30)"><i data-lucide="beef"></i></div><span class="brand-nm">숙성 관리</span></div></div></div>
+    <div class="ag-stats">
+      <div class="ag-stat"><div class="ag-val r">3</div><div class="ag-lbl">숙성 중</div></div>
+      <div class="ag-stat"><div class="ag-val b">8</div><div class="ag-lbl">완료됨</div></div>
+      <div class="ag-stat"><div class="ag-val">86.2%</div><div class="ag-lbl">평균 수율</div></div>
+    </div>
+    <div class="ag-seg"><div class="ag-seg-btn on">숙성 중 (3)</div><div class="ag-seg-btn off">완료됨 (8)</div></div>
+    <div class="ag-list" style="position:relative">
+      <div class="ag-card">
+        <div class="ag-card-hdr"><div class="ag-grade g1">1++</div><div class="ag-info"><div class="ag-nm">한우 등심</div><div class="ag-meta">002123456789012 · 2026.03.22 입고</div></div><div class="ag-days"><div class="ag-day-num">21</div><div class="ag-day-lbl">/ 28일</div></div></div>
+        <div class="ag-progress"><div class="ag-bar-track"><div class="ag-bar-fill near" style="width:75%;animation-delay:.1s"></div></div><div class="ag-pct-row"><span class="ag-pct">진행률 75%</span><span class="pill p-w" style="font-size:10px">수율 87.2%</span></div></div>
+      </div>
+      <div class="ag-card">
+        <div class="ag-card-hdr"><div class="ag-grade g1">1+</div><div class="ag-info"><div class="ag-nm">한우 채끝</div><div class="ag-meta">002198765432100 · 2026.03.30 입고</div></div><div class="ag-days"><div class="ag-day-num">13</div><div class="ag-day-lbl">/ 21일</div></div></div>
+        <div class="ag-progress"><div class="ag-bar-track"><div class="ag-bar-fill" style="width:62%;animation-delay:.2s"></div></div><div class="ag-pct-row"><span class="ag-pct">진행률 62%</span><span class="pill p-r" style="font-size:10px">수율 88.5%</span></div></div>
+      </div>
+      <div class="ag-card">
+        <div class="ag-card-hdr"><div class="ag-grade g2">1</div><div class="ag-info"><div class="ag-nm">한우 안심</div><div class="ag-meta">002344556677889 · 2026.04.05 입고</div></div><div class="ag-days"><div class="ag-day-num">7</div><div class="ag-day-lbl">/ 14일</div></div></div>
+        <div class="ag-progress"><div class="ag-bar-track"><div class="ag-bar-fill" style="width:50%;animation-delay:.3s"></div></div><div class="ag-pct-row"><span class="ag-pct">진행률 50%</span><span class="pill p-gray" style="font-size:10px">수율 측정 중</span></div></div>
+      </div>
+      <div class="ag-fab" style="position:fixed;bottom:84px;right:calc(50% - 195px + 16px)"><i data-lucide="plus"></i></div>
+    </div>
+    <div class="floor" style="height:60px"></div>
+    <div class="tabbar"><div class="ti"><div class="ti-ic"><i data-lucide="house"></i></div><span class="ti-lb">홈</span></div><div class="ti"><div class="ti-ic"><i data-lucide="package"></i></div><span class="ti-lb">재고</span></div><div class="ti"><div class="ti-ic"><i data-lucide="scan-search"></i></div><span class="ti-lb">조회</span></div><div class="ti"><div class="ti-ic"><i data-lucide="file-text"></i></div><span class="ti-lb">서류</span></div><div class="ti"><div class="ti-ic"><i data-lucide="settings-2"></i></div><span class="ti-lb">설정</span></div></div>
+  </div>
+
+  <!-- ══════════ PAGE 6: 정산 ══════════ -->
+  <div class="page" id="p6">
+    <div class="sb"><span class="sb-time">9:41</span><div class="sb-r"><div class="sb-sig"><span style="height:4px"></span><span style="height:7px"></span><span style="height:10px"></span><span style="height:13px"></span></div><div class="sb-batt"><div class="sb-bf"></div></div></div></div>
+    <div class="hdr-white"><div class="hdr-top"><div class="brand"><div class="brand-ic"><i data-lucide="calculator"></i></div><span class="brand-nm">마감 정산</span></div><div style="font-size:11px;color:var(--t3);font-weight:600">2026.04.12</div></div></div>
+    <div class="cl-hero">
+      <div class="cl-lbl">오늘 총 매출</div>
+      <div class="cl-amount">₩1,250,000</div>
+      <div class="cl-stats">
+        <div class="cl-s"><div class="cl-s-val g">38%</div><div class="cl-s-lbl">추정 마진</div></div>
+        <div class="cl-s"><div class="cl-s-val">₩775K</div><div class="cl-s-lbl">추정 원가</div></div>
+        <div class="cl-s"><div class="cl-s-val">7건</div><div class="cl-s-lbl">판매 건수</div></div>
+      </div>
+    </div>
+    <div class="sec"><span class="sec-t">판매 내역</span><div style="display:flex;align-items:center;gap:6px"><div class="add-btn" style="padding:6px 10px;font-size:11px"><i data-lucide="plus" style="width:13px;height:13px"></i>추가</div></div></div>
+    <div class="cl-section">
+      <div class="cl-item"><div class="cl-item-ic ic-r"><i data-lucide="beef"></i></div><div class="cl-item-body"><div class="cl-item-nm">한우 등심 1++</div><div class="cl-item-sb">09:30 · 800g × 178,000원/kg</div></div><div class="cl-item-amt">₩142,400</div></div>
+      <div class="cl-item"><div class="cl-item-ic ic-r"><i data-lucide="beef"></i></div><div class="cl-item-body"><div class="cl-item-nm">한우 갈비 1+</div><div class="cl-item-sb">11:20 · 1.2kg × 98,000원/kg</div></div><div class="cl-item-amt">₩117,600</div></div>
+      <div class="cl-item"><div class="cl-item-ic ic-w"><i data-lucide="beef"></i></div><div class="cl-item-body"><div class="cl-item-nm">목심 1+</div><div class="cl-item-sb">13:45 · 2.0kg × 62,000원/kg</div></div><div class="cl-item-amt">₩124,000</div></div>
+      <div class="cl-add-btn"><i data-lucide="plus"></i><span>판매 내역 추가</span></div>
+    </div>
+    <div class="sec"><span class="sec-t">폐기 내역</span></div>
+    <div class="cl-section">
+      <div class="cl-item"><div class="cl-item-ic ic-r"><i data-lucide="trash-2"></i></div><div class="cl-item-body"><div class="cl-item-nm">목심 1+</div><div class="cl-item-sb">300g · 유통기한 초과</div></div><div class="cl-item-amt r">-₩11,400</div></div>
+      <div class="cl-add-btn"><i data-lucide="plus"></i><span>폐기 내역 추가</span></div>
+    </div>
+    <div class="cl-pdf-btn"><i data-lucide="file-down"></i>정산 PDF 저장</div>
+    <div class="floor"></div>
+    <div class="tabbar"><div class="ti"><div class="ti-ic"><i data-lucide="house"></i></div><span class="ti-lb">홈</span></div><div class="ti"><div class="ti-ic"><i data-lucide="package"></i></div><span class="ti-lb">재고</span></div><div class="ti"><div class="ti-ic"><i data-lucide="scan-search"></i></div><span class="ti-lb">조회</span></div><div class="ti"><div class="ti-ic"><i data-lucide="file-text"></i></div><span class="ti-lb">서류</span></div><div class="ti"><div class="ti-ic"><i data-lucide="settings-2"></i></div><span class="ti-lb">설정</span></div></div>
+  </div>
+
+  <!-- ══════════ PAGE 7: 설정 ══════════ -->
+  <div class="page" id="p7">
+    <div class="sb"><span class="sb-time">9:41</span><div class="sb-r"><div class="sb-sig"><span style="height:4px"></span><span style="height:7px"></span><span style="height:10px"></span><span style="height:13px"></span></div><div class="sb-batt"><div class="sb-bf"></div></div></div></div>
+    <div class="hdr-white"><div class="hdr-top"><div class="brand"><div class="brand-ic"><i data-lucide="settings-2"></i></div><span class="brand-nm">설정</span></div></div></div>
+    <div class="stt-profile"><div class="stt-avatar">한</div><div class="stt-info"><div class="stt-nm">한우직판장</div><div class="stt-email">owner@hanwoo.kr</div><div class="stt-plan">프로 플랜</div></div></div>
+    <div class="sec"><span class="sec-t">계정 관리</span></div>
+    <div class="stt-section">
+      <div class="stt-card">
+        <div class="stt-row"><div class="stt-row-ic ic-r"><i data-lucide="crown"></i></div><div class="stt-row-body"><div class="stt-row-nm">현재 역할</div><div class="stt-row-sb">👑 사장 모드 활성화됨</div></div><div class="stt-row-right"><div class="pill p-r">사장</div></div></div>
+        <div class="stt-row"><div class="stt-row-ic ic-b"><i data-lucide="key-round"></i></div><div class="stt-row-body"><div class="stt-row-nm">사장 PIN</div><div class="stt-row-sb">●●●●  변경하기</div></div><div class="stt-row-right stt-chevron"><i data-lucide="chevron-right"></i></div></div>
+      </div>
+      <div class="stt-card">
+        <div class="stt-row"><div class="stt-row-ic" style="background:var(--bg2);color:var(--t2)"><i data-lucide="moon"></i></div><div class="stt-row-body"><div class="stt-row-nm">다크 모드</div><div class="stt-row-sb">어두운 테마 사용</div></div><div class="stt-row-right"><div class="toggle off"><div class="toggle-dot"></div></div></div></div>
+        <div class="stt-row"><div class="stt-row-ic" style="background:var(--bg2);color:var(--t2)"><i data-lucide="bell"></i></div><div class="stt-row-body"><div class="stt-row-nm">알림</div><div class="stt-row-sb">소비기한 임박 알림</div></div><div class="stt-row-right"><div class="toggle on"><div class="toggle-dot"></div></div></div></div>
+      </div>
+    </div>
+    <div class="sec"><span class="sec-t">직원 관리</span><span class="sec-a">추가 <i data-lucide="chevron-right"></i></span></div>
+    <div class="stt-section">
+      <div class="stt-card">
+        <div class="staff-item"><div class="staff-av" style="background:linear-gradient(135deg,#1D4ED8,#2563EB)">김</div><div class="staff-info"><div class="staff-nm">김철수</div><div class="staff-role">직원 · 위생 보건증 2027.03.15</div></div><div class="staff-dots"><i data-lucide="more-vertical"></i></div></div>
+        <div class="staff-item"><div class="staff-av" style="background:linear-gradient(135deg,#15803D,#16A34A)">이</div><div class="staff-info"><div class="staff-nm">이영희</div><div class="staff-role">직원 · 위생 보건증 2026.11.20</div></div><div class="staff-dots"><i data-lucide="more-vertical"></i></div></div>
+      </div>
+    </div>
+    <div class="sec"><span class="sec-t" style="color:var(--t3);font-size:11px;font-weight:500">MeatBig v2.4.1 · 최신 상태</span></div>
+    <div class="floor"></div>
+    <div class="tabbar"><div class="ti"><div class="ti-ic"><i data-lucide="house"></i></div><span class="ti-lb">홈</span></div><div class="ti"><div class="ti-ic"><i data-lucide="package"></i></div><span class="ti-lb">재고</span></div><div class="ti"><div class="ti-ic"><i data-lucide="scan-search"></i></div><span class="ti-lb">조회</span></div><div class="ti"><div class="ti-ic"><i data-lucide="file-text"></i></div><span class="ti-lb">서류</span></div><div class="ti on"><div class="ti-ic"><i data-lucide="settings-2"></i></div><span class="ti-lb">설정</span><div class="ti-dot"></div></div></div>
+  </div>
+
+  </div><!-- /screen -->
+</div><!-- /device -->
+
+<script>
+lucide.createIcons();
+function tick(){const d=new Date();const t=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');['clk','clk1'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=t;});const days=['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];const el=document.getElementById('dt');if(el)el.textContent=days[d.getDay()]+', '+(d.getMonth()+1)+'월 '+d.getDate()+'일';}
+tick();setInterval(tick,1000);
+function sw(n,btn){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('p'+n).classList.add('active');document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelector('.screen').scrollTop=0;setTimeout(()=>{lucide.createIcons();},50);}
+function mgS(type,el){document.querySelectorAll('.mg-tab').forEach(t=>t.classList.remove('on'));el.classList.add('on');document.querySelectorAll('.mg-panel').forEach(p=>p.classList.remove('show'));const panel=document.getElementById('mg-'+type);if(panel){panel.classList.add('show');panel.querySelectorAll('.mg-bf').forEach(b=>{b.style.animation='none';b.offsetHeight;b.style.animation='';});}}
+</script>
+</body>
+</html>
