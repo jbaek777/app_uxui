@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
@@ -85,8 +86,13 @@ export default function EducationScreen() {
   const handleExportPDF = async (log) => {
     try {
       const html = genEducationHTML(log);
-      const { uri } = await Print.printToFileAsync({ html, base64: false });
-      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: '교육일지 내보내기' });
+      const { uri: tmpUri } = await Print.printToFileAsync({ html, base64: false });
+      const d = new Date();
+      const datePrefix = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const filename = `${datePrefix}_교육일지.pdf`;
+      const dest = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.copyAsync({ from: tmpUri, to: dest });
+      await Sharing.shareAsync(dest, { mimeType: 'application/pdf', dialogTitle: filename });
     } catch (e) {
       Alert.alert('오류', 'PDF 내보내기에 실패했습니다.');
     }

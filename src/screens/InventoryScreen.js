@@ -69,7 +69,7 @@ export default function InventoryScreen() {
             style={[styles.tab, tab === i && { borderBottomColor: pal.ac }]}
             onPress={() => setTab(i)}
           >
-            <Text style={[styles.tabText, { color: tab === i ? pal.ac : pal.t3 }, tab === i && styles.tabTextActive]}>
+            <Text style={[styles.tabText, { color: tab === i ? pal.ac : pal.t3, fontSize: 24 }, tab === i && styles.tabTextActive]}>
               {t}
             </Text>
           </TouchableOpacity>
@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
   tabBarScroll: { borderBottomWidth: 1, flexGrow: 0 },
   tabBarContent: { flexDirection: 'row' },
   tab: { paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent', minWidth: 80 },
-  tabText: { fontSize: fontSize.sm, fontWeight: '600' },
+  tabText: { fontSize: fontSize.lg, fontWeight: '600' },
   tabTextActive: { fontWeight: '900' },
 
   // 2×2 그리드

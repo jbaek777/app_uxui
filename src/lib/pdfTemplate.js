@@ -6,8 +6,18 @@
 
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { Alert } from 'react-native';
 import { businessInfo } from '../data/mockData';
+
+// 오늘 날짜 → "2026-04-09"
+const todayStr = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 
 // ─── 문서 일련번호 생성 ──────────────────────────────────────
 const DOC_PREFIX = {
@@ -923,6 +933,8 @@ export function genTaxReportHTML(months, biz, year) {
 // 공통 출력 실행 함수
 // ═══════════════════════════════════════════════════════════════
 export async function printAndShare(html, fileName = 'MeatBig_문서') {
+  const safeFileName = `${todayStr()}_${fileName}`;
+
   // Step 1: PDF 파일 생성
   let uri;
   try {
@@ -930,7 +942,6 @@ export async function printAndShare(html, fileName = 'MeatBig_문서') {
     uri = result.uri;
   } catch (e) {
     console.error('PDF 파일 생성 실패:', e);
-    // 파일 생성 실패 시 바로 인쇄 다이얼로그 시도
     try {
       await Print.printAsync({ html });
     } catch (_) {
@@ -939,13 +950,22 @@ export async function printAndShare(html, fileName = 'MeatBig_문서') {
     return;
   }
 
+  // Step 1-B: 파일명 지정
+  try {
+    const dest = `${FileSystem.cacheDirectory}${safeFileName}.pdf`;
+    await FileSystem.copyAsync({ from: uri, to: dest });
+    uri = dest;
+  } catch (e) {
+    console.warn('파일명 변경 실패, 원본 URI 사용:', e);
+  }
+
   // Step 2: 공유 시도
   try {
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {
       await Sharing.shareAsync(uri, {
         mimeType: 'application/pdf',
-        dialogTitle: `${fileName} 내보내기`,
+        dialogTitle: `${safeFileName} 내보내기`,
         UTI: 'com.adobe.pdf',
       });
       return;
@@ -959,6 +979,6 @@ export async function printAndShare(html, fileName = 'MeatBig_문서') {
     await Print.printAsync({ html });
   } catch (e) {
     console.error('인쇄 다이얼로그 실패:', e);
-    Alert.alert('출력 완료', `${fileName}.pdf 파일이 기기에 저장되었습니다.`);
+    Alert.alert('출력 완료', `${safeFileName}.pdf 파일이 기기에 저장되었습니다.`);
   }
 }

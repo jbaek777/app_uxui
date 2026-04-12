@@ -206,7 +206,9 @@ export default function TaxReportScreen() {
     setExporting(true);
     try {
       const csv = buildCSV(filteredMonths, bizName);
-      const filename = `MeatBig_세무리포트_${selectedYear}.csv`;
+      const d = new Date();
+      const datePrefix = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const filename = `${datePrefix}_세무리포트_${selectedYear}.csv`;
 
       if (Platform.OS === 'web') {
         Alert.alert('CSV', 'PC에서만 다운로드 가능합니다.');
