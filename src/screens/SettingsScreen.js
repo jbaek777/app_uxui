@@ -4,7 +4,8 @@ import {
   Switch, Alert, Modal, TextInput,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
+import { Ionicons } from '@expo/vector-icons';
+import { fontSize, spacing, radius, shadow } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { staffData } from '../data/mockData';
@@ -16,12 +17,12 @@ import {
 import { useRole } from '../lib/RoleContext';
 import { useSubscription, PLANS } from '../lib/SubscriptionContext';
 import { useAuth } from '../lib/AuthContext';
+import { C, F, R, SH } from '../lib/v5';
 
 const NOTIF_KEY = '@meatbig_notifications';
 
 export default function SettingsScreen({ route, navigation }) {
   const { isDark, toggleTheme } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
   const { role, staffName, switchToStaff, requestOwnerMode, changePin, ownerPin } = useRole();
   const { sub, plan: currentPlan, isPremium, isTrial, daysLeft, cancelSubscription } = useSubscription();
   const { user, signOut } = useAuth();
@@ -140,52 +141,65 @@ export default function SettingsScreen({ route, navigation }) {
   };
 
   return (
+    <View style={[styles.container, { backgroundColor: '#F2F4F8' }]}>
+    {/* ── V5 헤더 ── */}
+    <View style={[styles.v5Header, { borderBottomColor: '#E2E8F0' }]}>
+      <View style={styles.v5HeaderAccent} />
+      <View style={styles.v5HeaderRow}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+          <View style={{ width: 33, height: 33, borderRadius: 10, backgroundColor: '#B91C1C', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="settings" size={17} color="#fff" />
+          </View>
+          <Text style={styles.v5PageTitle}>설정</Text>
+        </View>
+      </View>
+    </View>
     <ScrollView
-      style={[styles.container, { backgroundColor: pal.bg }]}
+      style={{ flex: 1, backgroundColor: '#F2F4F8' }}
       contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}
     >
 
       {/* ── 계정 프로필 카드 ── */}
-      <View style={[styles.profileCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-        <View style={[styles.profileAvatar, { backgroundColor: pal.ac + '25' }]}>
-          <Text style={[styles.profileAvatarText, { color: pal.ac }]}>
+      <View style={[styles.profileCard, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
+        <View style={[styles.profileAvatar, { backgroundColor: '#B91C1C' }]}>
+          <Text style={[styles.profileAvatarText, { color: '#FFFFFF' }]}>
             {(biz.bizName || 'M').charAt(0).toUpperCase()}
           </Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.profileName, { color: pal.tx }]}>{biz.bizName || 'MeatBig 매장'}</Text>
-          <Text style={[styles.profileEmail, { color: pal.t3 }]}>{user?.email || '이메일 없음'}</Text>
+          <Text style={[styles.profileName, { color: '#0F172A' }]}>{biz.bizName || 'MeatBig 매장'}</Text>
+          <Text style={[styles.profileEmail, { color: '#64748B' }]}>{user?.email || '이메일 없음'}</Text>
         </View>
         <View style={[styles.profileBadge, {
-          backgroundColor: isPremium ? pal.gn + '20' : pal.ac + '20',
+          backgroundColor: isPremium ? '#16A34A' + '20' : '#B91C1C' + '20',
         }]}>
-          <Text style={[styles.profileBadgeText, { color: isPremium ? pal.gn : pal.ac }]}>
+          <Text style={[styles.profileBadgeText, { color: isPremium ? '#16A34A' : '#B91C1C' }]}>
             {isTrial ? '체험 중' : isPremium ? (currentPlan.emoji + ' ' + currentPlan.name) : '무료 플랜'}
           </Text>
         </View>
       </View>
 
       {/* 권한 관리 */}
-      <SectionTitle icon="🔐" label="권한 관리" pal={pal} />
-      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: role === 'owner' ? pal.ac + '40' : pal.a2 + '60' }]}>
+      <SectionTitle icon="🔐" label="권한 관리" />
+      <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: role === 'owner' ? '#B91C1C' + '40' : '#DC2626' + '60' }]}>
         {/* 현재 모드 배너 */}
         <View style={{
           flexDirection: 'row', alignItems: 'center', gap: 12,
           paddingHorizontal: spacing.md, paddingVertical: 16,
-          borderBottomWidth: 1, borderBottomColor: pal.bd,
-          backgroundColor: role === 'owner' ? pal.ac + '10' : pal.a2 + '12',
+          borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
+          backgroundColor: role === 'owner' ? '#B91C1C' + '10' : '#DC2626' + '12',
         }}>
           <View style={{
             width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: role === 'owner' ? pal.ac + '25' : pal.a2 + '25',
+            backgroundColor: role === 'owner' ? '#B91C1C' + '25' : '#DC2626' + '25',
           }}>
             <Text style={{ fontSize: 22 }}>{role === 'owner' ? '👑' : '👤'}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: role === 'owner' ? pal.ac : pal.a2 }}>
+            <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: role === 'owner' ? '#B91C1C' : '#DC2626' }}>
               {role === 'owner' ? '사장 모드' : `직원 모드${staffName ? ` — ${staffName}` : ''}`}
             </Text>
-            <Text style={{ fontSize: fontSize.xs, color: pal.t3, marginTop: 2 }}>
+            <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>
               {role === 'owner' ? '모든 기능에 접근 가능합니다' : '위생·온도·이력 조회만 허용됩니다'}
             </Text>
           </View>
@@ -193,29 +207,29 @@ export default function SettingsScreen({ route, navigation }) {
         {/* 직원 모드 전환 (사장 모드에서) */}
         {role === 'owner' && (
           <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: pal.bd }}
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}
             onPress={switchToStaff}
           >
             <Text style={{ fontSize: 18, marginRight: 12 }}>👤</Text>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: pal.tx }}>직원 모드로 전환</Text>
-              <Text style={{ fontSize: fontSize.xs, color: pal.t3, marginTop: 2 }}>직원 선택 → PIN 입력 → 제한 모드 진입</Text>
+              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#0F172A' }}>직원 모드로 전환</Text>
+              <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>직원 선택 → PIN 입력 → 제한 모드 진입</Text>
             </View>
-            <Text style={{ color: pal.a2, fontSize: fontSize.md }}>›</Text>
+            <Text style={{ color: '#DC2626', fontSize: fontSize.md }}>›</Text>
           </TouchableOpacity>
         )}
         {/* 사장 모드 복귀 (직원 모드에서) */}
         {role === 'staff' && (
           <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: pal.bd }}
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}
             onPress={requestOwnerMode}
           >
             <Text style={{ fontSize: 18, marginRight: 12 }}>🔐</Text>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: pal.ac }}>사장 모드로 복귀</Text>
-              <Text style={{ fontSize: fontSize.xs, color: pal.t3, marginTop: 2 }}>사장 PIN 입력 필요</Text>
+              <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: '#B91C1C' }}>사장 모드로 복귀</Text>
+              <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>사장 PIN 입력 필요</Text>
             </View>
-            <Text style={{ color: pal.ac, fontSize: fontSize.md }}>›</Text>
+            <Text style={{ color: '#B91C1C', fontSize: fontSize.md }}>›</Text>
           </TouchableOpacity>
         )}
         {/* PIN 변경 (사장 모드에서만) */}
@@ -225,45 +239,45 @@ export default function SettingsScreen({ route, navigation }) {
             onPress={() => { setNewPin(''); setNewPinConfirm(''); setPinChangeModal(true); }}
           >
             <Text style={{ fontSize: 18, marginRight: 12 }}>🔑</Text>
-            <Text style={{ flex: 1, fontSize: fontSize.sm, color: pal.tx }}>사장 PIN 변경</Text>
-            <Text style={{ color: pal.t3, fontSize: fontSize.xs }}>{ownerPin.replace(/./g, '●')}&nbsp;&nbsp;›</Text>
+            <Text style={{ flex: 1, fontSize: fontSize.sm, color: '#0F172A' }}>사장 PIN 변경</Text>
+            <Text style={{ color: '#64748B', fontSize: fontSize.xs }}>{ownerPin.replace(/./g, '●')}&nbsp;&nbsp;›</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {/* 사업장 정보 */}
-      <SectionTitle icon="🏪" label="사업장 정보" pal={pal} />
-      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-        <InfoRow label="상호명" value={biz.bizName} pal={pal} />
-        <InfoRow label="대표자" value={biz.owner} pal={pal} />
-        <InfoRow label="사업자번호" value={biz.bizNo} pal={pal} />
-        <InfoRow label="취급 축종" value={(biz.species || []).join(', ')} last pal={pal} />
+      <SectionTitle icon="🏪" label="사업장 정보" />
+      <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
+        <InfoRow label="상호명" value={biz.bizName} />
+        <InfoRow label="대표자" value={biz.owner} />
+        <InfoRow label="사업자번호" value={biz.bizNo} />
+        <InfoRow label="취급 축종" value={(biz.species || []).join(', ')} last />
       </View>
 
       {/* 화면 설정 */}
-      <SectionTitle icon="🎨" label="화면 설정" pal={pal} />
-      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+      <SectionTitle icon="🎨" label="화면 설정" />
+      <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
         <View style={[styles.notifRow, { borderBottomWidth: 0 }]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.notifLabel, { color: pal.tx }]}>
+            <Text style={[styles.notifLabel, { color: '#0F172A' }]}>
               {isDark ? '🌙 다크 모드' : '☀️ 라이트 모드'}
             </Text>
-            <Text style={[styles.notifSubLabel, { color: pal.t3 }]}>
+            <Text style={[styles.notifSubLabel, { color: '#64748B' }]}>
               {isDark ? '어두운 배경 사용 중' : '밝은 배경 사용 중'}
             </Text>
           </View>
           <Switch
             value={isDark}
             onValueChange={toggleTheme}
-            trackColor={{ false: pal.bd2, true: pal.ac + '99' }}
-            thumbColor={isDark ? pal.ac : pal.t3}
+            trackColor={{ false: '#E2E8F0', true: '#B91C1C' + '99' }}
+            thumbColor={isDark ? '#B91C1C' : '#64748B'}
           />
         </View>
       </View>
 
       {/* 직원 관리 */}
-      <SectionTitle icon="👥" label="직원 관리" pal={pal} />
-      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+      <SectionTitle icon="👥" label="직원 관리" />
+      <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
         {staff.map((s, idx) => (
           <TouchableOpacity
             key={s.id}
@@ -271,7 +285,7 @@ export default function SettingsScreen({ route, navigation }) {
             onPress={() => openEditStaff(s)}
             style={[
               styles.staffRow,
-              { borderBottomColor: pal.bd + '50' },
+              { borderBottomColor: '#E2E8F0' + '50' },
               idx === staff.length - 1 && { borderBottomWidth: 0 },
             ]}
           >
@@ -280,41 +294,41 @@ export default function SettingsScreen({ route, navigation }) {
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={[styles.staffName, { color: pal.tx }]}>{s.name}</Text>
-                <View style={[styles.roleBadge, { backgroundColor: s.role === '사장' ? pal.ac + '25' : pal.a2 + '20' }]}>
-                  <Text style={[styles.roleBadgeText, { color: s.role === '사장' ? pal.ac : pal.a2 }]}>{s.role}</Text>
+                <Text style={[styles.staffName, { color: '#0F172A' }]}>{s.name}</Text>
+                <View style={[styles.roleBadge, { backgroundColor: s.role === '사장' ? '#B91C1C' + '25' : '#DC2626' + '20' }]}>
+                  <Text style={[styles.roleBadgeText, { color: s.role === '사장' ? '#B91C1C' : '#DC2626' }]}>{s.role}</Text>
                 </View>
               </View>
-              <Text style={[styles.staffMeta, { color: pal.t3 }]}>보건증: {s.health}  ·  위생교육: {s.edu}</Text>
+              <Text style={[styles.staffMeta, { color: '#64748B' }]}>보건증: {s.health}  ·  위생교육: {s.edu}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <View style={[styles.statusDot, { backgroundColor: s.status === 'ok' ? pal.gn : pal.rd }]} />
-              <Text style={{ fontSize: fontSize.xxs, color: pal.t3, marginTop: 4 }}>수정 ›</Text>
+              <View style={[styles.statusDot, { backgroundColor: s.status === 'ok' ? '#16A34A' : '#B91C1C' }]} />
+              <Text style={{ fontSize: fontSize.xxs, color: '#64748B', marginTop: 4 }}>수정 ›</Text>
             </View>
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={styles.addStaffRow} onPress={() => setStaffModal(true)}>
-          <Text style={[styles.addStaffText, { color: pal.a2 }]}>+ 직원 추가</Text>
+          <Text style={[styles.addStaffText, { color: '#DC2626' }]}>+ 직원 추가</Text>
         </TouchableOpacity>
       </View>
 
       {/* 알림 설정 */}
-      <SectionTitle icon="🔔" label="알림 설정" pal={pal} />
-      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-        <NotifRow label="위생점검 매일 09시 알림" value={notifications.hygiene} onChange={() => toggleNotif('hygiene')} last={false} pal={pal} />
-        <NotifRow label="소비기한 임박 알림 (D-2)" value={notifications.expiry} onChange={() => toggleNotif('expiry')} last={false} pal={pal} />
-        <NotifRow label="온도 이상 알림" value={notifications.temp} onChange={() => toggleNotif('temp')} last pal={pal} />
+      <SectionTitle icon="🔔" label="알림 설정" />
+      <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
+        <NotifRow label="위생점검 매일 09시 알림" value={notifications.hygiene} onChange={() => toggleNotif('hygiene')} last={false} />
+        <NotifRow label="소비기한 임박 알림 (D-2)" value={notifications.expiry} onChange={() => toggleNotif('expiry')} last={false} />
+        <NotifRow label="온도 이상 알림" value={notifications.temp} onChange={() => toggleNotif('temp')} last />
       </View>
 
       {/* 구독 관리 */}
-      <SectionTitle icon="💎" label="구독 관리" pal={pal} />
-      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: isPremium ? pal.gn + '60' : pal.bd, overflow: 'hidden' }]}>
+      <SectionTitle icon="💎" label="구독 관리" />
+      <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: isPremium ? '#16A34A' + '60' : '#E2E8F0', overflow: 'hidden' }]}>
         <View style={styles.planRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.planTitle, { color: pal.tx }]}>
+            <Text style={[styles.planTitle, { color: '#0F172A' }]}>
               {currentPlan.emoji} {currentPlan.name}
             </Text>
-            <Text style={[styles.planDesc, { color: pal.t3 }]}>
+            <Text style={[styles.planDesc, { color: '#64748B' }]}>
               {isTrial && daysLeft !== null
                 ? `무료 체험 중 — ${daysLeft}일 남음`
                 : isPremium
@@ -322,24 +336,24 @@ export default function SettingsScreen({ route, navigation }) {
                   : '기본 위생 점검, 이력 50건 저장'}
             </Text>
           </View>
-          <View style={[styles.planBadge, { backgroundColor: isPremium ? pal.gn + '20' : pal.t3 + '20' }]}>
-            <Text style={[styles.planBadgeText, { color: isPremium ? pal.gn : pal.t3 }]}>
+          <View style={[styles.planBadge, { backgroundColor: isPremium ? '#16A34A' + '20' : '#64748B' + '20' }]}>
+            <Text style={[styles.planBadgeText, { color: isPremium ? '#16A34A' : '#64748B' }]}>
               {isTrial ? '체험 중' : isPremium ? '구독 중' : '무료'}
             </Text>
           </View>
         </View>
         {isPremium && (
           <TouchableOpacity
-            style={{ paddingHorizontal: spacing.md, paddingVertical: 12, borderTopWidth: 1, borderTopColor: pal.bd + '50' }}
+            style={{ paddingHorizontal: spacing.md, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#E2E8F0' + '50' }}
             onPress={() => navigation.navigate('Paywall')}
           >
-            <Text style={{ fontSize: fontSize.sm, color: pal.a2, fontWeight: '700' }}>구독 관리 · 요금제 변경 →</Text>
+            <Text style={{ fontSize: fontSize.sm, color: '#DC2626', fontWeight: '700' }}>구독 관리 · 요금제 변경 →</Text>
           </TouchableOpacity>
         )}
         {!isPremium && (
           <PrimaryBtn
             label="14일 무료 체험 시작 →"
-            color={pal.ac}
+            color={'#B91C1C'}
             style={{ margin: spacing.md, marginTop: 0 }}
             onPress={() => navigation.navigate('Paywall')}
           />
@@ -347,59 +361,59 @@ export default function SettingsScreen({ route, navigation }) {
       </View>
 
       {/* 라벨 프린터 */}
-      <SectionTitle icon="🖨️" label="라벨 프린터" pal={pal} />
-      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+      <SectionTitle icon="🖨️" label="라벨 프린터" />
+      <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
         <TouchableOpacity
           style={styles.printerRow}
           onPress={() => Alert.alert('프린터 연결', 'Bluetooth 프린터를 검색합니다.')}
         >
           <Text style={{ fontSize: 28 }}>🔍</Text>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.printerLabel, { color: pal.tx }]}>프린터 검색</Text>
-            <Text style={[styles.printerDesc, { color: pal.t3 }]}>Bluetooth 라벨 프린터 연결</Text>
+            <Text style={[styles.printerLabel, { color: '#0F172A' }]}>프린터 검색</Text>
+            <Text style={[styles.printerDesc, { color: '#64748B' }]}>Bluetooth 라벨 프린터 연결</Text>
           </View>
-          <Text style={{ color: pal.t3, fontSize: fontSize.lg }}>›</Text>
+          <Text style={{ color: '#64748B', fontSize: fontSize.lg }}>›</Text>
         </TouchableOpacity>
       </View>
 
       {/* 앱 정보 */}
-      <SectionTitle icon="ℹ️" label="앱 정보" pal={pal} />
-      <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-        <InfoRow label="앱 이름" value="MeatBig (미트빅)" pal={pal} />
-        <InfoRow label="버전" value="v1.0.0" pal={pal} />
-        <InfoRow label="계정" value={user?.email || '—'} last pal={pal} />
+      <SectionTitle icon="ℹ️" label="앱 정보" />
+      <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
+        <InfoRow label="앱 이름" value="MeatBig (미트빅)" />
+        <InfoRow label="버전" value="v1.0.0" />
+        <InfoRow label="계정" value={user?.email || '—'} last />
       </View>
 
       {/* 로그아웃 */}
       <TouchableOpacity
-        style={[styles.logoutBtn, { borderColor: pal.rd }]}
+        style={[styles.logoutBtn, { borderColor: '#B91C1C' }]}
         onPress={handleSignOut}
         activeOpacity={0.8}
       >
-        <Text style={[styles.logoutText, { color: pal.rd }]}>🚪 로그아웃</Text>
+        <Text style={[styles.logoutText, { color: '#B91C1C' }]}>🚪 로그아웃</Text>
       </TouchableOpacity>
 
       {/* PIN 변경 모달 */}
       <Modal visible={pinChangeModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: pal.bg }}>
-          <View style={[styles.modalHeader, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx }]}>🔐 PIN 변경</Text>
+        <View style={{ flex: 1, backgroundColor: '#F2F4F8' }}>
+          <View style={[styles.modalHeader, { backgroundColor: '#FFFFFF', borderBottomColor: '#E2E8F0' }]}>
+            <Text style={[styles.modalTitle, { color: '#0F172A' }]}>🔐 PIN 변경</Text>
             <TouchableOpacity onPress={() => setPinChangeModal(false)}>
-              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
+              <Text style={[styles.closeBtn, { color: '#334155' }]}>✕</Text>
             </TouchableOpacity>
           </View>
           <View style={{ padding: spacing.lg }}>
-            <Text style={[styles.fieldLabel, { color: pal.t2 }]}>새 PIN (4자리 이상)</Text>
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>새 PIN (4자리 이상)</Text>
             <TextInput
-              style={[styles.fieldInput, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
-              placeholder="새 PIN 입력" placeholderTextColor={pal.t3}
+              style={[styles.fieldInput, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', color: '#0F172A' }]}
+              placeholder="새 PIN 입력" placeholderTextColor={'#64748B'}
               keyboardType="number-pad" secureTextEntry maxLength={6}
               value={newPin} onChangeText={setNewPin}
             />
-            <Text style={[styles.fieldLabel, { color: pal.t2, marginTop: spacing.md }]}>PIN 확인</Text>
+            <Text style={[styles.fieldLabel, { color: '#334155', marginTop: spacing.md }]}>PIN 확인</Text>
             <TextInput
-              style={[styles.fieldInput, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
-              placeholder="PIN 재입력" placeholderTextColor={pal.t3}
+              style={[styles.fieldInput, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', color: '#0F172A' }]}
+              placeholder="PIN 재입력" placeholderTextColor={'#64748B'}
               keyboardType="number-pad" secureTextEntry maxLength={6}
               value={newPinConfirm} onChangeText={setNewPinConfirm}
             />
@@ -414,50 +428,50 @@ export default function SettingsScreen({ route, navigation }) {
 
       {/* 직원 추가 모달 */}
       <Modal visible={staffModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: pal.bg }}>
-          <View style={[styles.modalHeader, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx }]}>👤 직원 추가</Text>
+        <View style={{ flex: 1, backgroundColor: '#F2F4F8' }}>
+          <View style={[styles.modalHeader, { backgroundColor: '#FFFFFF', borderBottomColor: '#E2E8F0' }]}>
+            <Text style={[styles.modalTitle, { color: '#0F172A' }]}>👤 직원 추가</Text>
             <TouchableOpacity onPress={() => setStaffModal(false)}>
-              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
+              <Text style={[styles.closeBtn, { color: '#334155' }]}>✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
             {/* 이름 */}
-            <Text style={[styles.fieldLabel, { color: pal.t2 }]}>이름 *</Text>
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>이름 *</Text>
             <TextInput
-              style={[styles.fieldInput, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+              style={[styles.fieldInput, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', color: '#0F172A' }]}
               placeholder="예: 홍길동"
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={'#64748B'}
               value={newStaff.name}
               onChangeText={t => setNewStaff({ ...newStaff, name: t })}
             />
             {/* 역할 */}
-            <Text style={[styles.fieldLabel, { color: pal.t2 }]}>역할</Text>
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>역할</Text>
             <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
               {['직원', '사장', '파트타임'].map(r => (
                 <TouchableOpacity
                   key={r}
-                  style={[styles.roleChip, { borderColor: newStaff.role === r ? pal.ac : pal.bd, backgroundColor: newStaff.role === r ? pal.ac + '20' : pal.s1 }]}
+                  style={[styles.roleChip, { borderColor: newStaff.role === r ? '#B91C1C' : '#E2E8F0', backgroundColor: newStaff.role === r ? '#B91C1C' + '20' : '#FFFFFF' }]}
                   onPress={() => setNewStaff({ ...newStaff, role: r })}
                 >
-                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: newStaff.role === r ? pal.ac : pal.t2 }}>{r}</Text>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: newStaff.role === r ? '#B91C1C' : '#334155' }}>{r}</Text>
                 </TouchableOpacity>
               ))}
             </View>
             {/* 아바타 색상 */}
-            <Text style={[styles.fieldLabel, { color: pal.t2 }]}>아바타 색상</Text>
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>아바타 색상</Text>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: spacing.md }}>
               {COLORS.map(c => (
                 <TouchableOpacity key={c} onPress={() => setSelectedColor(c)}
-                  style={[styles.colorDot, { backgroundColor: c, borderColor: selectedColor === c ? pal.tx : 'transparent' }]} />
+                  style={[styles.colorDot, { backgroundColor: c, borderColor: selectedColor === c ? '#0F172A' : 'transparent' }]} />
               ))}
             </View>
             {/* PIN */}
-            <Text style={[styles.fieldLabel, { color: pal.t2 }]}>PIN (4자리)</Text>
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>PIN (4자리)</Text>
             <TextInput
-              style={[styles.fieldInput, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+              style={[styles.fieldInput, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', color: '#0F172A' }]}
               placeholder="예: 5678"
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={'#64748B'}
               keyboardType="numeric"
               maxLength={4}
               secureTextEntry
@@ -465,20 +479,20 @@ export default function SettingsScreen({ route, navigation }) {
               onChangeText={t => setNewStaff({ ...newStaff, pin: t })}
             />
             {/* 보건증 만료일 */}
-            <Text style={[styles.fieldLabel, { color: pal.t2 }]}>보건증 만료일</Text>
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>보건증 만료일</Text>
             <TextInput
-              style={[styles.fieldInput, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+              style={[styles.fieldInput, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', color: '#0F172A' }]}
               placeholder="예: 2027.03.01"
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={'#64748B'}
               value={newStaff.health}
               onChangeText={t => setNewStaff({ ...newStaff, health: t })}
             />
             {/* 위생교육 만료일 */}
-            <Text style={[styles.fieldLabel, { color: pal.t2 }]}>위생교육 만료일</Text>
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>위생교육 만료일</Text>
             <TextInput
-              style={[styles.fieldInput, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+              style={[styles.fieldInput, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', color: '#0F172A' }]}
               placeholder="예: 2027.06.01"
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={'#64748B'}
               value={newStaff.edu}
               onChangeText={t => setNewStaff({ ...newStaff, edu: t })}
             />
@@ -491,27 +505,27 @@ export default function SettingsScreen({ route, navigation }) {
       {/* 직원 수정 모달 */}
       <Modal visible={editModal} animationType="fade" transparent>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing.lg }}>
-          <View style={[styles.card, { backgroundColor: pal.s1, borderColor: pal.bd, padding: spacing.lg }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx, marginBottom: spacing.md }]}>
+          <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', padding: spacing.lg }]}>
+            <Text style={[styles.modalTitle, { color: '#0F172A', marginBottom: spacing.md }]}>
               ✏️ {editTarget?.name} 정보 수정
             </Text>
 
-            <Text style={[styles.fieldLabel, { color: pal.t2 }]}>🏥 보건증 만료일</Text>
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>🏥 보건증 만료일</Text>
             <TextInput
-              style={[styles.fieldInput, { backgroundColor: pal.bg, borderColor: pal.bd, color: pal.tx }]}
+              style={[styles.fieldInput, { backgroundColor: '#F2F4F8', borderColor: '#E2E8F0', color: '#0F172A' }]}
               value={editForm.health}
               onChangeText={t => setEditForm({ ...editForm, health: t })}
               placeholder="예: 2027.06.01"
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={'#64748B'}
             />
 
-            <Text style={[styles.fieldLabel, { color: pal.t2 }]}>📚 위생교육 만료일</Text>
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>📚 위생교육 만료일</Text>
             <TextInput
-              style={[styles.fieldInput, { backgroundColor: pal.bg, borderColor: pal.bd, color: pal.tx }]}
+              style={[styles.fieldInput, { backgroundColor: '#F2F4F8', borderColor: '#E2E8F0', color: '#0F172A' }]}
               value={editForm.edu}
               onChangeText={t => setEditForm({ ...editForm, edu: t })}
               placeholder="예: 2027.09.01"
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={'#64748B'}
             />
 
             <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
@@ -522,36 +536,43 @@ export default function SettingsScreen({ route, navigation }) {
         </View>
       </Modal>
     </ScrollView>
+    </View>
   );
 }
 
 // ── 서브 컴포넌트 ─────────────────────────────────────────
 
-const SectionTitle = ({ icon, label, pal }) => (
-  <Text style={[styles.sectionTitle, { color: pal.t3 }]}>{icon} {label}</Text>
+const SectionTitle = ({ icon, label }) => (
+  <Text style={[styles.sectionTitle, { color: '#64748B' }]}>{icon} {label}</Text>
 );
 
-const InfoRow = ({ label, value, last, pal }) => (
-  <View style={[styles.infoRow, !last && { borderBottomWidth: 1, borderBottomColor: pal.bd + '50' }]}>
-    <Text style={[styles.infoLabel, { color: pal.t2 }]}>{label}</Text>
-    <Text style={[styles.infoValue, { color: pal.tx }]}>{value}</Text>
+const InfoRow = ({ label, value, last }) => (
+  <View style={[styles.infoRow, !last && { borderBottomWidth: 1, borderBottomColor: '#E2E8F0' + '50' }]}>
+    <Text style={[styles.infoLabel, { color: '#334155' }]}>{label}</Text>
+    <Text style={[styles.infoValue, { color: '#0F172A' }]}>{value}</Text>
   </View>
 );
 
-const NotifRow = ({ label, value, onChange, last, pal }) => (
-  <View style={[styles.notifRow, !last && { borderBottomWidth: 1, borderBottomColor: pal.bd + '50' }]}>
-    <Text style={[styles.notifLabel, { color: pal.tx }]}>{label}</Text>
+const NotifRow = ({ label, value, onChange, last }) => (
+  <View style={[styles.notifRow, !last && { borderBottomWidth: 1, borderBottomColor: '#E2E8F0' + '50' }]}>
+    <Text style={[styles.notifLabel, { color: '#0F172A' }]}>{label}</Text>
     <Switch
       value={value}
       onValueChange={onChange}
-      trackColor={{ false: pal.bd, true: pal.ac + '80' }}
-      thumbColor={value ? pal.ac : pal.t3}
+      trackColor={{ false: '#E2E8F0', true: '#B91C1C' + '80' }}
+      thumbColor={value ? '#B91C1C' : '#64748B'}
     />
   </View>
 );
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
+  // V5 헤더
+  v5Header:       { backgroundColor:'#FFFFFF', borderBottomWidth:1, borderBottomColor:'#E2E8F0', overflow:'hidden' },
+  v5HeaderAccent: { height:3, backgroundColor:'#B91C1C', position:'absolute', top:0, left:0, right:0 },
+  v5HeaderRow:    { paddingHorizontal:20, paddingTop:16, paddingBottom:13, flexDirection:'row', justifyContent:'space-between', alignItems:'center' },
+  v5PageTitle:    { fontSize:22, fontWeight:'900', color:'#0F172A', letterSpacing:-0.6 },
 
   // 계정 프로필 카드
   profileCard: {
@@ -560,17 +581,17 @@ const styles = StyleSheet.create({
     padding: spacing.md, marginBottom: spacing.md, ...shadow.sm,
   },
   profileAvatar: {
-    width: 52, height: 52, borderRadius: 16,
+    width: 56, height: 56, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',
   },
   profileAvatarText: { fontSize: 24, fontWeight: '900' },
-  profileName:  { fontSize: fontSize.md, fontWeight: '900', marginBottom: 3 },
-  profileEmail: { fontSize: fontSize.xs },
-  profileBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  profileName:  { fontSize: 18, fontWeight: '900', marginBottom: 3 },
+  profileEmail: { fontSize: 14 },
+  profileBadge: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
   profileBadgeText: { fontSize: fontSize.xxs, fontWeight: '800' },
 
   sectionTitle: {
-    fontSize: fontSize.xs,
+    fontSize: 15,
     fontWeight: '800',
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
@@ -612,9 +633,9 @@ const styles = StyleSheet.create({
   },
   avatar: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: fontSize.md, fontWeight: '900' },
-  staffName: { fontSize: fontSize.sm, fontWeight: '700' },
-  staffMeta: { fontSize: fontSize.xxs, marginTop: 2 },
-  roleBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  staffName: { fontSize: 16, fontWeight: '700' },
+  staffMeta: { fontSize: 14, marginTop: 2 },
+  roleBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   roleBadgeText: { fontSize: fontSize.xxs, fontWeight: '800' },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   addStaffRow: { paddingVertical: 16, alignItems: 'center' },
@@ -627,8 +648,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 14,
   },
-  notifLabel: { fontSize: fontSize.sm, fontWeight: '600', flex: 1, marginRight: spacing.sm },
-  notifSubLabel: { fontSize: fontSize.xxs, marginTop: 2 },
+  notifLabel: { fontSize: 16, fontWeight: '600', flex: 1, marginRight: spacing.sm },
+  notifSubLabel: { fontSize: 14, marginTop: 2 },
 
   planRow: {
     flexDirection: 'row',
@@ -638,7 +659,7 @@ const styles = StyleSheet.create({
   },
   planTitle: { fontSize: fontSize.md, fontWeight: '900', marginBottom: 4 },
   planDesc: { fontSize: fontSize.xs },
-  planBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  planBadge: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
   planBadgeText: { fontSize: fontSize.xs, fontWeight: '800' },
   adminBtn: { margin: spacing.md, marginTop: 4, paddingVertical: 10, borderTopWidth: 1, alignItems: 'center' },
   adminBtnText: { fontSize: fontSize.xs, fontWeight: '700' },
@@ -662,7 +683,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: fontSize.lg, fontWeight: '900' },
   closeBtn: { fontSize: 22, padding: 4 },
 
-  saveBtn: { backgroundColor: colors.gn, paddingVertical: 14, borderRadius: radius.md, alignItems: 'center' },
+  saveBtn: { backgroundColor: '#16A34A', paddingVertical: 14, borderRadius: radius.md, alignItems: 'center' },
   saveBtnText: { color: '#fff', fontSize: fontSize.md, fontWeight: '800' },
 
   fieldLabel: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 7, marginTop: 4 },

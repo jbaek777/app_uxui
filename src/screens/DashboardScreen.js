@@ -1,724 +1,577 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  ActivityIndicator, StatusBar, TextInput,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, darkColors, lightColors, radius, shadow, fontSize, spacing } from '../theme';
+import { Ionicons } from '@expo/vector-icons';
+import { lightColors, darkColors, fontSize, spacing, radius } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
-import { GaugeBar } from '../components/GaugeBar';
 import { meatInventory, hygieneData } from '../data/mockData';
 import { meatStore, hygieneStore } from '../lib/dataStore';
 
-// camelCase / snake_case 둘 다 지원
 const getBuyPrice  = m => m.buyPrice  || m.buy_price  || 0;
 const getSellPrice = m => m.sellPrice || m.sell_price || 0;
-const getDday = m => m.dday != null ? m.dday : 99;
-
-// 마진율 계산 (%)
+const getDday      = m => m.dday != null ? m.dday : 99;
 const getMarginPct = m => {
-  const buy = getBuyPrice(m);
-  const sell = getSellPrice(m);
+  const buy = getBuyPrice(m), sell = getSellPrice(m);
   if (!buy || !sell) return null;
   return Math.round((sell - buy) / buy * 100);
 };
 
-export default function DashboardScreen({ navigation, route }) {
+// ── 색상 상수 (V5 디자인 시스템) ──────────────────────────
+const C = {
+  bg:     '#F2F4F8',
+  white:  '#FFFFFF',
+  red:    '#B91C1C',
+  red2:   '#DC2626',
+  redS:   'rgba(185,28,28,0.08)',
+  redS2:  'rgba(185,28,28,0.14)',
+  ok:     '#15803D',
+  ok2:    '#16A34A',
+  okS:    'rgba(21,128,61,0.09)',
+  warn:   '#B45309',
+  warn2:  '#D97706',
+  warnS:  'rgba(180,83,9,0.09)',
+  blue:   '#1D4ED8',
+  blue2:  '#2563EB',
+  blueS:  'rgba(29,78,216,0.09)',
+  pur:    '#6D28D9',
+  purS:   'rgba(109,40,217,0.09)',
+  t1:     '#0F172A',
+  t2:     '#334155',
+  t3:     '#64748B',
+  t4:     '#94A3B8',
+  border: '#E2E8F0',
+  bg2:    '#F1F5F9',
+  bg3:    '#E8ECF2',
+};
+
+export default function DashboardScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
-  const [bizName, setBizName] = useState('');
-  const today = new Date();
-  const todayStr = today.toLocaleDateString('ko-KR');
-  const dateStr = today.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+  const [bizName, setBizName]     = useState('');
+  const [meat, setMeat]           = useState([]);
+  const [hygieneLogs, setHygiene] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [marginTab, setMarginTab] = useState('top'); // 'top' | 'low'
+  const [activeChip, setChip]     = useState('전체');
+  const [searchQ, setSearchQ]     = useState('');
 
-  const [meat, setMeat] = useState([]);
-  const [hygieneLogs, setHygieneLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const today    = new Date();
+  const dateStr  = today.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+  const todayStr = today.toLocaleDateString('ko-KR');
+  const todayISO = today.toISOString().slice(0, 10);
 
   useEffect(() => {
     AsyncStorage.getItem('@meatbig_biz').then(raw => {
-      if (raw) {
-        try { setBizName(JSON.parse(raw).bizName || ''); } catch (_) {}
-      }
+      if (raw) { try { setBizName(JSON.parse(raw).bizName || ''); } catch (_) {} }
     });
   }, []);
 
   useEffect(() => {
-    Promise.all([
-      meatStore.load(meatInventory),
-      hygieneStore.load(hygieneData),
-    ]).then(([meatData, hygieneData]) => {
-      setMeat(meatData);
-      setHygieneLogs(hygieneData);
-      setLoading(false);
-    });
+    Promise.all([meatStore.load(meatInventory), hygieneStore.load(hygieneData)])
+      .then(([m, h]) => { setMeat(m); setHygiene(h); setLoading(false); });
   }, []);
 
-  const activeMeat = meat.filter(m => !m.sold);
-  const urgent = activeMeat.filter(m => getDday(m) <= 1);
-  const nearExpiry3 = activeMeat.filter(m => getDday(m) <= 3);
+  const activeMeat   = meat.filter(m => !m.sold);
+  const urgent       = activeMeat.filter(m => getDday(m) <= 1);
+  const nearExpiry3  = activeMeat.filter(m => getDday(m) <= 3);
   const potentialLoss = nearExpiry3.reduce((s, m) => s + (m.qty || 0) * getBuyPrice(m), 0);
-  const criticalLoss = urgent.reduce((s, m) => s + (m.qty || 0) * getBuyPrice(m), 0);
 
-  // ── 마진 분석 데이터 ──────────────────────────────────────
   const marginItems = activeMeat
     .filter(m => getBuyPrice(m) > 0 && getSellPrice(m) > 0)
-    .map(m => ({
-      ...m,
-      marginPct:   getMarginPct(m),
-      marginPerKg: getSellPrice(m) - getBuyPrice(m),
-    }))
+    .map(m => ({ ...m, marginPct: getMarginPct(m) }))
     .filter(m => m.marginPct !== null)
     .sort((a, b) => b.marginPct - a.marginPct);
-
-  const topMargin  = marginItems.slice(0, 3);
-  const lowMargin  = [...marginItems].sort((a, b) => a.marginPct - b.marginPct).slice(0, 3);
+  const topMargin    = marginItems.slice(0, 3);
+  const lowMargin    = [...marginItems].sort((a, b) => a.marginPct - b.marginPct).slice(0, 3);
   const maxMarginPct = marginItems.length > 0 ? marginItems[0].marginPct : 100;
 
-  // 이번 달 실현 마진 (판매완료 기준)
-  const soldMeat = meat.filter(m => m.sold);
-  const thisMonthStr = today.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
-  const soldThisMonth = soldMeat.filter(m => {
-    const d = m.soldDate || '';
-    // 한국식 "2026. 4. 5." 또는 ISO "2026-04-05" 모두 지원
-    const yr = String(today.getFullYear());
-    const mo = String(today.getMonth() + 1);
-    return d.includes(yr) && (d.includes(mo + '월') || d.startsWith(`${yr}-${mo.padStart(2,'0')}`));
-  });
-  const monthRevenue = soldThisMonth.reduce((s, m) => s + (m.qty || 0) * getSellPrice(m), 0);
-  const monthCost    = soldThisMonth.reduce((s, m) => s + (m.qty || 0) * getBuyPrice(m), 0);
-  const monthProfit  = monthRevenue - monthCost;
-  const monthMarginPct = monthRevenue > 0 ? Math.round(monthProfit / monthRevenue * 100) : null;
-
-  // 오늘 위생점검 완료 여부
-  const todayISO = today.toISOString().slice(0, 10); // "2026-03-29"
-  const todayHygiene = hygieneLogs.filter(h => {
+  const todayHygiene  = hygieneLogs.filter(h => {
     const d = h.log_date || h.date || '';
-    return d === todayStr || d === todayISO || (d ? d.startsWith(todayISO) : false);
+    return d === todayStr || d === todayISO || (d && d.startsWith(todayISO));
   });
   const hygieneNeeded = todayHygiene.length === 0;
-  const tempNeeded = true; // 온도 기록 화면 연동 시 교체
+  const checkDoneCount = [!hygieneNeeded, true, true].filter(Boolean).length;
 
   const QUICK_ACTIONS = [
-    { icon: '🏷️', label: '이력\n스캔',  tab: 'TraceTab',    screen: 'Scan',     color: pal.ac,   initial: true  },
-    { icon: '📋', label: '위생\n일지',  tab: 'DocsTab',     screen: 'Hygiene',  color: pal.gn,   initial: true  },
-    { icon: '🥩', label: '숙성\n관리',  tab: 'DocsTab',     screen: 'Aging',    color: pal.a2,   initial: false },
-    { icon: '🖨️', label: '서류\n출력',  tab: 'DocsTab',     screen: 'Documents',color: pal.pu,   initial: true  },
-    { icon: '💰', label: '마감\n정산',  tab: 'DocsTab',     screen: 'Closing',  color: pal.cyan, initial: true  },
-    { icon: '📦', label: '재고\n확인',  tab: 'InventoryTab',screen: null,       color: pal.a2,   initial: true  },
+    { ionicon:'scan-outline', label:'이력\n스캔', tab:'TraceTab', screen:'Scan', main:true },
+    { ionicon:'shield-checkmark-outline', label:'위생\n일지', tab:'DocsTab', screen:'Hygiene', main:false },
+    { ionicon:'nutrition-outline', label:'숙성\n관리', tab:'DocsTab', screen:'Aging', main:false },
+    { ionicon:'document-text-outline', label:'서류\n출력', tab:'DocsTab', screen:'Documents', main:false },
+    { ionicon:'calculator-outline', label:'마감\n정산', tab:'DocsTab', screen:'Closing', main:false },
+    { ionicon:'cube-outline', label:'재고\n확인', tab:'InventoryTab', screen:null, main:false },
   ];
 
-  // 이번 달 위생 점수 계산 (pass 비율 기반)
-  const thisMonth = hygieneLogs.filter(h => {
-    const d = h.log_date || h.date || '';
-    return d.includes(today.getMonth() + 1 + '월') || d.startsWith(today.toISOString().slice(0, 7));
-  });
-  const hygieneScore = thisMonth.length === 0 ? '--' :
-    Math.round((thisMonth.filter(h => h.status === 'pass').length / thisMonth.length) * 100);
-
-  const cardBg = isDark
-    ? 'rgba(255,255,255,0.05)'
-    : 'rgba(0,0,0,0.03)';
+  const PHOTO_COLORS = ['#6B1515', '#7A2010', '#6B3010', '#4A2800'];
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: pal.bg, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color={pal.ac} />
-        <Text style={{ color: pal.t3, marginTop: 12, fontSize: fontSize.sm }}>데이터 불러오는 중...</Text>
+      <View style={{ flex:1, backgroundColor:C.bg, alignItems:'center', justifyContent:'center' }}>
+        <ActivityIndicator size="large" color={C.red} />
+        <Text style={{ color:C.t3, marginTop:12, fontSize:fontSize.sm }}>불러오는 중...</Text>
       </View>
     );
   }
 
-  // 오늘 점검 완료 수 계산
-  const checkDoneCount = [!hygieneNeeded, !tempNeeded, true].filter(Boolean).length;
-
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: pal.bg }]}
-      contentContainerStyle={{ paddingBottom: 120, paddingTop: insets.top + spacing.md }}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={{ flex:1, backgroundColor:C.bg }}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.white} />
 
-      {/* ── 1. 헤더 ── */}
-      <View style={styles.header}>
-        <Text style={{ fontSize: fontSize.xs, color: pal.t3, marginBottom: 6, fontWeight: '600' }}>{dateStr}</Text>
-        <Text style={{ fontSize: fontSize.lg, color: pal.tx, fontWeight: '700', marginBottom: 2 }}>안녕하세요,</Text>
-        <Text style={{ fontSize: fontSize.xxl, color: pal.tx, fontWeight: '900' }}>
-          <Text style={{ color: pal.ac }}>{bizName || '사장님'}</Text>
-          {bizName ? ' 사장님 👋' : ' 👋'}
-        </Text>
-      </View>
-
-      {/* ── 2. 오늘의 필수 점검 요약 (3-stat 박스) ── */}
-      <View style={styles.statRow}>
-        <View style={[styles.statBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <Text style={{ fontSize: fontSize.xxl, fontWeight: '900', color: pal.a2 }}>{activeMeat.length}</Text>
-          <Text style={{ fontSize: fontSize.xxs, color: pal.t3, marginTop: 4, fontWeight: '700' }}>📦 재고종류</Text>
+      {/* ── 헤더 ──────────────────────────────────────────── */}
+      <View style={[styles.header, { paddingTop: insets.top + 2 }]}>
+        <View style={styles.headerAccent} />
+        <View style={styles.headerTop}>
+          <View style={styles.brand}>
+            <View style={styles.brandIcon}><Ionicons name="nutrition" size={17} color="#fff" /></View>
+            <Text style={styles.brandName}>MeatBig</Text>
+          </View>
+          <TouchableOpacity style={styles.notifBtn} onPress={() => {}}>
+            <Ionicons name="notifications-outline" size={18} color={C.t2} />
+            {urgent.length > 0 && <View style={styles.notifDot} />}
+          </TouchableOpacity>
         </View>
-        <View style={[styles.statBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <Text style={{ fontSize: fontSize.xxl, fontWeight: '900', color: nearExpiry3.length > 0 ? pal.rd : pal.gn }}>
-            {nearExpiry3.length}
+        <View style={styles.headerInfo}>
+          <Text style={styles.headerDate}>{dateStr}</Text>
+          <Text style={styles.headerStore}>
+            {bizName || '한우직판장'}{' '}
+            <Text style={{ color:C.red }}>사장님</Text>
           </Text>
-          <Text style={{ fontSize: fontSize.xxs, color: pal.t3, marginTop: 4, fontWeight: '700' }}>⚠️ 소비기한임박</Text>
-        </View>
-        <View style={[styles.statBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <Text style={{ fontSize: fontSize.xxl, fontWeight: '900', color: pal.gn }}>{checkDoneCount}/3</Text>
-          <Text style={{ fontSize: fontSize.xxs, color: pal.t3, marginTop: 4, fontWeight: '700' }}>✅ 오늘 점검</Text>
         </View>
       </View>
 
-      {/* ── 3. 오늘의 점검 섹션 ── */}
-      <SectionHeader
-        label="오늘의 점검"
-        linkLabel="전체 보기"
-        pal={pal}
-        onLink={() => navigation.navigate('DocsTab')}
-      />
-      <View style={[styles.checkCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-        {/* 이력번호 조회 */}
-        <TouchableOpacity
-          style={styles.checkRow}
-          onPress={() => navigation.navigate('TraceTab', { screen: 'Scan' })}
-          activeOpacity={0.75}
-        >
-          <View style={[styles.dot, { backgroundColor: pal.rd }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: pal.tx }}>이력번호 조회</Text>
-            <Text style={{ fontSize: fontSize.xxs, color: pal.t3, marginTop: 2 }}>바코드 스캔으로 확인</Text>
-          </View>
-          <View style={[styles.chip, { backgroundColor: pal.rd + '20' }]}>
-            <Text style={{ fontSize: fontSize.xxs, fontWeight: '800', color: pal.rd }}>2건</Text>
-          </View>
-        </TouchableOpacity>
-
-        <View style={[styles.checkDivider, { borderTopColor: pal.bd }]} />
-
-        {/* 위생점검 */}
-        <TouchableOpacity
-          style={styles.checkRow}
-          onPress={() => navigation.navigate('DocsTab', { screen: 'Hygiene' })}
-          activeOpacity={0.75}
-        >
-          <View style={[styles.dot, { backgroundColor: hygieneNeeded ? pal.yw : pal.gn }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: pal.tx }}>위생점검</Text>
-            <Text style={{ fontSize: fontSize.xxs, color: pal.t3, marginTop: 2 }}>오전 위생일지 작성</Text>
-          </View>
-          <View style={[styles.chip, { backgroundColor: (hygieneNeeded ? pal.yw : pal.gn) + '20' }]}>
-            <Text style={{ fontSize: fontSize.xxs, fontWeight: '800', color: hygieneNeeded ? pal.yw : pal.gn }}>
-              {hygieneNeeded ? '미완료' : '완료'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        <View style={[styles.checkDivider, { borderTopColor: pal.bd }]} />
-
-        {/* 냉장고 온도 */}
-        <TouchableOpacity
-          style={styles.checkRow}
-          onPress={() => navigation.navigate('DocsTab', { screen: 'Temp' })}
-          activeOpacity={0.75}
-        >
-          <View style={[styles.dot, { backgroundColor: tempNeeded ? pal.cyan : pal.gn }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: pal.tx }}>냉장고 온도</Text>
-            <Text style={{ fontSize: fontSize.xxs, color: pal.t3, marginTop: 2 }}>온도 기록 및 확인</Text>
-          </View>
-          <View style={[styles.chip, { backgroundColor: (tempNeeded ? pal.cyan : pal.gn) + '20' }]}>
-            <Text style={{ fontSize: fontSize.xxs, fontWeight: '800', color: tempNeeded ? pal.cyan : pal.gn }}>
-              {tempNeeded ? '기록 필요' : '완료'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── 4. 재고 현황 ── */}
-      <SectionHeader
-        label="재고 현황"
-        linkLabel="재고 보기"
-        pal={pal}
-        onLink={() => navigation.navigate('InventoryTab')}
-      />
-      {activeMeat.length === 0 ? (
-        <StartGuide pal={pal} navigation={navigation} />
-      ) : (
-        <View style={[styles.sectionCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <View style={styles.gaugeList}>
-            {activeMeat.slice(0, 4).map(item => (
-              <GaugeBar
-                key={item.id}
-                label={item.cut}
-                sub={item.origin}
-                value={item.qty}
-                max={20}
-                unit="kg"
-                dday={getDday(item)}
-                height={12}
-              />
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* ── 5. 손실 방어 카드 ── */}
-      <SectionHeader label="손실 방어 현황" pal={pal} />
+      {/* ── 검색 ──────────────────────────────────────────── */}
       <TouchableOpacity
-        style={[styles.lossCard, {
-          backgroundColor: criticalLoss > 0 ? pal.rd + '10' : pal.s1,
-          borderColor: criticalLoss > 0 ? pal.rd + '40' : pal.bd,
-        }]}
+        style={styles.searchRow}
+        activeOpacity={0.8}
         onPress={() => navigation.navigate('InventoryTab')}
-        activeOpacity={0.85}
       >
-        <View style={styles.lossHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: pal.tx, marginBottom: 3 }}>
-              ⚠️ 3일 내 소비기한 손실 예상
-            </Text>
-            <Text style={{ fontSize: fontSize.xxs, color: pal.t3 }}>
-              {nearExpiry3.length > 0
-                ? `${nearExpiry3.slice(0, 3).map(m => m.cut).join('·')}${nearExpiry3.length > 3 ? ` 외 ${nearExpiry3.length - 3}건` : ` ${nearExpiry3.length}건`}`
-                : '소비기한 임박 재고 없음'}
-            </Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ fontSize: fontSize.xl, fontWeight: '900', color: potentialLoss > 0 ? pal.rd : pal.gn }}>
-              {potentialLoss > 0 ? `₩${potentialLoss.toLocaleString()}` : '이상 없음'}
-            </Text>
-            {potentialLoss > 0 && (
-              <Text style={{ fontSize: 20 }}>🚨</Text>
-            )}
-          </View>
+        <View style={styles.searchBox}>
+          <Ionicons name="search-outline" size={16} color={C.t4} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="재고명, 등급으로 검색..."
+            placeholderTextColor={C.t4}
+            value={searchQ}
+            onChangeText={setSearchQ}
+            onSubmitEditing={() => navigation.navigate('InventoryTab')}
+            returnKeyType="search"
+          />
+          {searchQ.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQ('')}>
+              <Ionicons name="close-circle" size={18} color={C.t4} />
+            </TouchableOpacity>
+          )}
         </View>
-
-        {nearExpiry3.length > 0 && (
-          <View style={[styles.lossDivider, { borderTopColor: pal.bd + '60' }]}>
-            {nearExpiry3.slice(0, 3).map(item => (
-              <View key={item.id} style={styles.lossRow}>
-                <View style={[styles.lossDot, {
-                  backgroundColor: getDday(item) === 0 ? pal.rd : getDday(item) === 1 ? pal.yw : pal.a2,
-                }]} />
-                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: pal.tx }}>{item.cut}</Text>
-                <Text style={{ fontSize: fontSize.xs, color: pal.t2 }}>{item.qty}kg</Text>
-                <View style={{ flex: 1 }} />
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: getDday(item) <= 1 ? pal.rd : pal.yw }}>
-                  {getDday(item) === 0 ? '오늘 만료' : `D-${getDday(item)}`}
-                </Text>
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '600', color: pal.t3, marginLeft: spacing.sm }}>
-                  {(((item.qty || 0) * getBuyPrice(item)) / 10000).toFixed(1)}만원
-                </Text>
-              </View>
-            ))}
-            {nearExpiry3.length > 3 && (
-              <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: pal.a2, textAlign: 'right', marginTop: 4 }}>
-                + {nearExpiry3.length - 3}개 더 보기 →
-              </Text>
-            )}
-          </View>
-        )}
-
-        {potentialLoss === 0 && (
-          <View style={[styles.lossDivider, { borderTopColor: pal.bd + '60' }]}>
-            <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: pal.gn, textAlign: 'center', paddingVertical: 4 }}>
-              ✓ 3일 이내 만료 재고 없음 — 현황 양호
-            </Text>
-          </View>
-        )}
       </TouchableOpacity>
 
-      {/* ── 6. 마진 분석 ── */}
-      {marginItems.length > 0 && (
-        <>
-          <SectionHeader label="마진 분석" pal={pal} />
+      {/* ── 카테고리 칩 ───────────────────────────────────── */}
+      <ScrollView
+        horizontal showsHorizontalScrollIndicator={false}
+        style={styles.chipsWrap}
+        contentContainerStyle={styles.chipsContent}
+      >
+        {['전체','한우','수입육', nearExpiry3.length > 0 ? `⚠ 임박 ${nearExpiry3.length}건` : null, '숙성중']
+          .filter(Boolean)
+          .map(chip => {
+            const isWarn = chip.includes('임박');
+            const isActive = activeChip === chip;
+            return (
+              <TouchableOpacity
+                key={chip}
+                style={[
+                  styles.chip,
+                  isActive && styles.chipActive,
+                  isWarn && !isActive && styles.chipWarn,
+                ]}
+                onPress={() => setChip(chip)}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.chipTxt,
+                  isActive && styles.chipTxtActive,
+                  isWarn && !isActive && { color: C.warn },
+                ]}>{chip}</Text>
+              </TouchableOpacity>
+            );
+          })}
+      </ScrollView>
 
-          {/* 이번 달 실현 마진 요약 */}
-          {soldThisMonth.length > 0 && (
-            <View style={[styles.marginSummaryRow, { marginHorizontal: spacing.lg, marginBottom: spacing.sm }]}>
-              <View style={[styles.marginSummaryBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-                <Text style={[styles.marginSummaryLabel, { color: pal.t3 }]}>이달 매출</Text>
-                <Text style={[styles.marginSummaryVal, { color: pal.a2 }]}>{(monthRevenue / 10000).toFixed(0)}만원</Text>
-              </View>
-              <View style={[styles.marginSummaryBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-                <Text style={[styles.marginSummaryLabel, { color: pal.t3 }]}>이달 마진</Text>
-                <Text style={[styles.marginSummaryVal, { color: monthProfit >= 0 ? pal.gn : pal.rd }]}>
-                  {monthProfit >= 0 ? '+' : ''}{(monthProfit / 10000).toFixed(0)}만원
-                </Text>
-              </View>
-              <View style={[styles.marginSummaryBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-                <Text style={[styles.marginSummaryLabel, { color: pal.t3 }]}>마진율</Text>
-                <Text style={[styles.marginSummaryVal, { color: monthMarginPct >= 25 ? pal.gn : pal.yw }]}>
-                  {monthMarginPct !== null ? `${monthMarginPct}%` : '--'}
-                </Text>
-              </View>
-            </View>
-          )}
+      {/* ── 스크롤 본문 ───────────────────────────────────── */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
 
-          <View style={[styles.sectionCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-            {/* TOP 3 고마진 */}
-            <View style={styles.marginGroupHeader}>
-              <View style={[styles.marginGroupBadge, { backgroundColor: pal.gn + '20' }]}>
-                <Text style={[styles.marginGroupBadgeText, { color: pal.gn }]}>🏆 고마진 TOP 3</Text>
-              </View>
-            </View>
-            {topMargin.map((item, idx) => (
-              <MarginBar key={item.id} item={item} rank={idx + 1} maxPct={maxMarginPct} color={pal.gn} pal={pal} />
-            ))}
-            {topMargin.length === 0 && (
-              <Text style={{ color: pal.t3, fontSize: fontSize.xs, paddingVertical: 8, textAlign: 'center' }}>마진 데이터 없음</Text>
-            )}
-
-            {/* 구분선 */}
-            <View style={[styles.marginDivider, { borderTopColor: pal.bd }]} />
-
-            {/* LOW 3 저마진 — topMargin과 겹치지 않는 경우만 */}
-            {lowMargin.some(l => !topMargin.find(t => t.id === l.id)) && (
-              <>
-                <View style={[styles.marginGroupHeader, { marginTop: 4 }]}>
-                  <View style={[styles.marginGroupBadge, { backgroundColor: pal.rd + '18' }]}>
-                    <Text style={[styles.marginGroupBadgeText, { color: pal.rd }]}>⚠️ 저마진 하위 3</Text>
-                  </View>
-                </View>
-                {lowMargin.filter(l => !topMargin.find(t => t.id === l.id)).map((item, idx) => (
-                  <MarginBar key={item.id} item={item} rank={idx + 1} maxPct={maxMarginPct} color={pal.rd} pal={pal} lowMode />
-                ))}
-              </>
-            )}
-
-            {/* 전체 바 차트 (3개 초과 시) */}
-            {marginItems.length > 3 && (
-              <>
-                <View style={[styles.marginDivider, { borderTopColor: pal.bd }]} />
-                <Text style={[styles.marginChartTitle, { color: pal.t2 }]}>📊 전체 부위별 마진율</Text>
-                {marginItems.map(item => (
-                  <View key={item.id} style={styles.marginChartRow}>
-                    <Text style={[styles.marginChartCut, { color: pal.t2 }]} numberOfLines={1}>{item.cut}</Text>
-                    <View style={styles.marginChartBarWrap}>
-                      <View
-                        style={[
-                          styles.marginChartBar,
-                          {
-                            width: `${Math.max(4, Math.round((item.marginPct / (maxMarginPct || 1)) * 100))}%`,
-                            backgroundColor: item.marginPct >= 30 ? pal.gn : item.marginPct >= 15 ? pal.yw : pal.rd,
-                          },
-                        ]}
-                      />
-                    </View>
-                    <Text style={[styles.marginChartPct, {
-                      color: item.marginPct >= 30 ? pal.gn : item.marginPct >= 15 ? pal.yw : pal.rd,
-                    }]}>{item.marginPct}%</Text>
-                  </View>
-                ))}
-              </>
-            )}
-          </View>
-        </>
-      )}
-
-      {/* ── 7. 빠른 실행 6개 그리드 ── */}
-      <SectionHeader label="빠른 실행" pal={pal} />
-      <View style={styles.quickGrid}>
-        {QUICK_ACTIONS.map((q, i) => (
+        {/* 손실 배너 */}
+        {nearExpiry3.length > 0 && (
           <TouchableOpacity
-            key={i}
-            style={[styles.quickBtn, { backgroundColor: pal.s1, borderColor: pal.bd }]}
-            onPress={() => {
-              if (q.screen) navigation.navigate(q.tab, { screen: q.screen, initial: q.initial });
-              else navigation.navigate(q.tab);
-            }}
-            activeOpacity={0.75}
+            style={styles.lossBanner}
+            onPress={() => navigation.navigate('InventoryTab')}
+            activeOpacity={0.85}
           >
-            <View style={[styles.quickIconWrap, { backgroundColor: q.color + '22' }]}>
-              <Text style={{ fontSize: 26 }}>{q.icon}</Text>
+            <View style={styles.lossStripe} />
+            <View style={styles.lossInner}>
+              <View style={styles.lossIconBox}>
+                <Ionicons name="alert-circle" size={22} color={C.red} />
+              </View>
+              <View style={{ flex:1 }}>
+                <Text style={styles.lossTtl}>3일 내 손실 위험 {nearExpiry3.length}건</Text>
+                <Text style={styles.lossSub} numberOfLines={1}>
+                  {nearExpiry3.slice(0,3).map(m => `${m.cut} D-${getDday(m)}`).join(' · ')}
+                </Text>
+              </View>
+              <View style={styles.lossRight}>
+                <Text style={styles.lossAmt}>₩{potentialLoss.toLocaleString()}</Text>
+                <Text style={styles.lossLbl}>손실 예상액</Text>
+              </View>
             </View>
-            <Text style={{ fontSize: 11, fontWeight: '800', color: pal.tx, textAlign: 'center', marginTop: 6 }}>{q.label}</Text>
           </TouchableOpacity>
-        ))}
-      </View>
+        )}
 
-    </ScrollView>
+        {/* 3 stat 카드 */}
+        <View style={styles.statsRow}>
+          <StatCard
+            color={C.red} iconBg={C.redS}
+            ionicon="cube-outline" value={activeMeat.length}
+            label={'재고\n종류'}
+            onPress={() => navigation.navigate('InventoryTab')}
+          />
+          <StatCard
+            color={nearExpiry3.length > 0 ? C.warn2 : C.ok2}
+            iconBg={nearExpiry3.length > 0 ? C.warnS : C.okS}
+            ionicon="alarm-outline" value={nearExpiry3.length}
+            label={'소비기한\n임박'}
+            onPress={() => navigation.navigate('InventoryTab')}
+          />
+          <StatCard
+            color={C.ok2} iconBg={C.okS}
+            ionicon="checkmark-circle-outline" value={`${checkDoneCount}/3`}
+            label={'오늘\n점검'}
+            onPress={() => navigation.navigate('DocsTab')}
+          />
+        </View>
+
+        {/* 오늘의 점검 */}
+        <SecHeader
+          label="오늘의 점검" linkLabel="전체 보기"
+          onLink={() => navigation.navigate('DocsTab')}
+        />
+        <View style={styles.checksWrap}>
+          <CheckItem
+            label="이력번호 조회" sub="바코드 스캔으로 확인"
+            stripe={C.red} iconBg={C.redS} iconName="pricetag-outline"
+            badgeColor={C.red} badgeTxt="2건"
+            onPress={() => navigation.navigate('TraceTab', { screen:'Scan' })}
+          />
+          <CheckItem
+            label="위생점검" sub="오전 위생일지 작성"
+            stripe={hygieneNeeded ? C.warn2 : C.ok2}
+            iconBg={hygieneNeeded ? C.warnS : C.okS}
+            iconName="shield-checkmark-outline"
+            badgeColor={hygieneNeeded ? C.warn2 : C.ok2}
+            badgeTxt={hygieneNeeded ? '미완료' : '완료'}
+            onPress={() => navigation.navigate('DocsTab', { screen:'Hygiene' })}
+          />
+          <CheckItem
+            label="냉장고 온도" sub="온도 기록 및 확인"
+            stripe={C.blue2} iconBg={C.blueS} iconName="thermometer-outline"
+            badgeColor={C.blue2} badgeTxt="기록 필요"
+            onPress={() => {}}
+          />
+        </View>
+
+        {/* 재고 현황 2열 그리드 */}
+        <SecHeader
+          label="재고 현황" linkLabel="재고 보기"
+          onLink={() => navigation.navigate('InventoryTab')}
+        />
+        {activeMeat.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Ionicons name="cube-outline" size={32} color={C.t4} style={{ marginBottom:8 }} />
+            <Text style={{ fontSize:fontSize.sm, fontWeight:'700', color:C.t2, marginBottom:4 }}>재고가 없습니다</Text>
+            <Text style={{ fontSize:fontSize.xs, color:C.t3 }}>재고 탭에서 첫 재고를 등록해보세요</Text>
+          </View>
+        ) : (
+          <View style={styles.invGrid}>
+            {activeMeat.slice(0, 4).map((item, idx) => {
+              const dday = getDday(item);
+              const ddColor = dday <= 1 ? C.red : dday <= 3 ? C.warn2 : null;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.invCard}
+                  onPress={() => navigation.navigate('InventoryTab')}
+                  activeOpacity={0.85}
+                >
+                  {/* 사진 영역 */}
+                  <View style={[styles.invPhoto, { backgroundColor: PHOTO_COLORS[idx % 4] }]}>
+                    <View style={styles.invPhotoOverlay} />
+                    <Text style={styles.invPhotoIcon}>🥩</Text>
+                    <View style={styles.invBadges}>
+                      <View style={styles.invGrade}>
+                        <Text style={styles.invGradeTxt}>{item.grade || '1+'}</Text>
+                      </View>
+                      {ddColor && (
+                        <View style={[styles.invDday, { backgroundColor: C.white }]}>
+                          <Text style={[styles.invDdayTxt, { color: ddColor }]}>
+                            {dday === 0 ? 'D-0' : `D-${dday}`}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                  {/* 정보 영역 */}
+                  <View style={styles.invBody}>
+                    <Text style={styles.invName} numberOfLines={1}>{item.cut}</Text>
+                    <Text style={styles.invSub}>{item.qty}kg · {item.origin}</Text>
+                    <Text style={styles.invPrice}>
+                      {getSellPrice(item) > 0 ? `₩${getSellPrice(item).toLocaleString()}/kg` : '—'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {/* 마진 분석 */}
+        {marginItems.length > 0 && (
+          <>
+            <SecHeader label="마진 분석" />
+            <View style={styles.mgWrap}>
+              {/* 탭 */}
+              <View style={styles.mgTabs}>
+                <TouchableOpacity
+                  style={[styles.mgTab, marginTab === 'top' && styles.mgTabOn]}
+                  onPress={() => setMarginTab('top')}
+                >
+                  <Text style={[styles.mgTabTxt, marginTab === 'top' && styles.mgTabTxtOn]}>
+                    고마진 TOP 3
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.mgTab, marginTab === 'low' && styles.mgTabOn]}
+                  onPress={() => setMarginTab('low')}
+                >
+                  <Text style={[styles.mgTabTxt, marginTab === 'low' && styles.mgTabTxtOn]}>
+                    손실 주의
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {/* 마진 바 */}
+              <View style={{ gap:7 }}>
+                {(marginTab === 'top' ? topMargin : lowMargin).map((item, idx) => {
+                  const isGood = marginTab === 'top';
+                  const pct = Math.max(4, Math.round((item.marginPct / (maxMarginPct || 1)) * 100));
+                  return (
+                    <View key={item.id} style={styles.mgRow}>
+                      <View style={[styles.mgRank, { backgroundColor: isGood ? C.okS : C.warnS }]}>
+                        <Text style={[styles.mgRankTxt, { color: isGood ? C.ok2 : C.warn2 }]}>{idx + 1}</Text>
+                      </View>
+                      <Text style={styles.mgName} numberOfLines={1}>{item.cut}</Text>
+                      <View style={styles.mgBarWrap}>
+                        <View style={styles.mgBarBg}>
+                          <View style={[styles.mgBarFill, {
+                            width: `${pct}%`,
+                            backgroundColor: isGood ? C.ok2 : C.warn2,
+                          }]} />
+                        </View>
+                      </View>
+                      <Text style={[styles.mgPct, { color: isGood ? C.ok2 : C.warn2 }]}>
+                        {item.marginPct}%
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* 빠른 실행 */}
+        <SecHeader label="빠른 실행" />
+        <View style={styles.quickGrid}>
+          {QUICK_ACTIONS.map((q, i) => (
+            <TouchableOpacity
+              key={i}
+              style={[styles.quickBtn, q.main && styles.quickBtnMain]}
+              onPress={() => {
+                if (q.screen) navigation.navigate(q.tab, { screen:q.screen, initial:true });
+                else navigation.navigate(q.tab);
+              }}
+              activeOpacity={0.8}
+            >
+              {urgent.length > 0 && q.screen === 'Scan' && (
+                <View style={styles.quickBadge}><Text style={{ fontSize:8, color:'#fff', fontWeight:'800' }}>{urgent.length}</Text></View>
+              )}
+              <View style={[styles.quickIcon, q.main && styles.quickIconMain]}>
+                <Ionicons name={q.ionicon} size={22} color={q.main ? '#fff' : C.t2} />
+              </View>
+              <Text style={[styles.quickLabel, q.main && styles.quickLabelMain]}>{q.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+      </ScrollView>
+    </View>
   );
 }
 
 // ── 서브 컴포넌트 ─────────────────────────────────────────
 
-function SectionHeader({ label, linkLabel, pal, onLink }) {
+function SecHeader({ label, linkLabel, onLink }) {
   return (
-    <View style={styles.sectionHeaderRow}>
-      <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: pal.tx }}>{label}</Text>
+    <View style={styles.secHeader}>
+      <Text style={styles.secTitle}>{label}</Text>
       {linkLabel && onLink && (
-        <TouchableOpacity onPress={onLink}>
-          <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: pal.a2 }}>{linkLabel} →</Text>
+        <TouchableOpacity onPress={onLink} style={{ flexDirection:'row', alignItems:'center', gap:2 }}>
+          <Text style={styles.secLink}>{linkLabel}</Text>
+          <Text style={[styles.secLink, { fontSize:12 }]}>›</Text>
         </TouchableOpacity>
       )}
     </View>
   );
 }
 
-const GUIDE_STEPS = [
-  {
-    step: '1',
-    icon: '📦',
-    title: '첫 재고 등록',
-    desc: '재고 탭 → "+ 재고 추가"\n부위·매입가·소비기한을 입력하면\n마진 분석이 자동으로 시작됩니다',
-    tip: '💡 거래명세서 사진을 찍으면 AI가 자동으로 채워줍니다',
-    tab: 'InventoryTab',
-    screen: null,
-    color: '#3b82f6',
-  },
-  {
-    step: '2',
-    icon: '🧼',
-    title: '위생 점검 시작',
-    desc: '서류 탭 → "위생 일지"\nHACCP 기준 6개 항목을\n매일 기록해 위생점수를 관리합니다',
-    tip: '💡 매일 오전 9시 푸시 알림으로 알려드립니다',
-    tab: 'DocsTab',
-    screen: 'Hygiene',
-    color: '#22c55e',
-  },
-  {
-    step: '3',
-    icon: '🔍',
-    title: '스캔 탭 활용',
-    desc: '스캔 탭 → 이력 조회 또는 서류 OCR\n바코드로 원산지·등급 확인,\n서류 촬영으로 재고 자동 등록',
-    tip: '💡 거래명세서 OCR → 재고 자동 등록, 보건증 OCR → 직원 서류 업데이트',
-    tab: 'TraceTab',
-    screen: 'Scan',
-    color: '#f59e0b',
-  },
-];
-
-function StartGuide({ pal, navigation }) {
+function StatCard({ color, iconBg, ionicon, value, label, onPress }) {
   return (
-    <View style={{ marginHorizontal: spacing.lg, marginTop: spacing.sm }}>
-      {/* 헤더 배너 */}
-      <View style={[styles.guideHeader, { backgroundColor: pal.ac + '15', borderColor: pal.ac + '40' }]}>
-        <Text style={{ fontSize: 32 }}>🚀</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.guideHeaderTitle, { color: pal.tx }]}>시작 가이드</Text>
-          <Text style={[styles.guideHeaderSub, { color: pal.t3 }]}>
-            아래 3단계로 MeatBig을 시작해보세요
-          </Text>
-        </View>
+    <TouchableOpacity style={styles.statCard} onPress={onPress} activeOpacity={0.82}>
+      <View style={[styles.statAccent, { backgroundColor: color }]} />
+      <View style={[styles.statIcon, { backgroundColor: iconBg }]}>
+        <Ionicons name={ionicon} size={16} color={color} />
       </View>
-
-      {/* 3단계 카드 */}
-      {GUIDE_STEPS.map(g => (
-        <TouchableOpacity
-          key={g.step}
-          style={[styles.guideCard, { backgroundColor: pal.s1, borderColor: pal.bd, borderLeftColor: g.color, borderLeftWidth: 4 }]}
-          onPress={() => {
-            if (g.screen) navigation.navigate(g.tab, { screen: g.screen, initial: true });
-            else navigation.navigate(g.tab);
-          }}
-          activeOpacity={0.82}
-        >
-          <View style={[styles.guideStepBadge, { backgroundColor: g.color }]}>
-            <Text style={styles.guideStepText}>{g.step}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.guideCardTop}>
-              <Text style={{ fontSize: 24 }}>{g.icon}</Text>
-              <Text style={[styles.guideCardTitle, { color: pal.tx }]}>{g.title}</Text>
-              <Text style={[styles.guideCardArrow, { color: g.color }]}>→</Text>
-            </View>
-            <Text style={[styles.guideCardDesc, { color: pal.t3 }]}>{g.desc}</Text>
-            <View style={[styles.guideTipBox, { backgroundColor: g.color + '12' }]}>
-              <Text style={[styles.guideTipText, { color: g.color }]}>{g.tip}</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-      ))}
-    </View>
+      <Text style={[styles.statVal, { color }]}>{value}</Text>
+      <Text style={styles.statLbl}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
-function MarginBar({ item, rank, maxPct, color, pal, lowMode }) {
-  const buy  = getBuyPrice(item);
-  const sell = getSellPrice(item);
-  const pct  = item.marginPct;
-  const barWidth = Math.max(4, Math.round((pct / (maxPct || 1)) * 100));
+function CheckItem({ label, sub, stripe, iconBg, iconName, badgeColor, badgeTxt, onPress }) {
   return (
-    <View style={styles.marginBarRow}>
-      <View style={[styles.marginRankBadge, { backgroundColor: color + '18' }]}>
-        <Text style={[styles.marginRankText, { color }]}>{rank}</Text>
+    <TouchableOpacity style={styles.ckItem} onPress={onPress} activeOpacity={0.82}>
+      <View style={[styles.ckStripe, { backgroundColor: stripe }]} />
+      <View style={[styles.ckIcon, { backgroundColor: iconBg }]}>
+        <Ionicons name={iconName} size={18} color={stripe} />
       </View>
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-          <Text style={[styles.marginBarCut, { color: pal.tx }]}>{item.cut}</Text>
-          <Text style={[styles.marginBarPct, { color }]}>{pct}%</Text>
-        </View>
-        <View style={[styles.marginBarTrack, { backgroundColor: pal.bg }]}>
-          <View style={[styles.marginBarFill, { width: `${barWidth}%`, backgroundColor: color }]} />
-        </View>
-        <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: 4 }}>
-          <Text style={[styles.marginBarSub, { color: pal.t3 }]}>매입 {buy.toLocaleString()}원</Text>
-          <Text style={[styles.marginBarSub, { color: pal.t3 }]}>판매 {sell.toLocaleString()}원</Text>
-          <Text style={[styles.marginBarSub, { color }]}>
-            +{item.marginPerKg.toLocaleString()}원/kg
-          </Text>
-        </View>
+      <View style={{ flex:1 }}>
+        <Text style={styles.ckName}>{label}</Text>
+        <Text style={styles.ckSub}>{sub}</Text>
       </View>
-    </View>
+      <View style={[styles.ckBadge, { backgroundColor: badgeColor + '18' }]}>
+        <Text style={[styles.ckBadgeTxt, { color: badgeColor }]}>{badgeTxt}</Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
+// ── StyleSheet ────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-
   // 헤더
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-  },
+  header:       { backgroundColor:C.white, borderBottomWidth:1, borderBottomColor:C.border, overflow:'hidden' },
+  headerAccent: { height:3, backgroundColor:C.red, position:'absolute', top:0, left:0, right:0 },
+  headerTop:    { paddingHorizontal:20, paddingTop:10, paddingBottom:2, flexDirection:'row', justifyContent:'space-between', alignItems:'center' },
+  brand:        { flexDirection:'row', alignItems:'center', gap:9 },
+  brandIcon:    { width:33, height:33, borderRadius:10, backgroundColor:C.red, alignItems:'center', justifyContent:'center' },
+  brandName:    { fontSize:18, fontWeight:'800', color:C.t1, letterSpacing:-0.5 },
+  notifBtn:     { width:34, height:34, borderRadius:17, backgroundColor:C.bg2, alignItems:'center', justifyContent:'center' },
+  notifDot:     { position:'absolute', top:6, right:6, width:7, height:7, borderRadius:4, backgroundColor:C.red, borderWidth:1.5, borderColor:C.white },
+  headerInfo:   { paddingHorizontal:20, paddingBottom:14, paddingTop:4 },
+  headerDate:   { fontSize:14, color:C.t3, fontWeight:'500', marginBottom:4 },
+  headerStore:  { fontSize:28, fontWeight:'900', color:C.t1, letterSpacing:-0.8 },
 
-  // 3-stat 박스 행
-  statRow: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  statBox: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderRadius: 14,
-    borderWidth: 1,
-    ...shadow.sm,
-  },
+  // 검색
+  searchRow:    { backgroundColor:C.white, paddingHorizontal:16, paddingBottom:14, borderBottomWidth:1, borderBottomColor:C.border },
+  searchBox:    { backgroundColor:C.bg2, borderRadius:14, paddingHorizontal:16, paddingVertical:12, flexDirection:'row', alignItems:'center', gap:10, minHeight:48 },
+  searchInput:  { flex:1, fontSize:16, color:C.t1, fontWeight:'500', paddingVertical:0 },
+
+  // 칩
+  chipsWrap:    { backgroundColor:C.white, borderBottomWidth:1, borderBottomColor:C.border, minHeight:60 },
+  chipsContent: { paddingHorizontal:16, paddingVertical:12, flexDirection:'row', gap:10, alignItems:'center' },
+  chip:         { height:42, paddingHorizontal:22, borderRadius:21, backgroundColor:'#E8ECF2', alignItems:'center', justifyContent:'center' },
+  chipActive:   { backgroundColor:'#0F172A' },
+  chipWarn:     { backgroundColor:'#FEF3C7', borderWidth:1.5, borderColor:'#D97706' },
+  chipTxt:      { fontSize:17, fontWeight:'800', color:'#0F172A', includeFontPadding:false, textAlignVertical:'center' },
+  chipTxtActive:{ color:'#FFFFFF' },
+
+  // 손실 배너
+  lossBanner:   { marginHorizontal:16, marginTop:14, backgroundColor:C.white, borderRadius:20, overflow:'hidden', borderWidth:1, borderColor:C.border, flexDirection:'row' },
+  lossStripe:   { width:4, backgroundColor:C.red },
+  lossInner:    { flex:1, padding:14, flexDirection:'row', alignItems:'center', gap:12 },
+  lossIconBox:  { width:44, height:44, borderRadius:14, backgroundColor:C.redS, alignItems:'center', justifyContent:'center' },
+  lossTtl:      { fontSize:16, fontWeight:'700', color:C.t1, marginBottom:3 },
+  lossSub:      { fontSize:14, color:C.t3, lineHeight:18 },
+  lossRight:    { alignItems:'flex-end', flexShrink:0 },
+  lossAmt:      { fontSize:20, fontWeight:'900', color:C.red, letterSpacing:-0.8, marginBottom:2 },
+  lossLbl:      { fontSize:11, color:C.t4 },
+
+  // stat 카드
+  statsRow:     { flexDirection:'row', gap:9, paddingHorizontal:16, paddingTop:14 },
+  statCard:     { flex:1, backgroundColor:C.white, borderRadius:16, padding:14, overflow:'hidden' },
+  statAccent:   { position:'absolute', top:0, left:0, right:0, height:3 },
+  statIcon:     { width:34, height:34, borderRadius:10, alignItems:'center', justifyContent:'center', marginBottom:10 },
+  statVal:      { fontSize:36, fontWeight:'900', letterSpacing:-1.5, lineHeight:40, marginBottom:6 },
+  statLbl:      { fontSize:13, color:C.t3, fontWeight:'600', lineHeight:17 },
 
   // 섹션 헤더
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
+  secHeader:    { paddingHorizontal:20, paddingTop:22, paddingBottom:12, flexDirection:'row', justifyContent:'space-between', alignItems:'center' },
+  secTitle:     { fontSize:20, fontWeight:'800', color:C.t1, letterSpacing:-0.4 },
+  secLink:      { fontSize:14, fontWeight:'600', color:C.red },
 
-  // 오늘의 점검 카드
-  checkCard: {
-    marginHorizontal: spacing.lg,
-    borderRadius: 14,
-    borderWidth: 1,
-    ...shadow.sm,
-  },
-  checkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  checkDivider: { borderTopWidth: 1 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
+  // 점검 아이템
+  checksWrap:   { paddingHorizontal:16, gap:9 },
+  ckItem:       { backgroundColor:C.white, borderRadius:16, padding:16, paddingLeft:20, flexDirection:'row', alignItems:'center', gap:13, overflow:'hidden' },
+  ckStripe:     { position:'absolute', left:0, top:0, bottom:0, width:3 },
+  ckIcon:       { width:42, height:42, borderRadius:12, alignItems:'center', justifyContent:'center' },
+  ckName:       { fontSize:17, fontWeight:'700', color:C.t1, marginBottom:3 },
+  ckSub:        { fontSize:14, color:C.t3 },
+  ckBadge:      { paddingHorizontal:12, paddingVertical:5, borderRadius:20 },
+  ckBadgeTxt:   { fontSize:14, fontWeight:'700' },
 
-  // 섹션 카드 (재고, 마진)
-  sectionCard: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    marginHorizontal: spacing.lg,
-    padding: spacing.md,
-    ...shadow.sm,
-  },
-  gaugeList: { gap: 4 },
+  // 재고 그리드
+  invGrid:      { paddingHorizontal:16, flexDirection:'row', flexWrap:'wrap', gap:11 },
+  invCard:      { width:'47.5%', backgroundColor:C.white, borderRadius:20, overflow:'hidden' },
+  invPhoto:     { height:95, alignItems:'center', justifyContent:'center', position:'relative' },
+  invPhotoOverlay:{ position:'absolute', bottom:0, left:0, right:0, height:40, backgroundColor:'rgba(0,0,0,0.25)' },
+  invPhotoIcon: { fontSize:34, opacity:0.35, zIndex:2 },
+  invBadges:    { position:'absolute', top:8, left:8, right:8, flexDirection:'row', justifyContent:'space-between', zIndex:4 },
+  invGrade:     { backgroundColor:'rgba(255,255,255,0.2)', borderRadius:6, paddingHorizontal:8, paddingVertical:4, borderWidth:1, borderColor:'rgba(255,255,255,0.25)' },
+  invGradeTxt:  { fontSize:11, fontWeight:'800', color:'#fff' },
+  invDday:      { borderRadius:6, paddingHorizontal:9, paddingVertical:4 },
+  invDdayTxt:   { fontSize:12, fontWeight:'800' },
+  invBody:      { padding:12 },
+  invName:      { fontSize:17, fontWeight:'800', color:C.t1, marginBottom:3, letterSpacing:-0.3 },
+  invSub:       { fontSize:14, color:C.t3, marginBottom:8 },
+  invPrice:     { fontSize:18, fontWeight:'900', color:C.t1, letterSpacing:-0.5 },
 
-  // 손실 방어
-  lossCard: {
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
-    marginHorizontal: spacing.lg,
-    ...shadow.sm,
-  },
-  lossHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  lossDivider: { borderTopWidth: 1, padding: spacing.md, paddingTop: spacing.sm, gap: 8 },
-  lossRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  lossDot: { width: 9, height: 9, borderRadius: 5 },
-
-  // 시작 가이드
-  guideHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    borderRadius: radius.lg, borderWidth: 1.5,
-    padding: spacing.md, marginBottom: spacing.md, ...shadow.sm,
-  },
-  guideHeaderTitle: { fontSize: fontSize.md, fontWeight: '900', marginBottom: 3 },
-  guideHeaderSub:   { fontSize: fontSize.xs, fontWeight: '600' },
-  guideCard: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
-    borderRadius: radius.md, borderWidth: 1,
-    padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm,
-  },
-  guideStepBadge: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  guideStepText:  { color: '#fff', fontSize: fontSize.sm, fontWeight: '900' },
-  guideCardTop:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  guideCardTitle: { flex: 1, fontSize: fontSize.sm, fontWeight: '900' },
-  guideCardArrow: { fontSize: fontSize.md, fontWeight: '900' },
-  guideCardDesc:  { fontSize: fontSize.xs, lineHeight: 20, marginBottom: 8 },
-  guideTipBox:    { borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 6 },
-  guideTipText:   { fontSize: 11, fontWeight: '700' },
-
-  // 마진 분석
-  marginSummaryRow: { flexDirection: 'row', gap: spacing.sm },
-  marginSummaryBox: {
-    flex: 1, borderRadius: radius.md, borderWidth: 1,
-    padding: spacing.sm, alignItems: 'center', ...shadow.sm,
-  },
-  marginSummaryLabel: { fontSize: 11, fontWeight: '600', marginBottom: 3 },
-  marginSummaryVal:   { fontSize: fontSize.md, fontWeight: '900' },
-
-  marginGroupHeader: { marginBottom: spacing.sm },
-  marginGroupBadge:  { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
-  marginGroupBadgeText: { fontSize: fontSize.xs, fontWeight: '800' },
-
-  marginBarRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
-  marginRankBadge: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  marginRankText:  { fontSize: fontSize.sm, fontWeight: '900' },
-  marginBarCut:    { fontSize: fontSize.sm, fontWeight: '800' },
-  marginBarPct:    { fontSize: fontSize.md, fontWeight: '900' },
-  marginBarTrack:  { height: 8, borderRadius: 4, overflow: 'hidden' },
-  marginBarFill:   { height: 8, borderRadius: 4 },
-  marginBarSub:    { fontSize: 11, fontWeight: '600' },
-
-  marginDivider: { borderTopWidth: 1, marginVertical: spacing.md },
-  marginChartTitle: { fontSize: fontSize.xs, fontWeight: '800', marginBottom: spacing.sm },
-  marginChartRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 8 },
-  marginChartCut:  { width: 56, fontSize: 11, fontWeight: '700' },
-  marginChartBarWrap: { flex: 1, height: 10, borderRadius: 5, backgroundColor: 'rgba(128,128,128,0.12)', overflow: 'hidden' },
-  marginChartBar:  { height: 10, borderRadius: 5 },
-  marginChartPct:  { width: 36, fontSize: 11, fontWeight: '800', textAlign: 'right' },
+  // 마진
+  mgWrap:       { marginHorizontal:16, backgroundColor:C.white, borderRadius:16, padding:16 },
+  mgTabs:       { flexDirection:'row', backgroundColor:C.bg2, borderRadius:12, padding:3, gap:3, marginBottom:14 },
+  mgTab:        { flex:1, paddingVertical:10, alignItems:'center', borderRadius:10 },
+  mgTabOn:      { backgroundColor:C.white },
+  mgTabTxt:     { fontSize:15, fontWeight:'700', color:C.t3 },
+  mgTabTxtOn:   { color:C.t1 },
+  mgRow:        { flexDirection:'row', alignItems:'center', gap:11 },
+  mgRank:       { width:30, height:30, borderRadius:9, alignItems:'center', justifyContent:'center' },
+  mgRankTxt:    { fontSize:13, fontWeight:'800' },
+  mgName:       { fontSize:15, fontWeight:'600', color:C.t1, width:75 },
+  mgBarWrap:    { flex:1 },
+  mgBarBg:      { height:5, backgroundColor:C.bg3, borderRadius:10, overflow:'hidden' },
+  mgBarFill:    { height:5, borderRadius:10 },
+  mgPct:        { fontSize:20, fontWeight:'900', minWidth:42, textAlign:'right', letterSpacing:-0.5 },
 
   // 빠른 실행
-  quickGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: spacing.lg,
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  quickBtn: {
-    width: '30%',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 14,
-    borderWidth: 1,
-    ...shadow.sm,
-  },
-  quickIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  quickGrid:    { paddingHorizontal:16, paddingBottom:10, flexDirection:'row', flexWrap:'wrap', gap:10 },
+  quickBtn:     { width:'30.5%', backgroundColor:C.white, borderRadius:16, paddingVertical:18, paddingHorizontal:8, alignItems:'center', gap:10, overflow:'hidden' },
+  quickBtnMain: { backgroundColor:C.t1 },
+  quickBadge:   { position:'absolute', top:7, right:7, backgroundColor:C.red, paddingHorizontal:7, paddingVertical:3, borderRadius:6 },
+  quickIcon:    { width:46, height:46, borderRadius:14, backgroundColor:C.bg2, alignItems:'center', justifyContent:'center' },
+  quickIconMain:{ backgroundColor:'rgba(255,255,255,0.12)' },
+  quickLabel:   { fontSize:14, fontWeight:'700', color:C.t2, textAlign:'center', lineHeight:18 },
+  quickLabelMain:{ color:'rgba(255,255,255,0.85)' },
+
+  // 빈 재고
+  emptyBox:     { marginHorizontal:16, backgroundColor:C.white, borderRadius:16, padding:30, alignItems:'center' },
 });

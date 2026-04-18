@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
-import { useTheme } from '../lib/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
+import { fontSize, spacing, radius, shadow } from '../theme';
 import { useRole, OWNER_ONLY } from '../lib/RoleContext';
-import { PrimaryBtn } from '../components/UI';
 import { hygieneData, agingData, tempData, staffData, meats as mockMeats } from '../data/mockData';
 import { educationStore, meatStore } from '../lib/dataStore';
 import {
   genHygieneHTML, genTempHTML, genAgingHTML, genStaffHTML,
   genEducationAllHTML, genTaxReportHTML, printAndShare,
 } from '../lib/pdfTemplate';
+
+// ── V5 색상 상수 ──────────────────────────────────────────────
+const C = {
+  bg:'#F2F4F8', white:'#FFFFFF', red:'#B91C1C', red2:'#DC2626',
+  redS:'rgba(185,28,28,0.08)', redS2:'rgba(185,28,28,0.14)',
+  ok:'#15803D', ok2:'#16A34A', okS:'rgba(21,128,61,0.09)',
+  warn:'#B45309', warn2:'#D97706', warnS:'rgba(180,83,9,0.09)',
+  blue:'#1D4ED8', blue2:'#2563EB', blueS:'rgba(29,78,216,0.09)',
+  pur:'#6D28D9', purS:'rgba(109,40,217,0.09)',
+  t1:'#0F172A', t2:'#334155', t3:'#64748B', t4:'#94A3B8',
+  border:'#E2E8F0', bg2:'#F1F5F9', bg3:'#E8ECF2',
+};
 
 async function loadBiz() {
   try {
@@ -63,46 +74,42 @@ const DOCS = [
   {
     id: 'hygiene',
     title: '위생관리 점검표',
-    icon: '🧼',
+    icon: 'shield-checkmark',
+    iconColor: C.blue2,
+    iconBg: C.blueS,
     desc: '일일 위생·HACCP 점검 기록',
-    color: '#27AE60',
     screen: 'Hygiene',
     getHTML: (biz) => genHygieneHTML(hygieneData, biz),
   },
   {
     id: 'temp',
     title: '온도관리 기록부',
-    icon: '🌡️',
+    icon: 'thermometer',
+    iconColor: C.blue2,
+    iconBg: C.blueS,
     desc: '냉장·숙성실 온도·습도 기록',
-    color: '#00ACC1',
     screen: 'Temp',
     getHTML: (biz) => genTempHTML(tempData, biz),
   },
   {
     id: 'aging',
     title: '숙성 관리 대장',
-    icon: '🥩',
+    icon: 'nutrition',
+    iconColor: C.warn2,
+    iconBg: C.warnS,
     desc: '드라이에이징 이력 및 수율 기록',
-    color: '#E8950A',
     screen: 'Aging',
     getHTML: (biz) => genAgingHTML(agingData, biz),
   },
   {
-    id: 'staff',
-    title: '직원 보건증 현황',
-    icon: '👥',
-    desc: '보건증·위생교육 이수증 만료일',
-    color: '#8E44AD',
-    screen: 'Staff',
-    getHTML: (biz) => genStaffHTML(staffData, biz),
-  },
-  {
     id: 'education',
-    title: '영업자 자체위생교육 일지',
-    icon: '📚',
-    desc: '월 1회 직원 위생교육 실시 기록',
-    color: '#7C3AED',
+    title: '교육 일지',
+    icon: 'book',
+    iconColor: C.ok2,
+    iconBg: C.okS,
+    desc: '위생 교육 이수 기록',
     screen: 'Education',
+    plan: 'basic',
     getHTML: async (biz) => {
       const logs = await educationStore.load();
       return genEducationAllHTML(logs, biz);
@@ -111,10 +118,12 @@ const DOCS = [
   {
     id: 'tax',
     title: '세무 리포트',
-    icon: '📊',
-    desc: '연간 매출·매입·마진 요약 · 부가세 신고 참고용',
-    color: '#00ACC1',
+    icon: 'bar-chart',
+    iconColor: C.pur,
+    iconBg: C.purS,
+    desc: '월별 매출·원가·마진 분석',
     screen: 'TaxReport',
+    plan: 'pro',
     getHTML: async (biz) => {
       const items = await meatStore.load(mockMeats);
       const months = buildMonthlyReport(items);
@@ -127,7 +136,7 @@ const DOCS = [
 
 async function printDoc(doc) {
   const biz = await loadBiz();
-  const html = await doc.getHTML(biz);  // async getHTML 지원 (교육일지·세무리포트)
+  const html = await doc.getHTML(biz);
   if (!html || html.trim().length === 0) {
     Alert.alert('오류', 'PDF 내용을 생성할 수 없습니다.');
     return;
@@ -135,29 +144,39 @@ async function printDoc(doc) {
   await printAndShare(html, doc.title);
 }
 
+// ── 바로가기 버튼 컴포넌트 ────────────────────────────────────
+const ScBtn = ({ icon, label, iconColor, iconBg, onPress, plan }) => (
+  <TouchableOpacity style={S.scBtn} onPress={onPress} activeOpacity={0.8}>
+    {plan === 'basic' && (
+      <View style={S.planBdgBasic}><Text style={S.planBdgBasicTxt}>베이직</Text></View>
+    )}
+    {plan === 'pro' && (
+      <View style={S.planBdgPro}><Text style={S.planBdgProTxt}>프로</Text></View>
+    )}
+    <View style={[S.scIc, { backgroundColor: iconBg }]}>
+      <Ionicons name={icon} size={20} color={iconColor} />
+    </View>
+    <Text style={S.scLb}>{label}</Text>
+  </TouchableOpacity>
+);
+
 export default function DocumentScreen({ navigation }) {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
   const { role, canAccess } = useRole();
   const isStaff = role === 'staff';
 
   const [printModal, setPrintModal] = useState(false);
   const [printing, setPrinting] = useState(false);
 
-  // 직원 모드에서 사장 전용 화면 접근 차단
   const navigateSafe = (screen) => {
     if (OWNER_ONLY.includes(screen) && isStaff) {
-      Alert.alert('🔒 사장 전용', '이 기능은 사장 모드에서만 사용할 수 있습니다.');
+      Alert.alert('사장 전용', '이 기능은 사장 모드에서만 사용할 수 있습니다.');
       return;
     }
     navigation.navigate(screen);
   };
 
   const handlePrint = async (doc) => {
-    // 1. 모달 먼저 닫기
     setPrintModal(false);
-    // 2. 모달 닫힘 애니메이션(300ms) 완료 대기 후 PDF 실행
-    //    → 모달과 시스템 다이얼로그 동시 오픈 충돌 방지
     setTimeout(async () => {
       setPrinting(true);
       try {
@@ -171,123 +190,124 @@ export default function DocumentScreen({ navigation }) {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: pal.bg }]}>
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
+    <View style={S.container}>
 
-        {/* ── 바로가기 (3열 그리드) ── */}
-        <Text style={[styles.sectionLabel, { color: pal.t2 }]}>바로가기</Text>
-        <View style={styles.shortcutGrid}>
-          <Shortcut pal={pal} icon="🧼" label="위생 일지"  onPress={() => navigateSafe('Hygiene')}   color="#27AE60" />
-          <Shortcut pal={pal} icon="🌡️" label="온도 기록"  onPress={() => navigateSafe('Temp')}       color="#00ACC1" />
-          <Shortcut pal={pal} icon="💰" label="마감 정산"  onPress={() => navigateSafe('Closing')}    color="#E8950A" locked={isStaff} />
-          <Shortcut pal={pal} icon="🥩" label="숙성 관리"  onPress={() => navigateSafe('Aging')}      color="#C0392B" locked={isStaff} />
-          <Shortcut pal={pal} icon="📚" label="교육일지"   onPress={() => navigateSafe('Education')}  color="#7C3AED" locked={isStaff} />
-          <Shortcut pal={pal} icon="📊" label="세무리포트" onPress={() => navigateSafe('TaxReport')}  color="#00ACC1" locked={isStaff} />
+      {/* ── 헤더 ── */}
+      <View style={S.header}>
+        <View style={S.headerAccent} />
+        <View style={S.headerTop}>
+          <View style={S.brand}>
+            <View style={S.brandIc}>
+              <Ionicons name="document-text" size={18} color="#fff" />
+            </View>
+            <Text style={S.brandNm}>서류 관리</Text>
+          </View>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={S.scroll}>
+
+        {/* ── 바로가기 그리드 (3x2) ── */}
+        <View style={S.scGrid}>
+          <ScBtn icon="shield-checkmark" label="위생 일지"  iconColor={C.blue2} iconBg={C.blueS} onPress={() => navigateSafe('Hygiene')} />
+          <ScBtn icon="thermometer"      label="온도 기록"  iconColor={C.blue2} iconBg={C.blueS} onPress={() => navigateSafe('Temp')} />
+          <ScBtn icon="calculator"       label="마감 정산"  iconColor={C.red}   iconBg={C.redS}  onPress={() => navigateSafe('Closing')} />
+          <ScBtn icon="nutrition"        label="숙성 관리"  iconColor={C.warn2} iconBg={C.warnS} onPress={() => navigateSafe('Aging')} />
+          <ScBtn icon="book"             label="교육 일지"  iconColor={C.ok2}   iconBg={C.okS}   onPress={() => navigateSafe('Education')} plan="basic" />
+          <ScBtn icon="bar-chart"        label="세무 리포트" iconColor={C.pur}  iconBg={C.purS}  onPress={() => navigateSafe('TaxReport')} plan="pro" />
         </View>
 
-        {/* ── PDF 출력 목록 ── */}
-        <Text style={[styles.sectionLabel, { color: pal.t2 }]}>PDF 출력</Text>
-        {DOCS.map(doc => {
-          const locked = isStaff && OWNER_ONLY.includes(doc.screen);
-          const planBadge =
-            doc.id === 'education' ? { label: '베이직', color: '#27AE60' } :
-            doc.id === 'tax'       ? { label: '프로',   color: '#C0392B' } : null;
-          return (
-          <TouchableOpacity
-            key={doc.id}
-            style={[styles.docCard, { backgroundColor: pal.s1, borderColor: locked ? pal.bd + '50' : pal.bd, opacity: locked ? 0.55 : 1 }]}
-            activeOpacity={0.8}
-            onPress={() => navigateSafe(doc.screen)}
-          >
-            <View style={[styles.docIconBox, { backgroundColor: doc.color + '20' }]}>
-              <Text style={{ fontSize: 30 }}>{doc.icon}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.docTitle, { color: pal.tx }]}>{doc.title}</Text>
-              <Text style={[styles.docDesc, { color: pal.t3 }]}>{doc.desc}</Text>
-            </View>
-            {planBadge && !locked ? (
-              <View style={[styles.planBadge, { backgroundColor: planBadge.color + '18', borderColor: planBadge.color + '40' }]}>
-                <Text style={[styles.planBadgeText, { color: planBadge.color }]}>{planBadge.label}</Text>
-              </View>
-            ) : (
-              <View style={[styles.docBadge, { backgroundColor: locked ? pal.bd + '20' : doc.color + '20' }]}>
-                <Text style={[styles.docBadgeText, { color: locked ? pal.t3 : doc.color }]}>
-                  {locked ? '🔒 사장' : '›'}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          );
-        })}
+        {/* ── 서류 출력 섹션 ── */}
+        <View style={S.sec}><Text style={S.secT}>서류 출력</Text></View>
+        <View style={S.docList}>
+          {DOCS.map(doc => {
+            const locked = isStaff && OWNER_ONLY.includes(doc.screen);
+            const pillLocked = doc.plan === 'basic' ? '베이직↑' : doc.plan === 'pro' ? '프로↑' : null;
+            return (
+              <TouchableOpacity
+                key={doc.id}
+                style={[S.docItem, locked && { opacity: 0.5 }]}
+                onPress={() => navigateSafe(doc.screen)}
+                activeOpacity={0.8}
+              >
+                <View style={[S.docIc, { backgroundColor: doc.iconBg }]}>
+                  <Ionicons name={doc.icon} size={20} color={doc.iconColor} />
+                </View>
+                <View style={S.docTx}>
+                  <Text style={S.docNm}>{doc.title}</Text>
+                  <Text style={S.docSb}>{doc.desc}</Text>
+                </View>
+                {pillLocked ? (
+                  <View style={S.pillGray}><Text style={S.pillGrayTxt}>{pillLocked}</Text></View>
+                ) : (
+                  <View style={S.pillBlue}><Text style={S.pillBlueTxt}>출력 가능</Text></View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-        {/* 출력 전용 CTA 버튼 */}
-        <TouchableOpacity style={[styles.printBigBtn, { marginTop: spacing.sm }]} onPress={() => setPrintModal(true)} activeOpacity={0.85}>
-          <Text style={{ fontSize: 28 }}>🖨️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.printBigLabel}>PDF 일괄 출력</Text>
-            <Text style={styles.printBigDesc}>위생·온도·숙성·보건증·교육·세무 PDF 생성·공유</Text>
+        {/* ── PDF 일괄 출력 버튼 ── */}
+        <TouchableOpacity style={S.bulkBtn} onPress={() => setPrintModal(true)} activeOpacity={0.85}>
+          <View style={S.bulkIc}>
+            <Ionicons name="print" size={22} color="#fff" />
           </View>
-          <View style={styles.printBigBadge}>
-            <Text style={styles.printBigBadgeText}>PDF</Text>
+          <View style={S.bulkTx}>
+            <Text style={S.bulkTtl}>PDF 일괄 출력</Text>
+            <Text style={S.bulkSb}>위생·온도·숙성·교육·세무 PDF 생성 및 공유</Text>
           </View>
+          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
 
-        {/* 플랜 안내 */}
-        <View style={[styles.planNotice, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <Text style={[styles.planNoticeText, { color: pal.t3 }]}>
-            ⚠️ 교육일지는 베이직, 세무리포트는 프로 플랜에서 출력 가능합니다
+        {/* ── 플랜 안내 ── */}
+        <View style={S.planNotice}>
+          <Text style={S.planNoticeTxt}>
+            교육일지는 베이직, 세무리포트는 프로 플랜에서 출력 가능합니다.
           </Text>
         </View>
+
       </ScrollView>
 
       {/* ── 출력 로딩 오버레이 ── */}
       {printing && (
-        <View style={{
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.55)',
-          alignItems: 'center', justifyContent: 'center', zIndex: 999,
-        }}>
-          <View style={{
-            backgroundColor: pal.s1, borderRadius: radius.lg,
-            padding: spacing.xl, alignItems: 'center', gap: spacing.md,
-          }}>
-            <ActivityIndicator size="large" color={pal.ac} />
-            <Text style={{ color: pal.tx, fontSize: fontSize.sm, fontWeight: '700' }}>PDF 생성 중...</Text>
+        <View style={S.loadingOverlay}>
+          <View style={S.loadingBox}>
+            <ActivityIndicator size="large" color={C.red} />
+            <Text style={S.loadingTxt}>PDF 생성 중...</Text>
           </View>
         </View>
       )}
 
       {/* ── 출력 선택 모달 ── */}
       <Modal visible={printModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: pal.bg }}>
-          <View style={[styles.modalHeader, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx }]}>🖨️ 어떤 서류를 출력할까요?</Text>
-            <TouchableOpacity onPress={() => setPrintModal(false)}>
-              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
+        <View style={S.modalContainer}>
+          <View style={S.modalHeader}>
+            <Text style={S.modalTitle}>어떤 서류를 출력할까요?</Text>
+            <TouchableOpacity onPress={() => setPrintModal(false)} style={S.modalClose}>
+              <Ionicons name="close" size={22} color={C.t2} />
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
-            <Text style={{ fontSize: fontSize.sm, color: pal.t3, marginBottom: spacing.lg }}>
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+            <Text style={S.modalSubtxt}>
               선택한 서류를 PDF로 생성하여 공유하거나 저장합니다{'\n'}
-              <Text style={{ color: pal.t3, fontSize: fontSize.xxs }}>교육일지·세무리포트는 현재 저장된 전체 데이터 기준</Text>
+              <Text style={{ fontSize: 12, color: C.t4 }}>교육일지·세무리포트는 현재 저장된 전체 데이터 기준</Text>
             </Text>
-            {DOCS.filter(d => d.getHTML !== null).map(doc => (
+            {DOCS.map(doc => (
               <TouchableOpacity
                 key={doc.id}
-                style={[styles.printSelectCard, { backgroundColor: pal.s1, borderColor: doc.color + '40' }]}
+                style={[S.printCard, { borderColor: doc.iconColor + '40' }]}
                 onPress={() => handlePrint(doc)}
                 activeOpacity={0.85}
               >
-                <View style={[styles.printSelectIcon, { backgroundColor: doc.color + '20' }]}>
-                  <Text style={{ fontSize: 36 }}>{doc.icon}</Text>
+                <View style={[S.printCardIc, { backgroundColor: doc.iconBg }]}>
+                  <Ionicons name={doc.icon} size={30} color={doc.iconColor} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.printSelectTitle, { color: pal.tx }]}>{doc.title}</Text>
-                  <Text style={[styles.printSelectDesc, { color: pal.t3 }]}>{doc.desc}</Text>
+                  <Text style={S.printCardTitle}>{doc.title}</Text>
+                  <Text style={S.printCardDesc}>{doc.desc}</Text>
                 </View>
-                <View style={[styles.printBtn, { backgroundColor: doc.color }]}>
-                  <Text style={styles.printBtnText}>출력</Text>
+                <View style={[S.printBtn, { backgroundColor: doc.iconColor }]}>
+                  <Text style={S.printBtnTxt}>출력</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -298,80 +318,71 @@ export default function DocumentScreen({ navigation }) {
   );
 }
 
-const Shortcut = ({ icon, label, onPress, color, pal, locked }) => (
-  <TouchableOpacity
-    style={[styles.shortcut, { backgroundColor: pal.s1, borderColor: locked ? pal.bd : color + '40', opacity: locked ? 0.45 : 1 }]}
-    onPress={onPress}
-    activeOpacity={0.8}
-  >
-    <View style={[styles.shortcutIcon, { backgroundColor: (locked ? pal.bd : color) + '20' }]}>
-      <Text style={{ fontSize: 26 }}>{locked ? '🔒' : icon}</Text>
-    </View>
-    <Text style={[styles.shortcutLabel, { color: locked ? pal.t3 : pal.tx }]}>{label}</Text>
-  </TouchableOpacity>
-);
+const S = StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
+  // 헤더
+  header:       { backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.border, overflow: 'hidden' },
+  headerAccent: { height: 3, backgroundColor: C.red, position: 'absolute', top: 0, left: 0, right: 0 },
+  headerTop:    { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 13, flexDirection: 'row', alignItems: 'center' },
+  brand:        { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  brandIc:      { width: 33, height: 33, borderRadius: 10, backgroundColor: C.red, alignItems: 'center', justifyContent: 'center' },
+  brandNm:      { fontSize: 22, fontWeight: '900', color: C.t1, letterSpacing: -0.6 },
 
-  sectionLabel: {
-    fontSize: fontSize.sm, fontWeight: '800',
-    marginBottom: spacing.md, marginTop: spacing.sm, letterSpacing: 0.5,
-  },
+  scroll: { padding: 16, paddingBottom: 100 },
 
-  shortcutGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  shortcut: {
-    width: '31%', borderRadius: radius.md,
-    borderWidth: 1, padding: spacing.md, alignItems: 'center', gap: 6, ...shadow.sm,
-  },
-  shortcutIcon: { width: 52, height: 52, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
-  shortcutLabel: { fontSize: fontSize.xs, fontWeight: '800', textAlign: 'center' },
+  // 바로가기 그리드
+  scGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 20 },
+  scBtn:        { width: '31%', backgroundColor: C.white, borderRadius: 16, borderWidth: 1, borderColor: C.border, paddingVertical: 18, paddingHorizontal: 10, alignItems: 'center', gap: 8, position: 'relative', overflow: 'visible' },
+  scIc:         { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  scLb:         { fontSize: 13, fontWeight: '700', color: C.t1, textAlign: 'center' },
+  planBdgBasic: { position: 'absolute', top: -7, right: -4, backgroundColor: '#D1FAE5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  planBdgBasicTxt: { fontSize: 10, fontWeight: '800', color: '#065F46' },
+  planBdgPro:   { position: 'absolute', top: -7, right: -4, backgroundColor: '#FEE2E2', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  planBdgProTxt: { fontSize: 10, fontWeight: '800', color: '#991B1B' },
 
-  printBigBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: '#C0392B', borderRadius: radius.lg, padding: spacing.lg,
-    marginBottom: spacing.lg, ...shadow.md,
-  },
-  printBigLabel: { fontSize: fontSize.lg, fontWeight: '900', color: '#fff', marginBottom: 4 },
-  printBigDesc: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.8)' },
-  printBigBadge: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 8 },
-  printBigBadgeText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '900' },
+  // 섹션 라벨
+  sec:  { marginTop: 4, marginBottom: 10 },
+  secT: { fontSize: 14, fontWeight: '800', color: C.t2, letterSpacing: 0.3 },
 
-  docCard: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    borderRadius: radius.md, borderWidth: 1,
-    padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm,
-  },
-  docIconBox: { width: 54, height: 54, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  docTitle: { fontSize: fontSize.md, fontWeight: '800', marginBottom: 3 },
-  docDesc: { fontSize: fontSize.xs },
-  docBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  docBadgeText: { fontSize: fontSize.xs, fontWeight: '800' },
+  // 서류 목록
+  docList:  { gap: 0, marginBottom: 16 },
+  docItem:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.border, paddingVertical: 14, paddingHorizontal: 4 },
+  docIc:    { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  docTx:    { flex: 1 },
+  docNm:    { fontSize: 15, fontWeight: '700', color: C.t1, marginBottom: 2 },
+  docSb:    { fontSize: 12, color: C.t3 },
+  pillBlue: { backgroundColor: C.blueS, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
+  pillBlueTxt: { fontSize: 12, fontWeight: '700', color: C.blue },
+  pillGray: { backgroundColor: C.bg3, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
+  pillGrayTxt: { fontSize: 12, fontWeight: '700', color: C.t3 },
 
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: spacing.lg, borderBottomWidth: 1,
-  },
-  modalTitle: { fontSize: fontSize.lg, fontWeight: '900' },
-  closeBtn: { fontSize: 22, padding: 4 },
+  // 일괄 출력 버튼
+  bulkBtn:  { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.t1, borderRadius: 16, padding: 20, marginBottom: 14 },
+  bulkIc:   { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  bulkTx:   { flex: 1 },
+  bulkTtl:  { fontSize: 16, fontWeight: '900', color: '#fff', marginBottom: 3 },
+  bulkSb:   { fontSize: 12, color: 'rgba(255,255,255,0.65)' },
 
-  printSelectCard: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    borderRadius: radius.lg, borderWidth: 1.5,
-    padding: spacing.md, marginBottom: spacing.md, ...shadow.sm,
-  },
-  printSelectIcon: { width: 72, height: 72, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  printSelectTitle: { fontSize: fontSize.md, fontWeight: '800', marginBottom: 4 },
-  printSelectDesc: { fontSize: fontSize.xs },
-  printBtn: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: radius.sm, alignItems: 'center', minWidth: 60 },
-  printBtnText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '900' },
+  // 플랜 안내
+  planNotice:    { backgroundColor: C.warnS, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(180,83,9,0.15)', padding: 14 },
+  planNoticeTxt: { fontSize: 13, color: C.warn, lineHeight: 20, textAlign: 'center' },
 
-  // 플랜 뱃지 + 안내
-  planBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, borderWidth: 1 },
-  planBadgeText: { fontSize: fontSize.xxs, fontWeight: '900' },
-  planNotice: {
-    borderRadius: radius.sm, borderWidth: 1,
-    padding: spacing.md, marginTop: spacing.sm,
-  },
-  planNoticeText: { fontSize: fontSize.xs, lineHeight: 20, textAlign: 'center' },
+  // 로딩 오버레이
+  loadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', zIndex: 999 },
+  loadingBox:     { backgroundColor: C.white, borderRadius: 16, padding: 28, alignItems: 'center', gap: 14 },
+  loadingTxt:     { color: C.t1, fontSize: 15, fontWeight: '700' },
+
+  // 모달
+  modalContainer: { flex: 1, backgroundColor: C.bg },
+  modalHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.white },
+  modalTitle:     { fontSize: 17, fontWeight: '900', color: C.t1 },
+  modalClose:     { padding: 4 },
+  modalSubtxt:    { fontSize: 14, color: C.t3, marginBottom: 20, lineHeight: 22 },
+  printCard:      { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.white, borderRadius: 14, borderWidth: 1.5, padding: 16, marginBottom: 12 },
+  printCardIc:    { width: 58, height: 58, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  printCardTitle: { fontSize: 16, fontWeight: '800', color: C.t1, marginBottom: 4 },
+  printCardDesc:  { fontSize: 13, color: C.t3 },
+  printBtn:       { paddingHorizontal: 18, paddingVertical: 14, borderRadius: 10, alignItems: 'center', minWidth: 56 },
+  printBtnTxt:    { color: '#fff', fontSize: 14, fontWeight: '900' },
 });

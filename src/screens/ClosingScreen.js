@@ -3,16 +3,14 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
-import { useTheme } from '../lib/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
+import { C, F, R, SH } from '../lib/v5';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { todaySales as initSales, meatInventory as initMeat } from '../data/mockData';
 import { genClosingHTML, printAndShare } from '../lib/pdfTemplate';
 import { closingStore, meatStore } from '../lib/dataStore';
 
 export default function ClosingScreen() {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
   const [sales, setSales] = useState(initSales);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ cut: '', qty: '', price: '' });
@@ -62,11 +60,22 @@ export default function ClosingScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: pal.bg }]}>
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120 }}>
+    <View style={[styles.container, { backgroundColor: C.bg }]}>
+      {/* V5 Header */}
+      <View style={styles.header}>
+        <View style={styles.headerAccent} />
+        <View style={styles.headerContent}>
+          <View style={styles.brandIcon}>
+            <Ionicons name="calculator-outline" size={18} color={C.white} />
+          </View>
+          <Text style={styles.headerTitle}>정산</Text>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
 
         {/* 총매출 히어로 */}
-        <View style={[styles.heroCard, { backgroundColor: pal.ac }]}>
+        <View style={[styles.heroCard, { backgroundColor: C.red }]}>
           <Text style={styles.heroLabel}>오늘 총매출</Text>
           <Text style={styles.heroValue}>{totalSales.toLocaleString()}원</Text>
           <View style={styles.heroRow}>
@@ -88,74 +97,91 @@ export default function ClosingScreen() {
         </View>
 
         {/* 판매 내역 */}
-        <View style={[styles.section, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <View style={[styles.sectionAccent, { backgroundColor: pal.a2 }]} />
+        <View style={[styles.section, { backgroundColor: C.white, borderColor: C.border }]}>
+          <View style={[styles.sectionAccent, { backgroundColor: C.red2 }]} />
           <View style={styles.sectionHead}>
-            <Text style={[styles.sectionTitle, { color: pal.tx }]}>판매 내역</Text>
-            <TouchableOpacity style={[styles.addBtn, { borderColor: pal.a2 + '50', backgroundColor: pal.a2 + '15' }]} onPress={() => setModal(true)}>
-              <Text style={[styles.addBtnText, { color: pal.a2 }]}>+ 추가</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="receipt-outline" size={18} color={C.red2} />
+              <Text style={[styles.sectionTitle, { color: C.t1 }]}>판매 내역</Text>
+            </View>
+            <TouchableOpacity style={[styles.addBtn, { borderColor: C.red2 + '50', backgroundColor: C.red2 + '15' }]} onPress={() => setModal(true)}>
+              <Ionicons name="add-circle-outline" size={16} color={C.red2} style={{ marginRight: 4 }} />
+              <Text style={[styles.addBtnText, { color: C.red2 }]}>추가</Text>
             </TouchableOpacity>
           </View>
           {sales.map(r => (
-            <View key={r.id} style={[styles.saleRow, { borderBottomColor: pal.bd + '50' }]}>
+            <View key={r.id} style={[styles.saleRow, { borderBottomColor: C.border + '50' }]}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.saleCut, { color: pal.tx }]}>{r.cut}</Text>
-                <Text style={[styles.saleMeta, { color: pal.t3 }]}>{r.time} · {r.qty}kg × {r.price.toLocaleString()}원</Text>
+                <Text style={[styles.saleCut, { color: C.t1 }]}>{r.cut}</Text>
+                <Text style={[styles.saleMeta, { color: C.t3 }]}>{r.time} · {r.qty}kg × {r.price.toLocaleString()}원</Text>
               </View>
-              <Text style={[styles.saleTotal, { color: pal.a2 }]}>{r.total.toLocaleString()}원</Text>
+              <Text style={[styles.saleTotal, { color: C.red2 }]}>{r.total.toLocaleString()}원</Text>
             </View>
           ))}
         </View>
 
         {/* 폐기 내역 */}
-        <View style={[styles.section, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <View style={[styles.sectionAccent, { backgroundColor: pal.rd }]} />
+        <View style={[styles.section, { backgroundColor: C.white, borderColor: C.border }]}>
+          <View style={[styles.sectionAccent, { backgroundColor: C.red }]} />
           <View style={styles.sectionHead}>
-            <Text style={[styles.sectionTitle, { color: pal.tx }]}>폐기 내역</Text>
-            <TouchableOpacity style={[styles.addBtn, { backgroundColor: pal.rd + '20', borderColor: pal.rd + '40' }]}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="trash-outline" size={18} color={C.red} />
+              <Text style={[styles.sectionTitle, { color: C.t1 }]}>폐기 내역</Text>
+            </View>
+            <TouchableOpacity style={[styles.addBtn, { backgroundColor: C.red + '20', borderColor: C.red + '40' }]}
               onPress={() => setWasteModal(true)}>
-              <Text style={[styles.addBtnText, { color: pal.rd }]}>+ 폐기 등록</Text>
+              <Ionicons name="add-circle-outline" size={16} color={C.red} style={{ marginRight: 4 }} />
+              <Text style={[styles.addBtnText, { color: C.red }]}>폐기 등록</Text>
             </TouchableOpacity>
           </View>
           {waste.length === 0 ? (
-            <Text style={[styles.emptyText, { color: pal.t3 }]}>폐기 항목 없음</Text>
+            <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+              <Ionicons name="checkmark-circle-outline" size={28} color={C.t4} style={{ marginBottom: 6 }} />
+              <Text style={[styles.emptyText, { color: C.t3 }]}>폐기 항목 없음</Text>
+            </View>
           ) : (
             waste.map(w => (
-              <View key={w.id} style={[styles.wasteRow, { borderBottomColor: pal.bd + '50' }]}>
-                <Text style={[styles.wasteCut, { color: pal.tx }]}>{w.cut}</Text>
-                <Text style={[styles.wasteMeta, { color: pal.t3 }]}>{w.qty}kg · {w.reason || '사유 미입력'}</Text>
-                <Text style={[styles.wasteVal, { color: pal.rd }]}>손실 추정 {(parseFloat(w.qty) * (parseFloat(w.price) || 5000)).toLocaleString()}원</Text>
+              <View key={w.id} style={[styles.wasteRow, { borderBottomColor: C.border + '50' }]}>
+                <Text style={[styles.wasteCut, { color: C.t1 }]}>{w.cut}</Text>
+                <Text style={[styles.wasteMeta, { color: C.t3 }]}>{w.qty}kg · {w.reason || '사유 미입력'}</Text>
+                <Text style={[styles.wasteVal, { color: C.red }]}>
+                  <Ionicons name="warning-outline" size={12} color={C.red} /> 손실 추정 {(parseFloat(w.qty) * (parseFloat(w.price) || 5000)).toLocaleString()}원
+                </Text>
               </View>
             ))
           )}
           {waste.length > 0 && (
             <View style={styles.wasteSummary}>
-              <Text style={[styles.wasteSumLabel, { color: pal.t2 }]}>총 손실 추정</Text>
-              <Text style={[styles.wasteSumVal, { color: pal.rd }]}>{wasteTotal.toLocaleString()}원</Text>
+              <Text style={[styles.wasteSumLabel, { color: C.t2 }]}>총 손실 추정</Text>
+              <Text style={[styles.wasteSumVal, { color: C.red }]}>{wasteTotal.toLocaleString()}원</Text>
             </View>
           )}
         </View>
 
         {/* 잔여 재고 */}
-        <View style={[styles.section, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <View style={[styles.sectionAccent, { backgroundColor: pal.gn }]} />
+        <View style={[styles.section, { backgroundColor: C.white, borderColor: C.border }]}>
+          <View style={[styles.sectionAccent, { backgroundColor: C.ok2 }]} />
           <View style={styles.sectionHead}>
-            <Text style={[styles.sectionTitle, { color: pal.tx }]}>잔여 재고</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="cube-outline" size={18} color={C.ok2} />
+              <Text style={[styles.sectionTitle, { color: C.t1 }]}>잔여 재고</Text>
+            </View>
           </View>
           {(realMeat.length > 0 ? realMeat : initMeat.filter(m => !m.sold)).map(m => (
-            <View key={m.id} style={[styles.stockRow, { borderBottomColor: pal.bd + '40' }]}>
-              <Text style={[styles.stockCut, { color: pal.tx }]}>{m.cut}</Text>
-              <Text style={[styles.stockOrigin, { color: pal.t3 }]}>{m.origin}</Text>
-              <Text style={[styles.stockQty, { color: m.qty < 5 ? pal.rd : pal.gn }]}>{m.qty}kg</Text>
+            <View key={m.id} style={[styles.stockRow, { borderBottomColor: C.border + '40' }]}>
+              <Text style={[styles.stockCut, { color: C.t1 }]}>{m.cut}</Text>
+              <Text style={[styles.stockOrigin, { color: C.t3 }]}>{m.origin}</Text>
+              <Text style={[styles.stockQty, { color: m.qty < 5 ? C.red : C.ok2 }]}>{m.qty}kg</Text>
             </View>
           ))}
-          <View style={{ height: spacing.sm }} />
+          <View style={{ height: 10 }} />
         </View>
 
         <PrimaryBtn
-          label="📊 정산 PDF 저장"
-          color={pal.pu}
-          style={{ marginTop: spacing.md }}
+          label="정산 PDF 저장"
+          icon={<Ionicons name="document-text-outline" size={18} color={C.white} style={{ marginRight: 6 }} />}
+          color={C.pur}
+          style={{ marginTop: 16 }}
           onPress={async () => {
             await closingStore.save({
               sales: sales,
@@ -175,53 +201,63 @@ export default function ClosingScreen() {
 
       {/* 판매 추가 모달 */}
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: pal.bg }}>
-          <View style={[styles.modalHeader, { borderBottomColor: pal.bd, backgroundColor: pal.s1 }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx }]}>판매 추가</Text>
-            <TouchableOpacity onPress={() => setModal(false)}><Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text></TouchableOpacity>
+        <View style={{ flex: 1, backgroundColor: C.bg }}>
+          <View style={[styles.modalHeader, { borderBottomColor: C.border, backgroundColor: C.white }]}>
+            <Text style={[styles.modalTitle, { color: C.t1 }]}>판매 추가</Text>
+            <TouchableOpacity onPress={() => setModal(false)} style={styles.closeBtnWrap}>
+              <Ionicons name="close" size={24} color={C.t2} />
+            </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+          <ScrollView contentContainerStyle={{ padding: 20 }}>
             {[
-              { label: '부위명', key: 'cut', placeholder: '예: 등심' },
-              { label: '판매 중량 (kg)', key: 'qty', placeholder: '0.0', keyboardType: 'numeric' },
-              { label: '판매 단가 (원/kg)', key: 'price', placeholder: '0', keyboardType: 'numeric' },
+              { label: '부위명', key: 'cut', placeholder: '예: 등심', icon: 'pricetag-outline' },
+              { label: '판매 중량 (kg)', key: 'qty', placeholder: '0.0', keyboardType: 'numeric', icon: 'scale-outline' },
+              { label: '판매 단가 (원/kg)', key: 'price', placeholder: '0', keyboardType: 'numeric', icon: 'cash-outline' },
             ].map(f => (
-              <View key={f.key} style={{ marginBottom: spacing.md }}>
-                <Text style={[styles.fieldLabel, { color: pal.t2 }]}>{f.label}</Text>
-                <TextInput style={[styles.input, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]} value={form[f.key]}
+              <View key={f.key} style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <Ionicons name={f.icon} size={15} color={C.t2} />
+                  <Text style={[styles.fieldLabel, { color: C.t2 }]}>{f.label}</Text>
+                </View>
+                <TextInput style={[styles.input, { backgroundColor: C.white, borderColor: C.border, color: C.t1 }]} value={form[f.key]}
                   onChangeText={t => setForm({ ...form, [f.key]: t })}
-                  placeholder={f.placeholder} placeholderTextColor={pal.t3} keyboardType={f.keyboardType} />
+                  placeholder={f.placeholder} placeholderTextColor={C.t3} keyboardType={f.keyboardType} />
               </View>
             ))}
             <PrimaryBtn label="저장" onPress={addSale} />
-            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
+            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: 10 }} />
           </ScrollView>
         </View>
       </Modal>
 
       {/* 폐기 모달 */}
       <Modal visible={wasteModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: pal.bg }}>
-          <View style={[styles.modalHeader, { borderBottomColor: pal.bd, backgroundColor: pal.s1 }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx }]}>폐기 등록</Text>
-            <TouchableOpacity onPress={() => setWasteModal(false)}><Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text></TouchableOpacity>
+        <View style={{ flex: 1, backgroundColor: C.bg }}>
+          <View style={[styles.modalHeader, { borderBottomColor: C.border, backgroundColor: C.white }]}>
+            <Text style={[styles.modalTitle, { color: C.t1 }]}>폐기 등록</Text>
+            <TouchableOpacity onPress={() => setWasteModal(false)} style={styles.closeBtnWrap}>
+              <Ionicons name="close" size={24} color={C.t2} />
+            </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+          <ScrollView contentContainerStyle={{ padding: 20 }}>
             {[
-              { label: '부위명', key: 'cut', placeholder: '예: 안심' },
-              { label: '폐기량 (kg)', key: 'qty', placeholder: '0.0', keyboardType: 'numeric' },
-              { label: '폐기 사유', key: 'reason', placeholder: '예: 소비기한 경과' },
-              { label: '매입가 (원/kg, 선택)', key: 'price', placeholder: '미입력 시 5,000원 기준', keyboardType: 'numeric' },
+              { label: '부위명', key: 'cut', placeholder: '예: 안심', icon: 'pricetag-outline' },
+              { label: '폐기량 (kg)', key: 'qty', placeholder: '0.0', keyboardType: 'numeric', icon: 'scale-outline' },
+              { label: '폐기 사유', key: 'reason', placeholder: '예: 소비기한 경과', icon: 'alert-circle-outline' },
+              { label: '매입가 (원/kg, 선택)', key: 'price', placeholder: '미입력 시 5,000원 기준', keyboardType: 'numeric', icon: 'cash-outline' },
             ].map(f => (
-              <View key={f.key} style={{ marginBottom: spacing.md }}>
-                <Text style={[styles.fieldLabel, { color: pal.t2 }]}>{f.label}</Text>
-                <TextInput style={[styles.input, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]} value={wasteForm[f.key]}
+              <View key={f.key} style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <Ionicons name={f.icon} size={15} color={C.t2} />
+                  <Text style={[styles.fieldLabel, { color: C.t2 }]}>{f.label}</Text>
+                </View>
+                <TextInput style={[styles.input, { backgroundColor: C.white, borderColor: C.border, color: C.t1 }]} value={wasteForm[f.key]}
                   onChangeText={t => setWasteForm({ ...wasteForm, [f.key]: t })}
-                  placeholder={f.placeholder} placeholderTextColor={pal.t3} keyboardType={f.keyboardType} />
+                  placeholder={f.placeholder} placeholderTextColor={C.t3} keyboardType={f.keyboardType} />
               </View>
             ))}
-            <PrimaryBtn label="저장" onPress={addWaste} color={pal.rd} />
-            <OutlineBtn label="취소" onPress={() => setWasteModal(false)} style={{ marginTop: spacing.sm }} />
+            <PrimaryBtn label="저장" onPress={addWaste} color={C.red} />
+            <OutlineBtn label="취소" onPress={() => setWasteModal(false)} style={{ marginTop: 10 }} />
           </ScrollView>
         </View>
       </Modal>
@@ -232,45 +268,57 @@ export default function ClosingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  heroCard: { borderRadius: radius.xl, padding: spacing.lg, marginBottom: spacing.lg, overflow: 'hidden' },
-  heroLabel: { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: '700', marginBottom: 10, letterSpacing: 1 },
-  heroValue: { fontSize: 42, fontWeight: '900', color: '#fff', marginBottom: 20, letterSpacing: -1, lineHeight: 48 },
-  heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 14, padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  // V5 Header
+  header: { backgroundColor: C.white, ...SH.sm },
+  headerAccent: { height: 3, backgroundColor: C.red },
+  headerContent: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 12 },
+  brandIcon: { width: 33, height: 33, borderRadius: R.sm, backgroundColor: C.red, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 22, fontWeight: '900', color: C.t1 },
+
+  // Hero card
+  heroCard: { borderRadius: R.xl, padding: 20, marginBottom: 20, overflow: 'hidden', ...SH.md },
+  heroLabel: { fontSize: F.xxs, color: 'rgba(255,255,255,0.6)', fontWeight: '700', marginBottom: 10, letterSpacing: 1 },
+  heroValue: { fontSize: F.hero + 2, fontWeight: '900', color: '#fff', marginBottom: 20, letterSpacing: -1, lineHeight: 48 },
+  heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: R.md, padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   heroStat: { flex: 1, alignItems: 'center', paddingVertical: 6 },
-  heroStatVal: { fontSize: fontSize.md, fontWeight: '900', color: '#fff', letterSpacing: -0.5, marginBottom: 4 },
-  heroStatLabel: { fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: '600', lineHeight: 14 },
+  heroStatVal: { fontSize: F.body, fontWeight: '900', color: '#fff', letterSpacing: -0.5, marginBottom: 4 },
+  heroStatLabel: { fontSize: F.xxs, color: 'rgba(255,255,255,0.5)', fontWeight: '600', lineHeight: 14 },
   heroDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.2)' },
 
-  section: { borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.md, overflow: 'hidden' },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, paddingBottom: spacing.sm },
-  sectionTitle: { fontSize: fontSize.sm, fontWeight: '800' },
-  addBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1.5 },
-  addBtnText: { fontSize: fontSize.xs, fontWeight: '800' },
-
-  saleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 1 },
-  saleCut: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 3 },
-  saleMeta: { fontSize: fontSize.xs },
-  saleTotal: { fontSize: fontSize.md, fontWeight: '900' },
-
-  wasteRow: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 1 },
-  wasteCut: { fontSize: fontSize.sm, fontWeight: '700' },
-  wasteMeta: { fontSize: fontSize.xs, marginTop: 2 },
-  wasteVal: { fontSize: fontSize.xs, fontWeight: '700', marginTop: 3 },
-  wasteSummary: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing.sm, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.md },
-  wasteSumLabel: { fontSize: fontSize.sm, fontWeight: '700' },
-  wasteSumVal: { fontSize: fontSize.md, fontWeight: '900' },
-  emptyText: { fontSize: fontSize.sm, textAlign: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.md },
-
+  // Sections
+  section: { borderRadius: R.lg, borderWidth: 1, marginBottom: 16, overflow: 'hidden', ...SH.sm },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingBottom: 10 },
+  sectionTitle: { fontSize: F.h3, fontWeight: '800' },
   sectionAccent: { height: 4, width: '100%' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: R.sm, borderWidth: 1.5 },
+  addBtnText: { fontSize: F.sm, fontWeight: '800' },
 
-  stockRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.md, gap: spacing.sm, borderBottomWidth: 1 },
-  stockCut: { fontSize: fontSize.sm, fontWeight: '700', flex: 1 },
-  stockOrigin: { fontSize: fontSize.xs },
-  stockQty: { fontSize: fontSize.sm, fontWeight: '900' },
+  // Sales
+  saleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1 },
+  saleCut: { fontSize: F.body, fontWeight: '700', marginBottom: 3 },
+  saleMeta: { fontSize: F.sm },
+  saleTotal: { fontSize: F.h3, fontWeight: '900' },
 
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1 },
-  modalTitle: { fontSize: fontSize.lg, fontWeight: '900' },
-  closeBtn: { fontSize: 22, padding: 4 },
-  fieldLabel: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 7 },
-  input: { borderWidth: 1.5, borderRadius: radius.sm, padding: spacing.md, fontSize: fontSize.md, minHeight: 56 },
+  // Waste
+  wasteRow: { paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1 },
+  wasteCut: { fontSize: F.body, fontWeight: '700' },
+  wasteMeta: { fontSize: F.sm, marginTop: 2 },
+  wasteVal: { fontSize: F.sm, fontWeight: '700', marginTop: 3 },
+  wasteSummary: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, marginTop: 10, paddingHorizontal: 16, paddingBottom: 16 },
+  wasteSumLabel: { fontSize: F.body, fontWeight: '700' },
+  wasteSumVal: { fontSize: F.h3, fontWeight: '900' },
+  emptyText: { fontSize: F.body, textAlign: 'center' },
+
+  // Stock
+  stockRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, gap: 10, borderBottomWidth: 1 },
+  stockCut: { fontSize: F.body, fontWeight: '700', flex: 1 },
+  stockOrigin: { fontSize: F.sm },
+  stockQty: { fontSize: F.body, fontWeight: '900' },
+
+  // Modal
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1 },
+  modalTitle: { fontSize: F.h2, fontWeight: '900' },
+  closeBtnWrap: { padding: 4 },
+  fieldLabel: { fontSize: F.body, fontWeight: '700' },
+  input: { borderWidth: 1.5, borderRadius: R.sm, padding: 16, fontSize: F.body, minHeight: 56 },
 });

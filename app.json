@@ -50,7 +50,7 @@
     },
     "owner": "jbaek777",
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "sdkVersion"
     },
     "updates": {
       "url": "https://u.expo.dev/05a0fe1c-65ec-464e-a161-5c14fe31d3e2"

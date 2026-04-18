@@ -3,8 +3,8 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Modal, TextInput, Alert,
 } from 'react-native';
-import { colors, darkColors, lightColors, radius, shadow, fontSize, spacing } from '../theme';
-import { useTheme } from '../lib/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
+import { C, F, R, SH } from '../lib/v5';
 import { StatusBadge, AlertBox, PrimaryBtn, OutlineBtn, ProgressBar, AddBtn } from '../components/UI';
 import { hygieneData as initHyg, tempData as initTemp, staffData, inventoryData } from '../data/mockData';
 import { hygieneApi, sensorApi, employeeApi, inventoryApi } from '../lib/supabase';
@@ -13,8 +13,6 @@ import { genHygieneHTML, genTempHTML, printAndShare } from '../lib/pdfTemplate';
 
 // ═══ 위생 일지 ═══════════════════════════════════════════
 export function HygieneScreen() {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
   const [logs, setLogs] = useState(initHyg);
   const [expanded, setExpanded] = useState(null);
   const [modal, setModal] = useState(false);
@@ -33,11 +31,11 @@ export function HygieneScreen() {
   }, []);
 
   const CHECKS = [
-    { key: 'board', label: '🪵 도마 소독 완료' },
-    { key: 'knife', label: '🔪 칼·기구 소독 완료' },
-    { key: 'hands', label: '🙌 종사자 손 세척 확인' },
-    { key: 'clothes', label: '👕 작업복 세탁 확인' },
-    { key: 'pest', label: '🐛 해충·방제 이상 없음' },
+    { key: 'board',   icon: 'construct',    label: '도마 소독 완료' },
+    { key: 'knife',   icon: 'cut',          label: '칼·기구 소독 완료' },
+    { key: 'hands',   icon: 'hand-left',    label: '종사자 손 세척 확인' },
+    { key: 'clothes', icon: 'shirt',        label: '작업복 세탁 확인' },
+    { key: 'pest',    icon: 'bug',          label: '해충·방제 이상 없음' },
   ];
 
   const handleSave = async () => {
@@ -68,48 +66,52 @@ export function HygieneScreen() {
   const pass = logs.filter(l => l.status === 'pass').length;
 
   return (
-    <View style={{ flex: 1, backgroundColor: pal.bg }}>
-      <View style={[styles.statBar, { backgroundColor: pal.bg }]}>
-        <StatMini label="이번 달 작성" value={`${logs.length}건`} color={pal.gn} pal={pal} />
-        <StatMini label="적합 판정" value={`${pass}건`} color={pal.a2} pal={pal} />
-        <StatMini label="위생 점수" value="94점" color={pal.ac} pal={pal} />
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={styles.statBar}>
+        <StatMini label="이번 달 작성" value={`${logs.length}건`} color={C.ok} />
+        <StatMini label="적합 판정" value={`${pass}건`} color={C.red2} />
+        <StatMini label="위생 점수" value="94점" color={C.red} />
       </View>
-      <View style={[styles.toolbar, { }]}>
-        <Text style={[styles.toolTitle, { color: pal.tx }]}>📋 위생 일지 목록</Text>
+      <View style={styles.toolbar}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="clipboard" size={18} color={C.t1} />
+          <Text style={styles.toolTitle}>위생 일지 목록</Text>
+        </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={[styles.pdfBtn, { borderColor: pal.a2 }]} onPress={async () => {
+          <TouchableOpacity style={styles.pdfBtn} onPress={async () => {
             try {
               await printAndShare(genHygieneHTML(logs), '위생관리점검표');
             } catch (e) {
               Alert.alert('오류', 'PDF 생성 중 오류가 발생했습니다.');
             }
           }}>
-            <Text style={[styles.pdfBtnText, { color: pal.a2 }]}>📄 PDF</Text>
+            <Ionicons name="document" size={14} color={C.red2} />
+            <Text style={styles.pdfBtnText}> PDF</Text>
           </TouchableOpacity>
-          <AddBtn label="📋 오늘 작성" onPress={() => setModal(true)} color={pal.gn} />
+          <AddBtn label="오늘 작성" onPress={() => setModal(true)} color={C.ok} />
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
+      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 100 }}>
         {logs.map(log => {
           const isOpen = expanded === log.id;
           return (
             <TouchableOpacity key={log.id}
-              style={[styles.logCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}
+              style={styles.logCard}
               onPress={() => setExpanded(isOpen ? null : log.id)} activeOpacity={0.88}>
               <View style={styles.logTop}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.logDate, { color: pal.tx }]}>{log.date} {log.time}</Text>
-                  <Text style={[styles.logInspector, { color: pal.t3 }]}>담당: {log.inspector}</Text>
+                  <Text style={styles.logDate}>{log.date} {log.time}</Text>
+                  <Text style={styles.logInspector}>담당: {log.inspector}</Text>
                 </View>
                 <StatusBadge status={log.status} />
               </View>
               {isOpen && (
-                <View style={[styles.logExpand, { borderTopColor: pal.bd }]}>
+                <View style={styles.logExpand}>
                   {log.items.map((item, i) => (
-                    <View key={i} style={[styles.logItem, { borderBottomColor: pal.bd + '40' }]}>
-                      <Text style={{ color: pal.gn, fontWeight: '700', fontSize: fontSize.sm }}>✓</Text>
-                      <Text style={[styles.logItemText, { color: pal.t2 }]}>{item}</Text>
+                    <View key={i} style={styles.logItem}>
+                      <Ionicons name="checkmark" size={16} color={C.ok} />
+                      <Text style={styles.logItemText}>{item}</Text>
                     </View>
                   ))}
                 </View>
@@ -120,34 +122,38 @@ export function HygieneScreen() {
       </ScrollView>
 
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.modalWrap, { backgroundColor: pal.s1 }]}>
-          <ModalHeader title="📋 오늘 위생 일지 작성" onClose={() => setModal(false)} pal={pal} />
-          <ScrollView contentContainerStyle={{ padding: spacing.md }}>
+        <View style={{ flex: 1, backgroundColor: C.white }}>
+          <ModalHeader title="오늘 위생 일지 작성" icon="clipboard" onClose={() => setModal(false)} />
+          <ScrollView contentContainerStyle={{ padding: 18 }}>
             <FormField label="담당자 이름" placeholder="예: 홍길동" value={form.inspector}
-              onChangeText={t => setForm({ ...form, inspector: t })} pal={pal} />
+              onChangeText={t => setForm({ ...form, inspector: t })} />
             <View style={styles.rowInputs}>
               <View style={{ flex: 1 }}>
                 <FormField label="작업장 온도 (°C)" placeholder="예: 4" value={form.tempWork}
-                  onChangeText={t => setForm({ ...form, tempWork: t })} keyboardType="numeric" pal={pal} />
+                  onChangeText={t => setForm({ ...form, tempWork: t })} keyboardType="numeric" />
               </View>
               <View style={{ flex: 1 }}>
                 <FormField label="냉장고 온도 (°C)" placeholder="예: -2" value={form.tempFridge}
-                  onChangeText={t => setForm({ ...form, tempFridge: t })} keyboardType="numeric" pal={pal} />
+                  onChangeText={t => setForm({ ...form, tempFridge: t })} keyboardType="numeric" />
               </View>
             </View>
-            <Text style={[styles.formLabel, { color: pal.t2 }]}>✅ 체크리스트</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <Ionicons name="checkmark-done" size={16} color={C.t2} />
+              <Text style={styles.formLabel}>체크리스트</Text>
+            </View>
             {CHECKS.map(c => (
               <TouchableOpacity key={c.key}
-                style={[styles.checkRow, { borderBottomColor: pal.bd }]}
+                style={styles.checkRow}
                 onPress={() => setChecks({ ...checks, [c.key]: !checks[c.key] })}>
-                <View style={[styles.checkBox, { borderColor: pal.bd2, backgroundColor: pal.s1 }, checks[c.key] && styles.checkBoxOn]}>
-                  {checks[c.key] && <Text style={{ color: '#fff', fontSize: fontSize.xs, fontWeight: '800' }}>✓</Text>}
+                <View style={[styles.checkBox, checks[c.key] && styles.checkBoxOn]}>
+                  {checks[c.key] && <Ionicons name="checkmark" size={14} color="#fff" />}
                 </View>
-                <Text style={[styles.checkLabel, { color: pal.tx }]}>{c.label}</Text>
+                <Ionicons name={c.icon} size={16} color={checks[c.key] ? C.ok : C.t3} style={{ marginRight: 4 }} />
+                <Text style={[styles.checkLabel, { color: C.t1 }]}>{c.label}</Text>
               </TouchableOpacity>
             ))}
-            <PrimaryBtn label="✓ 위생 일지 저장" onPress={handleSave} color={pal.gn} style={{ marginTop: spacing.md }} />
-            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
+            <PrimaryBtn label="위생 일지 저장" onPress={handleSave} color={C.ok} style={{ marginTop: 16 }} />
+            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: 10 }} />
           </ScrollView>
         </View>
       </Modal>
@@ -157,8 +163,6 @@ export function HygieneScreen() {
 
 // ═══ 온도·습도 기록 ════════════════════════════════════════
 export function TempScreen() {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
   const [records, setRecords] = useState([]);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ temp: '', humidity: '', person: '', note: '' });
@@ -189,70 +193,80 @@ export function TempScreen() {
   const isTempOk = !latest || latest.temp <= 4;
 
   return (
-    <View style={{ flex: 1, backgroundColor: pal.bg }}>
-      <View style={[styles.statBar, { backgroundColor: pal.bg }]}>
-        <StatMini label="현재 온도" value={latest ? `${latest.temp}°C` : '—'} color={isTempOk ? pal.gn : pal.yw} pal={pal} />
-        <StatMini label="현재 습도" value={latest ? `${latest.humidity}%` : '—'} color={pal.gn} pal={pal} />
-        <StatMini label="이달 이상" value={`${warnCount}회`} color={warnCount > 0 ? pal.yw : pal.gn} pal={pal} />
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={styles.statBar}>
+        <StatMini label="현재 온도" value={latest ? `${latest.temp}°C` : '—'} color={isTempOk ? C.ok : C.warn} />
+        <StatMini label="현재 습도" value={latest ? `${latest.humidity}%` : '—'} color={C.ok} />
+        <StatMini label="이달 이상" value={`${warnCount}회`} color={warnCount > 0 ? C.warn : C.ok} />
       </View>
       <View style={styles.toolbar}>
-        <Text style={[styles.toolTitle, { color: pal.tx }]}>🌡️ 온도·습도 기록</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="thermometer" size={18} color={C.t1} />
+          <Text style={styles.toolTitle}>온도·습도 기록</Text>
+        </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={[styles.pdfBtn, { borderColor: pal.a2 }]} onPress={async () => {
+          <TouchableOpacity style={styles.pdfBtn} onPress={async () => {
             try {
               await printAndShare(genTempHTML(records), '온도관리기록부');
             } catch (e) {
               Alert.alert('오류', 'PDF 생성 중 오류가 발생했습니다.');
             }
           }}>
-            <Text style={[styles.pdfBtnText, { color: pal.a2 }]}>📄 PDF</Text>
+            <Ionicons name="document" size={14} color={C.red2} />
+            <Text style={styles.pdfBtnText}> PDF</Text>
           </TouchableOpacity>
           <AddBtn label="+ 기록 추가" onPress={() => setModal(true)} />
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
+      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 100 }}>
         {records.map(r => (
-          <View key={r.id} style={[styles.tempCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+          <View key={r.id} style={styles.tempCard}>
             <View style={styles.tempRow}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.tempDate, { color: pal.tx }]}>{r.date} {r.time}</Text>
-                <Text style={[styles.tempPerson, { color: pal.t3 }]}>측정자: {r.person}</Text>
+                <Text style={styles.tempDate}>{r.date} {r.time}</Text>
+                <Text style={styles.tempPerson}>측정자: {r.person}</Text>
               </View>
               <View style={styles.tempVals}>
-                <Text style={[styles.tempVal, { color: r.temp > 4 ? pal.yw : pal.gn }]}>{r.temp}°C</Text>
-                <Text style={[styles.tempHumid, { color: pal.t2 }]}>{r.humidity}% 습도</Text>
+                <Text style={[styles.tempVal, { color: r.temp > 4 ? C.warn : C.ok }]}>{r.temp}°C</Text>
+                <Text style={styles.tempHumid}>{r.humidity}% 습도</Text>
               </View>
-              <View style={[styles.tempBadge, { backgroundColor: r.status === 'warn' ? '#fef9c3' : '#dcfce7' }]}>
-                <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: r.status === 'warn' ? pal.yw : pal.gn }}>
-                  {r.status === 'warn' ? '⚠ 주의' : '✓ 정상'}
+              <View style={[styles.tempBadge, { backgroundColor: r.status === 'warn' ? C.warnS : C.okS }]}>
+                <Ionicons name={r.status === 'warn' ? 'warning' : 'checkmark-circle'} size={13} color={r.status === 'warn' ? C.warn : C.ok} />
+                <Text style={{ fontSize: F.xs, fontWeight: '700', color: r.status === 'warn' ? C.warn : C.ok, marginLeft: 4 }}>
+                  {r.status === 'warn' ? '주의' : '정상'}
                 </Text>
               </View>
             </View>
-            {r.note !== '—' && <Text style={[styles.tempNote, { color: pal.t2, borderTopColor: pal.bd }]}>💬 {r.note}</Text>}
+            {r.note !== '—' && (
+              <View style={[styles.tempNote, { borderTopColor: C.border }]}>
+                <Ionicons name="chatbubble" size={12} color={C.t3} />
+                <Text style={{ fontSize: F.xs, color: C.t2, marginLeft: 6 }}>{r.note}</Text>
+              </View>
+            )}
           </View>
         ))}
       </ScrollView>
 
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.modalWrap, { backgroundColor: pal.s1 }]}>
-          <ModalHeader title="🌡️ 온도·습도 기록 추가" onClose={() => setModal(false)} pal={pal} />
-          <ScrollView contentContainerStyle={{ padding: spacing.md }}>
+        <View style={{ flex: 1, backgroundColor: C.white }}>
+          <ModalHeader title="온도·습도 기록 추가" icon="thermometer" onClose={() => setModal(false)} />
+          <ScrollView contentContainerStyle={{ padding: 18 }}>
             <View style={styles.rowInputs}>
               <View style={{ flex: 1 }}>
                 <FormField label="온도 (°C)" placeholder="0.0" value={form.temp}
-                  onChangeText={t => setForm({ ...form, temp: t })} keyboardType="numeric" pal={pal} />
+                  onChangeText={t => setForm({ ...form, temp: t })} keyboardType="numeric" />
               </View>
               <View style={{ flex: 1 }}>
                 <FormField label="습도 (%)" placeholder="82" value={form.humidity}
-                  onChangeText={t => setForm({ ...form, humidity: t })} keyboardType="numeric" pal={pal} />
+                  onChangeText={t => setForm({ ...form, humidity: t })} keyboardType="numeric" />
               </View>
             </View>
-            <FormField label="측정자" value={form.person} onChangeText={t => setForm({ ...form, person: t })} pal={pal} />
+            <FormField label="측정자" value={form.person} onChangeText={t => setForm({ ...form, person: t })} />
             <FormField label="비고" placeholder="이상 발생 시 원인 기록" value={form.note}
-              onChangeText={t => setForm({ ...form, note: t })} pal={pal} />
+              onChangeText={t => setForm({ ...form, note: t })} />
             <PrimaryBtn label="저장" onPress={handleSave} style={{ marginTop: 8 }} />
-            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
+            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: 10 }} />
           </ScrollView>
         </View>
       </Modal>
@@ -262,12 +276,10 @@ export function TempScreen() {
 
 // ═══ 서류 체크리스트 ════════════════════════════════════════
 export function DocsScreen() {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
   const commonDocs = [
     { key: 'd1', label: '영업신고증 / 허가증', sub: '식육판매업 신고증', date: '2025.06.01', status: 'ok' },
     { key: 'd2', label: '건강진단결과서 — 홍길동', sub: '만료 2027.01.15', date: '2026.01.15', status: 'ok' },
-    { key: 'd3', label: '건강진단결과서 — 김○○', sub: '갱신 필요', date: '⚠ 만료', status: 'expired' },
+    { key: 'd3', label: '건강진단결과서 — 김○○', sub: '갱신 필요', date: '만료', status: 'expired' },
     { key: 'd4', label: '위생교육 이수증', sub: '만료 2027.02.20', date: '2026.02.20', status: 'ok' },
     { key: 'd5', label: '원료육 거래명세서', sub: '이력번호 포함', date: '2026.03.24', status: 'ok' },
     { key: 'd6', label: '온도관리 기록지', sub: '시스템 자동', date: '2026.03.26', status: 'ok' },
@@ -282,38 +294,49 @@ export function DocsScreen() {
   const [checked, setChecked] = useState({ d1: true, d2: true, d4: true, d5: true, d6: true, a1: true, a2: true, a4: true });
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: pal.bg }} contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
-      <AlertBox type="warn" icon="⚠️" title="미비 서류 2건" message="소비기한 설정 근거 문서 · 건강진단결과서(김○○)" />
-      <DocSection title="📋 공통 필수 서류" docs={commonDocs} checked={checked} onToggle={k => setChecked({ ...checked, [k]: !checked[k] })} />
-      <DocSection title="🥩 건조숙성육 특화 서류" docs={agingDocs} checked={checked} onToggle={k => setChecked({ ...checked, [k]: !checked[k] })} />
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 18, paddingBottom: 100 }}>
+      <AlertBox type="warn" icon="warning" title="미비 서류 2건" message="소비기한 설정 근거 문서 · 건강진단결과서(김○○)" />
+      <DocSection title="공통 필수 서류" icon="clipboard" docs={commonDocs} checked={checked} onToggle={k => setChecked({ ...checked, [k]: !checked[k] })} />
+      <DocSection title="건조숙성육 특화 서류" icon="nutrition" docs={agingDocs} checked={checked} onToggle={k => setChecked({ ...checked, [k]: !checked[k] })} />
     </ScrollView>
   );
 }
 
-function DocSection({ title, docs, checked, onToggle }) {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
+function DocSection({ title, icon, docs, checked, onToggle }) {
   return (
-    <View style={[styles.docSection, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-      <Text style={[styles.docSectionTitle, { color: pal.t2, backgroundColor: pal.s2, borderBottomColor: pal.bd }]}>{title}</Text>
+    <View style={styles.docSection}>
+      <View style={styles.docSectionHeader}>
+        <Ionicons name={icon} size={16} color={C.t2} />
+        <Text style={styles.docSectionTitle}>{title}</Text>
+      </View>
       {docs.map(doc => {
         const isChecked = checked[doc.key];
         const isMissing = doc.status === 'missing';
         return (
-          <View key={doc.key} style={[styles.docRow, { borderBottomColor: pal.bd + '50' }]}>
+          <View key={doc.key} style={styles.docRow}>
             <TouchableOpacity
-              style={[styles.checkBox, { borderColor: pal.bd2, backgroundColor: pal.s1 }, isChecked && styles.checkBoxOn, isMissing && styles.checkBoxWarn]}
+              style={[styles.checkBox, isChecked && styles.checkBoxOn, isMissing && styles.checkBoxWarn]}
               onPress={() => onToggle(doc.key)}>
-              {isChecked && <Text style={{ color: '#fff', fontSize: fontSize.xxs, fontWeight: '800' }}>✓</Text>}
+              {isChecked && <Ionicons name="checkmark" size={13} color="#fff" />}
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.docLabel, { color: pal.tx }, isMissing && { color: pal.rd }]}>{doc.label}</Text>
-              <Text style={[styles.docSub, { color: pal.t3 }]}>{doc.sub}</Text>
+              <Text style={[styles.docLabel, isMissing && { color: C.red3 }]}>{doc.label}</Text>
+              <Text style={styles.docSub}>{doc.sub}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={[styles.docDate, { color: pal.t3 }, isMissing && { color: pal.rd, fontWeight: '800' }]}>{doc.date}</Text>
-              {doc.status === 'ok' && <Text style={styles.docOk}>✓ 유효</Text>}
-              {isMissing && <Text style={styles.docMissing}>❌ 미등록</Text>}
+              <Text style={[styles.docDate, isMissing && { color: C.red3, fontWeight: '800' }]}>{doc.date}</Text>
+              {doc.status === 'ok' && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Ionicons name="checkmark-circle" size={12} color={C.ok} />
+                  <Text style={styles.docOk}>유효</Text>
+                </View>
+              )}
+              {isMissing && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Ionicons name="close-circle" size={12} color={C.red3} />
+                  <Text style={styles.docMissing}>미등록</Text>
+                </View>
+              )}
             </View>
           </View>
         );
@@ -324,58 +347,53 @@ function DocSection({ title, docs, checked, onToggle }) {
 
 // ═══ 직원 서류 ════════════════════════════════════════════
 export function StaffScreen() {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
   const [staff] = useState(staffData);
   const expiredStaff = staff.filter(s => s.status === 'expired');
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: pal.bg }} contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 18, paddingBottom: 100 }}>
       {expiredStaff.length > 0 && (
-        <AlertBox type="error" icon="🚨" title="보건증 만료"
+        <AlertBox type="error" icon="alert-circle" title="보건증 만료"
           message={expiredStaff.map(s => `${s.name} — ${s.health} 만료`).join('\n')} />
       )}
       {staff.map(s => {
         const expired = s.status === 'expired';
         return (
-          <View key={s.id} style={{
-            backgroundColor: pal.s1, borderRadius: radius.md, borderWidth: 1,
-            borderColor: pal.bd, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm,
-          }}>
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
+          <View key={s.id} style={styles.staffCard}>
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
               <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#fff', fontSize: fontSize.lg, fontWeight: '900' }}>{s.name[0]}</Text>
+                <Text style={{ color: '#fff', fontSize: F.h2, fontWeight: '900' }}>{s.name[0]}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                  <Text style={{ fontSize: fontSize.md, fontWeight: '800', color: pal.tx }}>{s.name}</Text>
+                  <Text style={{ fontSize: F.body, fontWeight: '800', color: C.t1 }}>{s.name}</Text>
                   <StatusBadge status={expired ? 'expired' : 'ok'} />
                 </View>
-                <Text style={{ fontSize: fontSize.xs, color: pal.t3, marginBottom: 6 }}>{s.role} · 입사일 {s.hire}</Text>
+                <Text style={{ fontSize: F.xs, color: C.t3, marginBottom: 6 }}>{s.role} · 입사일 {s.hire}</Text>
                 <View style={{ flexDirection: 'row', gap: 7, flexWrap: 'wrap' }}>
-                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, borderWidth: 1 },
-                    expired ? { backgroundColor: '#fee2e2', borderColor: '#fecaca' } : { backgroundColor: '#dcfce7', borderColor: '#bbf7d0' }]}>
-                    <Text style={{ fontSize: fontSize.xs }}>🏥</Text>
-                    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: expired ? colors.rd : colors.gn }}>보건증 ~{s.health}</Text>
+                  <View style={[styles.docBadge,
+                    expired ? { backgroundColor: C.redS, borderColor: C.red3 + '40' } : { backgroundColor: C.okS, borderColor: C.ok + '30' }]}>
+                    <Ionicons name="medkit" size={12} color={expired ? C.red3 : C.ok} />
+                    <Text style={{ fontSize: F.xs, fontWeight: '700', color: expired ? C.red3 : C.ok, marginLeft: 4 }}>보건증 ~{s.health}</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, borderWidth: 1, backgroundColor: '#dcfce7', borderColor: '#bbf7d0' }}>
-                    <Text style={{ fontSize: fontSize.xs }}>📚</Text>
-                    <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: colors.gn }}>위생교육 ~{s.edu}</Text>
+                  <View style={[styles.docBadge, { backgroundColor: C.okS, borderColor: C.ok + '30' }]}>
+                    <Ionicons name="school" size={12} color={C.ok} />
+                    <Text style={{ fontSize: F.xs, fontWeight: '700', color: C.ok, marginLeft: 4 }}>위생교육 ~{s.edu}</Text>
                   </View>
                 </View>
               </View>
             </View>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: fontSize.xxs, color: pal.t3, marginBottom: 4, fontWeight: '600' }}>보건증 유효기간 ~{s.health}</Text>
-                <ProgressBar pct={expired ? 0 : 85} color={expired ? colors.rd : colors.gn} height={6} />
+                <Text style={{ fontSize: F.xxs, color: C.t3, marginBottom: 4, fontWeight: '600' }}>보건증 유효기간 ~{s.health}</Text>
+                <ProgressBar pct={expired ? 0 : 85} color={expired ? C.red3 : C.ok} height={6} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: fontSize.xxs, color: pal.t3, marginBottom: 4, fontWeight: '600' }}>위생교육 ~{s.edu}</Text>
-                <ProgressBar pct={92} color={colors.gn} height={6} />
+                <Text style={{ fontSize: F.xxs, color: C.t3, marginBottom: 4, fontWeight: '600' }}>위생교육 ~{s.edu}</Text>
+                <ProgressBar pct={92} color={C.ok} height={6} />
               </View>
             </View>
-            {expired && <AlertBox type="warn" icon="⚠️" message={`보건증이 ${s.health} 만료. 즉시 갱신 바랍니다.`} />}
+            {expired && <AlertBox type="warn" icon="warning" message={`보건증이 ${s.health} 만료. 즉시 갱신 바랍니다.`} />}
           </View>
         );
       })}
@@ -396,9 +414,9 @@ export function InventoryScreen() {
   const filtered = filter === 'all' ? items : items.filter(i => i.status === filter);
 
   const CONF = {
-    ok:       { label: '정상', color: colors.gn, bg: '#dcfce7' },
-    low:      { label: '부족', color: colors.yw, bg: '#fef9c3' },
-    critical: { label: '긴급', color: colors.rd, bg: '#fee2e2' },
+    ok:       { label: '정상', color: C.ok,   bg: C.okS },
+    low:      { label: '부족', color: C.warn,  bg: C.warnS },
+    critical: { label: '긴급', color: C.red3,  bg: C.redS },
   };
 
   const handleSave = () => {
@@ -415,34 +433,43 @@ export function InventoryScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={styles.statBar}>
-        <StatMini label="전체 품목" value={`${items.length}종`} color={colors.a2} pal={colors} />
-        <StatMini label="발주 필요" value={`${criticals.length + lows.length}건`} color={criticals.length ? colors.rd : colors.yw} pal={colors} />
-        <StatMini label="재고 가치" value={`${Math.round(totalVal / 10000)}만원`} color={colors.gn} pal={colors} />
+        <StatMini label="전체 품목" value={`${items.length}종`} color={C.red2} />
+        <StatMini label="발주 필요" value={`${criticals.length + lows.length}건`} color={criticals.length ? C.red3 : C.warn} />
+        <StatMini label="재고 가치" value={`${Math.round(totalVal / 10000)}만원`} color={C.ok} />
       </View>
       {criticals.length > 0 && (
-        <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.xs }}>
-          <AlertBox type="error" icon="🚨" title="긴급 발주 필요" message={criticals.map(i => i.name).join(', ')} />
+        <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
+          <AlertBox type="error" icon="alert-circle" title="긴급 발주 필요" message={criticals.map(i => i.name).join(', ')} />
         </View>
       )}
 
       <View style={styles.filterRow}>
-        {[{ k: 'all', l: '전체' }, { k: 'critical', l: '🔴 긴급' }, { k: 'low', l: '🟡 부족' }, { k: 'ok', l: '🟢 정상' }].map(f => (
+        {[
+          { k: 'all', l: '전체', icon: null },
+          { k: 'critical', l: '긴급', icon: 'ellipse', iconColor: C.red3 },
+          { k: 'low', l: '부족', icon: 'ellipse', iconColor: C.warn },
+          { k: 'ok', l: '정상', icon: 'ellipse', iconColor: C.ok },
+        ].map(f => (
           <TouchableOpacity key={f.k}
             style={[styles.filterBtn, filter === f.k && styles.filterBtnActive]}
             onPress={() => setFilter(f.k)}>
+            {f.icon && <Ionicons name={f.icon} size={8} color={filter === f.k ? '#fff' : f.iconColor} style={{ marginRight: 4 }} />}
             <Text style={[styles.filterBtnText, filter === f.k && styles.filterBtnTextActive]}>{f.l}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
       <View style={styles.toolbar}>
-        <Text style={[styles.toolTitle, { color: colors.tx }]}>📦 재고 현황</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="cube" size={18} color={C.t1} />
+          <Text style={styles.toolTitle}>재고 현황</Text>
+        </View>
         <AddBtn label="+ 품목 추가" onPress={() => setModal(true)} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
+      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 100 }}>
         {filtered.map(item => {
           const conf = CONF[item.status] || CONF.ok;
           const pct = item.minQty > 0 ? Math.min(100, Math.round((item.qty / item.minQty) * 100)) : 100;
@@ -480,15 +507,15 @@ export function InventoryScreen() {
       </ScrollView>
 
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modalWrap}>
-          <ModalHeader title="📦 품목 추가" onClose={() => setModal(false)} pal={colors} />
-          <ScrollView contentContainerStyle={{ padding: spacing.md }}>
+        <View style={{ flex: 1, backgroundColor: C.white }}>
+          <ModalHeader title="품목 추가" icon="cube" onClose={() => setModal(false)} />
+          <ScrollView contentContainerStyle={{ padding: 18 }}>
             <FormField label="품목명 *" placeholder="예: 진공포장지 (대)" value={form.name}
-              onChangeText={t => setForm({ ...form, name: t })} pal={colors} />
+              onChangeText={t => setForm({ ...form, name: t })} />
             <View style={styles.rowInputs}>
               <View style={{ flex: 1 }}>
                 <FormField label="단위" placeholder="roll, kg, ea" value={form.unit}
-                  onChangeText={t => setForm({ ...form, unit: t })} pal={colors} />
+                  onChangeText={t => setForm({ ...form, unit: t })} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.formLabel}>카테고리</Text>
@@ -505,17 +532,17 @@ export function InventoryScreen() {
             <View style={styles.rowInputs}>
               <View style={{ flex: 1 }}>
                 <FormField label="현재 수량" placeholder="0" value={form.qty}
-                  onChangeText={t => setForm({ ...form, qty: t })} keyboardType="numeric" pal={colors} />
+                  onChangeText={t => setForm({ ...form, qty: t })} keyboardType="numeric" />
               </View>
               <View style={{ flex: 1 }}>
                 <FormField label="최소 수량" placeholder="0" value={form.minQty}
-                  onChangeText={t => setForm({ ...form, minQty: t })} keyboardType="numeric" pal={colors} />
+                  onChangeText={t => setForm({ ...form, minQty: t })} keyboardType="numeric" />
               </View>
             </View>
             <FormField label="단가 (원)" placeholder="예: 42000" value={form.price}
-              onChangeText={t => setForm({ ...form, price: t })} keyboardType="numeric" pal={colors} />
-            <PrimaryBtn label="📦 등록 완료" onPress={handleSave} style={{ marginTop: 8 }} />
-            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
+              onChangeText={t => setForm({ ...form, price: t })} keyboardType="numeric" />
+            <PrimaryBtn label="등록 완료" onPress={handleSave} style={{ marginTop: 8 }} />
+            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: 10 }} />
           </ScrollView>
         </View>
       </Modal>
@@ -524,132 +551,126 @@ export function InventoryScreen() {
 }
 
 // ═══ 공통 헬퍼 ════════════════════════════════════════════
-const ModalHeader = ({ title, onClose, pal }) => (
-  <View style={[styles.modalHeader, { borderBottomColor: pal.bd }]}>
-    <Text style={[styles.modalTitle, { color: pal.tx }]}>{title}</Text>
+const ModalHeader = ({ title, icon, onClose }) => (
+  <View style={styles.modalHeader}>
+    <View style={styles.modalHeaderAccent} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      {icon && <Ionicons name={icon} size={18} color={C.red} />}
+      <Text style={styles.modalTitle}>{title}</Text>
+    </View>
     <TouchableOpacity onPress={onClose}>
-      <Text style={[styles.modalClose, { color: pal.t2 }]}>✕</Text>
+      <Ionicons name="close" size={22} color={C.t3} />
     </TouchableOpacity>
   </View>
 );
 
-const FormField = ({ label, pal, ...props }) => (
-  <View style={{ marginBottom: spacing.md }}>
-    {label && <Text style={[styles.formLabel, { color: pal.t2 }]}>{label}</Text>}
+const FormField = ({ label, ...props }) => (
+  <View style={{ marginBottom: 16 }}>
+    {label && <Text style={styles.formLabel}>{label}</Text>}
     <TextInput
-      style={[styles.input, { backgroundColor: pal.bg, borderColor: pal.bd, color: pal.tx }]}
-      placeholderTextColor={pal.t3}
+      style={styles.input}
+      placeholderTextColor={C.t4}
       {...props}
     />
   </View>
 );
 
-const StatMini = ({ label, value, color, pal }) => (
-  <View style={[styles.statMini, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+const StatMini = ({ label, value, color }) => (
+  <View style={styles.statMini}>
     <Text style={[styles.statVal, { color }]}>{value}</Text>
-    <Text style={[styles.statLbl, { color: pal.t3 }]}>{label}</Text>
+    <Text style={styles.statLbl}>{label}</Text>
   </View>
 );
 
 // ═══ 공통 스타일 ══════════════════════════════════════════
 const styles = StyleSheet.create({
-  statBar: { flexDirection: 'row', gap: spacing.sm, padding: spacing.sm },
+  statBar: { flexDirection: 'row', gap: 10, padding: 10 },
   statMini: {
-    flex: 1, borderRadius: radius.md,
-    borderWidth: 1, padding: spacing.sm + 2,
-    alignItems: 'center', ...shadow.sm,
+    flex: 1, borderRadius: R.md,
+    borderWidth: 1, borderColor: C.border, padding: 12,
+    alignItems: 'center', backgroundColor: C.white, ...SH.sm,
   },
-  statVal: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 3 },
-  statLbl: { fontSize: fontSize.xxs, fontWeight: '600', textAlign: 'center' },
+  statVal: { fontSize: F.h2, fontWeight: '900', marginBottom: 3 },
+  statLbl: { fontSize: F.xxs, fontWeight: '600', textAlign: 'center', color: C.t3 },
 
-  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  toolTitle: { fontSize: fontSize.md, fontWeight: '800' },
-  pdfBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1.5, backgroundColor: '#eff6ff' },
-  pdfBtnText: { fontSize: fontSize.sm, fontWeight: '800' },
+  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 10 },
+  toolTitle: { fontSize: F.body, fontWeight: '800', color: C.t1 },
+  pdfBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: R.sm, borderWidth: 1.5, borderColor: C.red2, backgroundColor: C.redS },
+  pdfBtnText: { fontSize: F.sm, fontWeight: '800', color: C.red2 },
 
   // 위생일지
-  logCard: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
+  logCard: { borderRadius: R.md, borderWidth: 1, borderColor: C.border, padding: 18, marginBottom: 10, backgroundColor: C.white, ...SH.sm },
   logTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  logDate: { fontSize: fontSize.md, fontWeight: '700', marginBottom: 3 },
-  logInspector: { fontSize: fontSize.xs },
-  logExpand: { borderTopWidth: 1, marginTop: spacing.sm, paddingTop: spacing.sm },
-  logItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6, borderBottomWidth: 1 },
-  logItemText: { fontSize: fontSize.sm },
+  logDate: { fontSize: F.body, fontWeight: '700', marginBottom: 3, color: C.t1 },
+  logInspector: { fontSize: F.xs, color: C.t3 },
+  logExpand: { borderTopWidth: 1, borderTopColor: C.border, marginTop: 12, paddingTop: 12 },
+  logItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: C.border + '40' },
+  logItemText: { fontSize: F.sm, color: C.t2 },
 
   // 온도
-  tempCard: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
-  tempRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  tempDate: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 3 },
-  tempPerson: { fontSize: fontSize.xxs },
+  tempCard: { borderRadius: R.md, borderWidth: 1, borderColor: C.border, padding: 18, marginBottom: 10, backgroundColor: C.white, ...SH.sm },
+  tempRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  tempDate: { fontSize: F.sm, fontWeight: '700', marginBottom: 3, color: C.t1 },
+  tempPerson: { fontSize: F.xxs, color: C.t3 },
   tempVals: { flex: 1, alignItems: 'center' },
-  tempVal: { fontSize: fontSize.xl, fontWeight: '900' },
-  tempHumid: { fontSize: fontSize.xs },
-  tempBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
-  tempNote: { fontSize: fontSize.xs, marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1 },
+  tempVal: { fontSize: F.h2, fontWeight: '900' },
+  tempHumid: { fontSize: F.xs, color: C.t2 },
+  tempBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
+  tempNote: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: 1 },
 
   // 서류
-  docSection: { borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.md, overflow: 'hidden', ...shadow.sm },
-  docSectionTitle: { fontSize: fontSize.md, fontWeight: '800', padding: spacing.md, borderBottomWidth: 1 },
-  docRow: { flexDirection: 'row', alignItems: 'flex-start', padding: spacing.md, borderBottomWidth: 1, gap: 12 },
-  docLabel: { fontSize: fontSize.sm, fontWeight: '600', marginBottom: 3 },
-  docSub: { fontSize: fontSize.xxs },
-  docDate: { fontSize: fontSize.xxs },
-  docOk: { fontSize: fontSize.xxs, color: colors.gn, fontWeight: '700' },
-  docMissing: { fontSize: fontSize.xxs, color: colors.rd, fontWeight: '800' },
+  docSection: { borderRadius: R.md, borderWidth: 1, borderColor: C.border, marginBottom: 16, overflow: 'hidden', backgroundColor: C.white, ...SH.sm },
+  docSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.bg2 },
+  docSectionTitle: { fontSize: F.body, fontWeight: '800', color: C.t2 },
+  docRow: { flexDirection: 'row', alignItems: 'flex-start', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border + '50', gap: 12 },
+  docLabel: { fontSize: F.sm, fontWeight: '600', marginBottom: 3, color: C.t1 },
+  docSub: { fontSize: F.xxs, color: C.t3 },
+  docDate: { fontSize: F.xxs, color: C.t3 },
+  docOk: { fontSize: F.xxs, color: C.ok, fontWeight: '700' },
+  docMissing: { fontSize: F.xxs, color: C.red3, fontWeight: '800' },
 
   // 직원
-  staffCard: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
-  staffTop: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
-  staffAvatar: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  staffAvatarText: { color: '#fff', fontSize: fontSize.lg, fontWeight: '900' },
-  staffNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
-  staffName: { fontSize: fontSize.md, fontWeight: '800' },
-  staffRole: { fontSize: fontSize.xs, marginBottom: 6 },
-  docBadgeRow: { flexDirection: 'row', gap: 7, flexWrap: 'wrap' },
-  docBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, borderWidth: 1 },
-  docBadgeGreen: { backgroundColor: '#dcfce7', borderColor: '#bbf7d0' },
-  docBadgeRed: { backgroundColor: '#fee2e2', borderColor: '#fecaca' },
-  barRow: { flexDirection: 'row', gap: spacing.sm },
-  barLabel: { fontSize: fontSize.xxs, marginBottom: 4, fontWeight: '600' },
+  staffCard: { backgroundColor: C.white, borderRadius: R.md, borderWidth: 1, borderColor: C.border, padding: 18, marginBottom: 10, ...SH.sm },
+
+  docBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, borderWidth: 1 },
 
   // 재고
-  filterRow: { flexDirection: 'row', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm },
-  filterBtn: { flex: 1, paddingVertical: 10, borderRadius: radius.sm, borderWidth: 1.5, borderColor: colors.bd, backgroundColor: colors.s1, alignItems: 'center', justifyContent: 'center' },
-  filterBtnActive: { backgroundColor: colors.ac, borderColor: colors.ac },
-  filterBtnText: { fontSize: fontSize.sm, color: colors.t2, fontWeight: '600' },
+  filterRow: { flexDirection: 'row', paddingHorizontal: 18, paddingVertical: 10, gap: 10 },
+  filterBtn: { flex: 1, flexDirection: 'row', paddingVertical: 10, borderRadius: R.sm, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center' },
+  filterBtnActive: { backgroundColor: C.red, borderColor: C.red },
+  filterBtnText: { fontSize: F.sm, color: C.t2, fontWeight: '600' },
   filterBtnTextActive: { color: '#fff', fontWeight: '800' },
-  invCard: { backgroundColor: colors.s1, borderRadius: radius.md, borderWidth: 1, borderColor: colors.bd, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
-  invTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.sm },
-  invName: { fontSize: fontSize.md, fontWeight: '800', color: colors.tx },
-  invMeta: { fontSize: fontSize.xxs, color: colors.t3, marginTop: 2 },
-  invQty: { fontSize: fontSize.xl, fontWeight: '900' },
-  invUnit: { fontSize: fontSize.xxs, color: colors.t3 },
-  invBarRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  invCard: { backgroundColor: C.white, borderRadius: R.md, borderWidth: 1, borderColor: C.border, padding: 18, marginBottom: 10, ...SH.sm },
+  invTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+  invName: { fontSize: F.body, fontWeight: '800', color: C.t1 },
+  invMeta: { fontSize: F.xxs, color: C.t3, marginTop: 2 },
+  invQty: { fontSize: F.h2, fontWeight: '900' },
+  invUnit: { fontSize: F.xxs, color: C.t3 },
+  invBarRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   invStatusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  invStatusText: { fontSize: fontSize.xs, fontWeight: '800' },
-  catBadge: { backgroundColor: colors.s2, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
-  catText: { fontSize: fontSize.xxs, color: colors.t2, fontWeight: '700' },
-  orderBtn: { backgroundColor: colors.ac, borderRadius: 7, paddingHorizontal: 12, paddingVertical: 7 },
-  orderBtnText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '800' },
+  invStatusText: { fontSize: F.xs, fontWeight: '800' },
+  catBadge: { backgroundColor: C.bg2, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
+  catText: { fontSize: F.xxs, color: C.t2, fontWeight: '700' },
+  orderBtn: { backgroundColor: C.red, borderRadius: 7, paddingHorizontal: 12, paddingVertical: 7 },
+  orderBtnText: { color: '#fff', fontSize: F.sm, fontWeight: '800' },
 
   // 공통 모달
-  modalWrap: { flex: 1 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1 },
-  modalTitle: { fontSize: fontSize.lg, fontWeight: '800' },
-  modalClose: { fontSize: 20, padding: 4 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.white },
+  modalHeaderAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: C.red },
+  modalTitle: { fontSize: F.h3, fontWeight: '900', color: C.t1 },
 
-  formLabel: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 7 },
-  input: { borderWidth: 1.5, borderRadius: radius.sm, padding: 13, fontSize: fontSize.sm },
-  rowInputs: { flexDirection: 'row', gap: spacing.sm },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: spacing.sm },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: colors.bd, backgroundColor: colors.s1 },
-  chipActive: { backgroundColor: colors.ac, borderColor: colors.ac },
-  chipText: { fontSize: fontSize.sm, color: colors.t2, fontWeight: '600' },
+  formLabel: { fontSize: F.sm, fontWeight: '700', marginBottom: 7, color: C.t2 },
+  input: { borderWidth: 1.5, borderRadius: R.sm, padding: 13, fontSize: F.sm, backgroundColor: C.white, borderColor: C.border, color: C.t1 },
+  rowInputs: { flexDirection: 'row', gap: 10 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 12 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.white },
+  chipActive: { backgroundColor: C.red, borderColor: C.red },
+  chipText: { fontSize: F.sm, color: C.t2, fontWeight: '600' },
   chipTextActive: { color: '#fff', fontWeight: '800' },
 
-  checkRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderBottomWidth: 1, gap: 12 },
-  checkBox: { width: 26, height: 26, borderRadius: 7, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  checkBoxOn: { backgroundColor: colors.gn, borderColor: colors.gn },
-  checkBoxWarn: { borderColor: colors.yw },
-  checkLabel: { fontSize: fontSize.sm },
+  checkRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.border, gap: 12 },
+  checkBox: { width: 26, height: 26, borderRadius: 7, borderWidth: 2, borderColor: C.border, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center' },
+  checkBoxOn: { backgroundColor: C.ok, borderColor: C.ok },
+  checkBoxWarn: { borderColor: C.warn },
+  checkLabel: { fontSize: F.sm },
 });

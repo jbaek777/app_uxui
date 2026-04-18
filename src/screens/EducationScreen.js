@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert, TextInput,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
-import { darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
-import { useTheme } from '../lib/ThemeContext';
+import { C, F, R, SH } from '../lib/v5';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { educationStore } from '../lib/dataStore';
 
@@ -25,9 +25,6 @@ const DEFAULT_TOPICS = [
 ];
 
 export default function EducationScreen() {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
-
   const [logs, setLogs] = useState([]);
   const [modal, setModal] = useState(false);
 
@@ -80,7 +77,7 @@ export default function EducationScreen() {
     const updated = await educationStore.add(newLog);
     setLogs(updated);
     setModal(false);
-    Alert.alert('저장 완료 ✓', '교육일지가 저장되었습니다.');
+    Alert.alert('저장 완료', '교육일지가 저장되었습니다.');
   };
 
   const handleExportPDF = async (log) => {
@@ -109,35 +106,49 @@ export default function EducationScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: pal.bg }]}>
-      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, marginBottom: spacing.md }}>
-        <PrimaryBtn label="📝 교육일지 작성" onPress={openModal} />
+    <View style={[styles.container, { backgroundColor: C.bg }]}>
+      {/* V5 Header */}
+      <View style={styles.v5Header}>
+        <View style={styles.v5HeaderAccent} />
+        <View style={styles.v5HeaderContent}>
+          <View style={styles.v5HeaderIcon}>
+            <Ionicons name="school-outline" size={18} color={C.white} />
+          </View>
+          <Text style={styles.v5HeaderTitle}>위생 교육</Text>
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
+      <View style={{ paddingHorizontal: 24, paddingTop: 16, marginBottom: 16 }}>
+        <PrimaryBtn label="교육일지 작성" onPress={openModal} />
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 100 }}>
         {logs.length === 0 && (
-          <View style={[styles.emptyBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-            <Text style={{ fontSize: 40, marginBottom: 10 }}>📚</Text>
-            <Text style={[styles.emptyTitle, { color: pal.tx }]}>아직 교육일지가 없습니다</Text>
-            <Text style={[styles.emptyDesc, { color: pal.t3 }]}>월 1회 직원 위생교육 기록을 작성하세요</Text>
+          <View style={[styles.emptyBox, { backgroundColor: C.white, borderColor: C.border }]}>
+            <View style={{ width: 48, height: 48, borderRadius: R.md, backgroundColor: C.redS, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+              <Ionicons name="book-outline" size={26} color={C.red} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: C.t1 }]}>아직 교육일지가 없습니다</Text>
+            <Text style={[styles.emptyDesc, { color: C.t3 }]}>월 1회 직원 위생교육 기록을 작성하세요</Text>
           </View>
         )}
         {logs.map(log => (
-          <View key={log.id} style={[styles.logCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+          <View key={log.id} style={[styles.logCard, { backgroundColor: C.white, borderColor: C.border }]}>
             <View style={styles.logTop}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.logDate, { color: pal.tx }]}>{log.date}</Text>
-                <Text style={[styles.logMeta, { color: pal.t3 }]}>대상: {log.attendees}</Text>
-                <Text style={[styles.logTopics, { color: pal.t2 }]} numberOfLines={2}>
+                <Text style={[styles.logDate, { color: C.t1 }]}>{log.date}</Text>
+                <Text style={[styles.logMeta, { color: C.t3 }]}>대상: {log.attendees}</Text>
+                <Text style={[styles.logTopics, { color: C.t2 }]} numberOfLines={2}>
                   {log.topics.join(' · ')}
                 </Text>
               </View>
               <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                <TouchableOpacity style={[styles.pdfBtn, { backgroundColor: pal.a2 + '15', borderColor: pal.a2 + '40' }]} onPress={() => handleExportPDF(log)}>
-                  <Text style={[styles.pdfBtnText, { color: pal.a2 }]}>PDF</Text>
+                <TouchableOpacity style={[styles.pdfBtn, { backgroundColor: C.redS, borderColor: C.red2 + '40' }]} onPress={() => handleExportPDF(log)}>
+                  <Ionicons name="document-text-outline" size={14} color={C.red2} style={{ marginRight: 4 }} />
+                  <Text style={[styles.pdfBtnText, { color: C.red2 }]}>PDF</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => handleDelete(log.id)}>
-                  <Text style={{ color: pal.t3, fontSize: 18 }}>🗑</Text>
+                  <Ionicons name="trash-outline" size={20} color={C.t3} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -147,38 +158,38 @@ export default function EducationScreen() {
 
       {/* 작성 모달 */}
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.modalWrap, { backgroundColor: pal.bg }]}>
-          <View style={[styles.modalHeader, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx }]}>영업자 자체위생교육 실시</Text>
+        <View style={[styles.modalWrap, { backgroundColor: C.bg }]}>
+          <View style={[styles.modalHeader, { backgroundColor: C.white, borderBottomColor: C.border }]}>
+            <Text style={[styles.modalTitle, { color: C.t1 }]}>영업자 자체위생교육 실시</Text>
             <TouchableOpacity onPress={() => setModal(false)}>
-              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
+              <Ionicons name="close" size={24} color={C.t2} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}>
+          <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
             {/* 교육일시 */}
-            <FieldLabel label="교육일시" pal={pal} />
+            <FieldLabel label="교육일시" />
             <TextInput
-              style={[styles.input, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+              style={[styles.input, { backgroundColor: C.white, borderColor: C.border, color: C.t1 }]}
               value={date}
               onChangeText={setDate}
               placeholder="예: 2026.04.01"
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={C.t3}
             />
 
             {/* 교육대상 */}
-            <FieldLabel label="교육대상" pal={pal} />
+            <FieldLabel label="교육대상" />
             <TextInput
-              style={[styles.input, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+              style={[styles.input, { backgroundColor: C.white, borderColor: C.border, color: C.t1 }]}
               value={attendees}
               onChangeText={setAttendees}
               placeholder="예: 전 직원, 홍길동·이영희"
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={C.t3}
             />
 
             {/* 교육내용 */}
-            <FieldLabel label="교육내용" pal={pal} />
-            <Text style={[styles.fieldHint, { color: pal.t3 }]}>항목을 탭하여 선택/해제</Text>
+            <FieldLabel label="교육내용" />
+            <Text style={[styles.fieldHint, { color: C.t3 }]}>항목을 탭하여 선택/해제</Text>
             <View style={styles.topicList}>
               {DEFAULT_TOPICS.map(topic => {
                 const selected = selectedTopics.includes(topic);
@@ -186,14 +197,15 @@ export default function EducationScreen() {
                   <TouchableOpacity
                     key={topic}
                     style={[styles.topicChip, {
-                      backgroundColor: selected ? pal.ac + '20' : pal.s1,
-                      borderColor: selected ? pal.ac : pal.bd,
+                      backgroundColor: selected ? C.redS : C.white,
+                      borderColor: selected ? C.red : C.border,
                     }]}
                     onPress={() => toggleTopic(topic)}
                     activeOpacity={0.75}
                   >
-                    <Text style={[styles.topicChipText, { color: selected ? pal.ac : pal.t2, fontWeight: selected ? '800' : '500' }]}>
-                      {selected ? '✓ ' : ''}{topic}
+                    {selected && <Ionicons name="checkmark" size={14} color={C.red} style={{ marginRight: 4 }} />}
+                    <Text style={[styles.topicChipText, { color: selected ? C.red : C.t2, fontWeight: selected ? '800' : '500' }]}>
+                      {topic}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -202,11 +214,12 @@ export default function EducationScreen() {
               {selectedTopics.filter(t => !DEFAULT_TOPICS.includes(t)).map(topic => (
                 <TouchableOpacity
                   key={topic}
-                  style={[styles.topicChip, { backgroundColor: pal.gn + '20', borderColor: pal.gn }]}
+                  style={[styles.topicChip, { backgroundColor: C.okS, borderColor: C.ok2 }]}
                   onPress={() => toggleTopic(topic)}
                   activeOpacity={0.75}
                 >
-                  <Text style={[styles.topicChipText, { color: pal.gn, fontWeight: '800' }]}>✓ {topic}</Text>
+                  <Ionicons name="checkmark" size={14} color={C.ok2} style={{ marginRight: 4 }} />
+                  <Text style={[styles.topicChipText, { color: C.ok2, fontWeight: '800' }]}>{topic}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -214,27 +227,27 @@ export default function EducationScreen() {
             {/* 직접 추가 */}
             <View style={styles.customRow}>
               <TextInput
-                style={[styles.customInput, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx, flex: 1 }]}
+                style={[styles.customInput, { backgroundColor: C.white, borderColor: C.border, color: C.t1, flex: 1 }]}
                 value={customTopic}
                 onChangeText={setCustomTopic}
                 placeholder="직접 입력 후 추가"
-                placeholderTextColor={pal.t3}
+                placeholderTextColor={C.t3}
                 onSubmitEditing={addCustomTopic}
                 returnKeyType="done"
               />
-              <TouchableOpacity style={[styles.addBtn, { backgroundColor: pal.ac }]} onPress={addCustomTopic}>
+              <TouchableOpacity style={[styles.addBtn, { backgroundColor: C.red }]} onPress={addCustomTopic}>
                 <Text style={styles.addBtnText}>추가</Text>
               </TouchableOpacity>
             </View>
 
             {selectedTopics.length > 0 && (
-              <View style={[styles.selectedBox, { backgroundColor: pal.s1, borderColor: pal.gn + '40' }]}>
-                <Text style={[styles.selectedTitle, { color: pal.gn }]}>선택된 교육내용 ({selectedTopics.length}개)</Text>
+              <View style={[styles.selectedBox, { backgroundColor: C.white, borderColor: C.ok2 + '40' }]}>
+                <Text style={[styles.selectedTitle, { color: C.ok2 }]}>선택된 교육내용 ({selectedTopics.length}개)</Text>
                 {selectedTopics.map((t, i) => (
                   <View key={t} style={styles.selectedRow}>
-                    <Text style={[styles.selectedText, { color: pal.tx }]}>{i + 1}. {t}</Text>
+                    <Text style={[styles.selectedText, { color: C.t1 }]}>{i + 1}. {t}</Text>
                     <TouchableOpacity onPress={() => toggleTopic(t)}>
-                      <Text style={{ color: pal.t3 }}>✕</Text>
+                      <Ionicons name="close-circle-outline" size={20} color={C.t3} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -242,19 +255,19 @@ export default function EducationScreen() {
             )}
 
             {/* 기타사항 */}
-            <FieldLabel label="기타사항 (선택)" pal={pal} />
+            <FieldLabel label="기타사항 (선택)" />
             <TextInput
-              style={[styles.input, styles.textarea, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+              style={[styles.input, styles.textarea, { backgroundColor: C.white, borderColor: C.border, color: C.t1 }]}
               value={notes}
               onChangeText={setNotes}
               placeholder="특이사항이나 추가 내용을 입력하세요"
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={C.t3}
               multiline
               numberOfLines={3}
             />
 
-            <PrimaryBtn label="✓ 저장하기" onPress={handleSave} style={{ marginTop: spacing.lg }} />
-            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
+            <PrimaryBtn label="저장하기" onPress={handleSave} style={{ marginTop: 24 }} />
+            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: 8 }} />
           </ScrollView>
         </View>
       </Modal>
@@ -262,8 +275,8 @@ export default function EducationScreen() {
   );
 }
 
-function FieldLabel({ label, pal }) {
-  return <Text style={[styles.fieldLabel, { color: pal.tx }]}>{label}</Text>;
+function FieldLabel({ label }) {
+  return <Text style={[styles.fieldLabel, { color: C.t1 }]}>{label}</Text>;
 }
 
 // ── PDF 생성 ─────────────────────────────────────────────────
@@ -299,39 +312,46 @@ function genEducationHTML(log) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  emptyBox: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.xl, alignItems: 'center', marginBottom: spacing.md },
-  emptyTitle: { fontSize: fontSize.md, fontWeight: '800', marginBottom: 6 },
-  emptyDesc: { fontSize: fontSize.sm, textAlign: 'center' },
 
-  logCard: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
-  logTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  logDate: { fontSize: fontSize.md, fontWeight: '700', marginBottom: 3 },
-  logMeta: { fontSize: fontSize.xs, marginBottom: 3 },
-  logTopics: { fontSize: fontSize.xs },
-  pdfBtn: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
-  pdfBtnText: { fontSize: 12, fontWeight: '800' },
+  // V5 Header
+  v5Header: { backgroundColor: C.white, ...SH.sm },
+  v5HeaderAccent: { height: 3, backgroundColor: C.red },
+  v5HeaderContent: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
+  v5HeaderIcon: { width: 33, height: 33, borderRadius: R.sm, backgroundColor: C.red, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  v5HeaderTitle: { fontSize: 22, fontWeight: '900', color: C.t1 },
+
+  emptyBox: { borderRadius: R.lg, borderWidth: 1, padding: 32, alignItems: 'center', marginBottom: 16 },
+  emptyTitle: { fontSize: F.body, fontWeight: '800', marginBottom: 6 },
+  emptyDesc: { fontSize: F.sm, textAlign: 'center' },
+
+  logCard: { borderRadius: R.md, borderWidth: 1, padding: 16, marginBottom: 8, ...SH.sm },
+  logTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  logDate: { fontSize: F.body, fontWeight: '700', marginBottom: 3 },
+  logMeta: { fontSize: F.xs, marginBottom: 3 },
+  logTopics: { fontSize: F.xs },
+  pdfBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  pdfBtnText: { fontSize: F.xs, fontWeight: '800' },
 
   modalWrap: { flex: 1 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1 },
-  modalTitle: { fontSize: fontSize.md, fontWeight: '900' },
-  closeBtn: { fontSize: 22, padding: 4 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 24, borderBottomWidth: 1 },
+  modalTitle: { fontSize: F.h3, fontWeight: '900' },
 
-  fieldLabel: { fontSize: fontSize.sm, fontWeight: '800', marginTop: spacing.lg, marginBottom: spacing.sm },
-  fieldHint: { fontSize: 11, marginBottom: spacing.sm },
-  input: { borderWidth: 1.5, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: 14, fontSize: fontSize.md, minHeight: 52 },
+  fieldLabel: { fontSize: F.body, fontWeight: '800', marginTop: 24, marginBottom: 8 },
+  fieldHint: { fontSize: F.xxs, marginBottom: 8 },
+  input: { borderWidth: 1.5, borderRadius: R.sm, paddingHorizontal: 16, paddingVertical: 14, fontSize: F.body, minHeight: 52 },
   textarea: { minHeight: 90, textAlignVertical: 'top' },
 
-  topicList: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
-  topicChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1.5 },
-  topicChipText: { fontSize: 13 },
+  topicList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  topicChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1.5 },
+  topicChipText: { fontSize: F.sm },
 
-  customRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  customInput: { borderWidth: 1.5, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: 12, fontSize: fontSize.sm },
-  addBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: radius.sm, justifyContent: 'center' },
-  addBtnText: { color: '#fff', fontWeight: '800', fontSize: fontSize.sm },
+  customRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  customInput: { borderWidth: 1.5, borderRadius: R.sm, paddingHorizontal: 16, paddingVertical: 12, fontSize: F.sm },
+  addBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: R.sm, justifyContent: 'center' },
+  addBtnText: { color: '#fff', fontWeight: '800', fontSize: F.sm },
 
-  selectedBox: { borderRadius: radius.md, borderWidth: 1.5, padding: spacing.md, marginBottom: spacing.md },
-  selectedTitle: { fontSize: fontSize.sm, fontWeight: '800', marginBottom: spacing.sm },
+  selectedBox: { borderRadius: R.md, borderWidth: 1.5, padding: 16, marginBottom: 16 },
+  selectedTitle: { fontSize: F.sm, fontWeight: '800', marginBottom: 8 },
   selectedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
-  selectedText: { fontSize: fontSize.sm, flex: 1 },
+  selectedText: { fontSize: F.sm, flex: 1 },
 });

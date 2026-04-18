@@ -5,102 +5,16 @@ import {
   TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { colors, darkColors, lightColors, radius, shadow, fontSize, spacing } from '../theme';
-import { useTheme } from '../lib/ThemeContext';
+import { radius, shadow, fontSize, spacing } from '../theme';
+import { C } from '../lib/v5';
 import { PrimaryBtn, OutlineBtn, StatusBadge } from '../components/UI';
+import { lookupTrace, MTRACE_KEY_STORAGE } from '../lib/traceApi';
 
 const OFFLINE_QUEUE_KEY = '@meatbig_scan_queue';
 const SCAN_HISTORY_KEY = '@meatbig_scan_history';
-const MTRACE_KEY_STORAGE = '@meatbig_mtrace_api_key';
-
-// ─── 축산물이력제 API (data.go.kr 발급) ──────────────────
-const MTRACE_BASE = 'https://api.mtrace.go.kr/mtrace/api';
-
-// 날짜 포맷 변환 (20221015 → 2022.10.15)
-function fmtDate(val) {
-  const s = String(val || '');
-  if (s.length === 8) return `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}`;
-  return s || 'N/A';
-}
-
-// 실제 API 호출 (소 이력 조회)
-async function fetchMtrace(traceNo, apiKey) {
-  const url = `${MTRACE_BASE}/cattleIndvdlQryApi?tno=${traceNo}&apiKey=${encodeURIComponent(apiKey)}&_type=json`;
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 8000);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(tid);
-    const json = await res.json();
-    const header = json?.response?.header;
-    const body = json?.response?.body;
-    // resultCode가 '00'이 아니면 (인증오류, 서비스오류 등) null 반환
-    if (header?.resultCode && header.resultCode !== '00') return null;
-    // totalCount 0 체크 (숫자/문자열 둘 다 처리)
-    if (!body || Number(body.totalCount) === 0) return null;
-    // item이 배열(복수)이거나 단일 객체일 수 있음
-    const raw = body.items?.item;
-    if (!raw) return null;
-    const item = Array.isArray(raw) ? raw[0] : raw;
-    if (!item) return null;
-    return {
-      traceNo,
-      animalType: item.lsTypeNm || '소',
-      grade: item.gradeNm || 'N/A',
-      birthDate: fmtDate(item.birthYmd),
-      farmName: [item.farmNm, item.farmAddr].filter(Boolean).join(' (') + (item.farmAddr ? ')' : '') || 'N/A',
-      slaughterDate: fmtDate(item.slaugtDt),
-      slaughterPlace: item.slaugtPlcNm || 'N/A',
-      weight: item.wt ? `${item.wt}kg` : 'N/A',
-      inspection: item.inspPassYn === 'Y' ? '적합' : (item.inspPassYn === 'N' ? '부적합' : 'N/A'),
-    };
-  } catch {
-    clearTimeout(tid);
-    return null;
-  }
-}
-
-// ─── 데모용 Mock 데이터 (API 키 없을 때 폴백) ─────────────
-const MOCK_TRACE_DB = {
-  '002091700003743': {
-    traceNo: '002091700003743', animalType: '한우', grade: '1++',
-    birthDate: '2022.03.15', farmName: '○○한우농장 (경북 안동)',
-    slaughterDate: '2024.10.20', slaughterPlace: '○○도축장 (HACCP 인증)',
-    weight: '462kg', inspection: '적합',
-  },
-  '002091800012456': {
-    traceNo: '002091800012456', animalType: '한우', grade: '1+',
-    birthDate: '2021.11.08', farmName: '△△한우목장 (강원 횡성)',
-    slaughterDate: '2024.09.05', slaughterPlace: '△△도축장 (HACCP 인증)',
-    weight: '498kg', inspection: '적합',
-  },
-};
-
-async function lookupTrace(traceNo, apiKey = '') {
-  const clean = traceNo.replace(/\D/g, '');
-
-  // API 키 없으면 Mock 데이터로 폴백
-  if (!apiKey) {
-    await new Promise(r => setTimeout(r, 400));
-    return MOCK_TRACE_DB[clean] || {
-      traceNo: clean, animalType: '조회 불가', grade: 'N/A',
-      birthDate: 'N/A', farmName: 'API 키를 설정해야 실제 데이터를 조회할 수 있습니다',
-      slaughterDate: 'N/A', slaughterPlace: 'N/A', weight: 'N/A', inspection: 'N/A',
-    };
-  }
-
-  // 실제 API 조회
-  const result = await fetchMtrace(clean, apiKey);
-  if (result) return result;
-
-  // 조회 결과 없음 (미등록 이력번호)
-  return {
-    traceNo: clean, animalType: '이력 없음', grade: 'N/A',
-    birthDate: 'N/A', farmName: '등록되지 않은 이력번호입니다',
-    slaughterDate: 'N/A', slaughterPlace: 'N/A', weight: 'N/A', inspection: 'N/A',
-  };
-}
+// MTRACE_KEY_STORAGE / lookupTrace는 traceApi.js에서 import
 
 // 네트워크 연결 확인 (간단한 fetch 방식)
 async function checkOnline() {
@@ -116,8 +30,6 @@ async function checkOnline() {
 }
 
 export default function ScanScreen({ navigation }) {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
   const [mode, setMode] = useState('trace'); // 'trace' | 'ocr'
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false);
@@ -267,46 +179,62 @@ export default function ScanScreen({ navigation }) {
   };
 
   if (!permission) return (
-    <View style={[styles.center, { backgroundColor: pal.bg }]}>
-      <ActivityIndicator color={pal.ac} />
+    <View style={[styles.center, { backgroundColor: C.bg }]}>
+      <ActivityIndicator color={C.red} />
     </View>
   );
 
   if (!permission.granted) {
     return (
-      <View style={[styles.center, { backgroundColor: pal.bg }]}>
+      <View style={[styles.center, { backgroundColor: C.bg }]}>
         <Text style={styles.permIcon}>📷</Text>
-        <Text style={[styles.permTitle, { color: pal.tx }]}>카메라 권한 필요</Text>
-        <Text style={[styles.permSub, { color: pal.t2 }]}>이력번호 바코드 스캔을 위해{'\n'}카메라 접근 권한이 필요합니다</Text>
+        <Text style={[styles.permTitle, { color: C.t1 }]}>카메라 권한 필요</Text>
+        <Text style={[styles.permSub, { color: C.t2 }]}>이력번호 바코드 스캔을 위해{'\n'}카메라 접근 권한이 필요합니다</Text>
         <PrimaryBtn label="권한 허용" onPress={requestPermission} style={{ marginTop: 20, paddingHorizontal: 40 }} />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: pal.bg }}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* ── V5 헤더 + 탭 ── */}
+      <View style={[styles.v5Header]}>
+        <View style={styles.v5HeaderAccent} />
+        <View style={styles.v5HeaderRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+            <View style={{ width: 33, height: 33, borderRadius: 10, backgroundColor: '#B91C1C', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="scan" size={17} color="#fff" />
+            </View>
+            <Text style={styles.v5PageTitle}>이력 조회</Text>
+          </View>
+          {isOnline
+            ? <View style={styles.v5OnlineBadge}><Text style={styles.v5OnlineTxt}>● 온라인</Text></View>
+            : <View style={[styles.v5OnlineBadge, { backgroundColor:'#FEF3C7' }]}><Text style={[styles.v5OnlineTxt, { color:'#B45309' }]}>● 오프라인</Text></View>
+          }
+        </View>
+      </View>
       {/* ── 상단 세그먼트 탭 ── */}
-      <View style={[styles.segmentBar, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
+      <View style={[styles.segmentBar, { backgroundColor: C.white, borderBottomColor: C.border }]}>
         <TouchableOpacity
-          style={[styles.segmentTab, mode === 'trace' && { borderBottomColor: pal.ac }]}
+          style={[styles.segmentTab, mode === 'trace' && { borderBottomColor: C.red }]}
           onPress={() => setMode('trace')}
         >
-          <Text style={[styles.segmentText, { color: mode === 'trace' ? pal.ac : pal.t3 }, mode === 'trace' && { fontWeight: '900' }]}>
+          <Text style={[styles.segmentText, { color: mode === 'trace' ? C.red : C.t3 }, mode === 'trace' && { fontWeight: '900' }]}>
             🏷️ 이력 조회
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.segmentTab, mode === 'ocr' && { borderBottomColor: pal.pu }]}
+          style={[styles.segmentTab, mode === 'ocr' && { borderBottomColor: C.pur }]}
           onPress={() => setMode('ocr')}
         >
-          <Text style={[styles.segmentText, { color: mode === 'ocr' ? pal.pu : pal.t3 }, mode === 'ocr' && { fontWeight: '900' }]}>
-            📷 서류 OCR
+          <Text style={[styles.segmentText, { color: mode === 'ocr' ? C.pur : C.t3 }, mode === 'ocr' && { fontWeight: '900' }]}>
+            📄 서류 OCR
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* OCR 탭 */}
-      {mode === 'ocr' && <OCRHub pal={pal} navigation={navigation} />}
+      {mode === 'ocr' && <OCRHub navigation={navigation} />}
 
       {/* 이력 조회 탭 — 전체 ScrollView */}
       {mode === 'trace' && (
@@ -314,60 +242,60 @@ export default function ScanScreen({ navigation }) {
 
           {/* 배너: 오프라인 */}
           {!isOnline && (
-            <View style={[styles.offlineBanner, { backgroundColor: pal.yw + '18', borderColor: pal.yw + '50', marginBottom: spacing.sm }]}>
-              <Text style={{ fontSize: 14 }}>📡</Text>
-              <Text style={[styles.offlineBannerText, { color: pal.yw }]}>오프라인 모드 — 스캔 결과가 로컬에 저장됩니다</Text>
+            <View style={[styles.offlineBanner, { backgroundColor: C.warn + '18', borderColor: C.warn + '50', marginBottom: spacing.sm }]}>
+              <Text style={{ fontSize: 15 }}>📡</Text>
+              <Text style={[styles.offlineBannerText, { color: C.warn }]}>오프라인 모드 — 스캔 결과가 로컬에 저장됩니다</Text>
             </View>
           )}
           {/* 배너: 미동기화 대기 */}
           {pendingQueue.length > 0 && (
             <TouchableOpacity
-              style={[styles.syncBanner, { backgroundColor: pal.a2 + '18', borderColor: pal.a2 + '40', marginBottom: spacing.sm }]}
+              style={[styles.syncBanner, { backgroundColor: C.red2 + '18', borderColor: C.red2 + '40', marginBottom: spacing.sm }]}
               onPress={trySyncQueue}
               activeOpacity={0.8}
             >
-              <Text style={{ fontSize: 14 }}>🔄</Text>
+              <Text style={{ fontSize: 15 }}>🔄</Text>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.syncBannerTitle, { color: pal.a2 }]}>오프라인 {pendingQueue.length}건 대기 중</Text>
-                <Text style={[styles.syncBannerSub, { color: pal.t3 }]}>네트워크 연결 시 자동 동기화 · 탭하여 지금 동기화</Text>
+                <Text style={[styles.syncBannerTitle, { color: C.red2 }]}>오프라인 {pendingQueue.length}건 대기 중</Text>
+                <Text style={[styles.syncBannerSub, { color: C.t3 }]}>네트워크 연결 시 자동 동기화 · 탭하여 지금 동기화</Text>
               </View>
               {syncing
-                ? <ActivityIndicator size="small" color={pal.a2} />
-                : <Text style={{ color: pal.a2, fontSize: 18 }}>↑</Text>
+                ? <ActivityIndicator size="small" color={C.red2} />
+                : <Text style={{ color: C.red2, fontSize: 18 }}>↑</Text>
               }
             </TouchableOpacity>
           )}
           {/* 배너: API 키 미설정 */}
           {!mtraceKey ? (
             <TouchableOpacity
-              style={[styles.offlineBanner, { backgroundColor: pal.pu + '12', borderColor: pal.pu + '40', marginBottom: spacing.sm }]}
+              style={[styles.offlineBanner, { backgroundColor: C.pur + '12', borderColor: C.pur + '40', marginBottom: spacing.sm }]}
               onPress={() => { setKeyInput(''); setShowKeyModal(true); }}
               activeOpacity={0.7}
             >
-              <Text style={{ fontSize: 14 }}>🔑</Text>
+              <Text style={{ fontSize: 15 }}>🔑</Text>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.offlineBannerText, { color: pal.pu, marginBottom: 2 }]}>API 키 미설정 — 실제 이력 조회 불가</Text>
-                <Text style={{ fontSize: fontSize.xxs, color: pal.pu + 'aa' }}>탭하여 data.go.kr API 키 입력 →</Text>
+                <Text style={[styles.offlineBannerText, { color: C.pur, marginBottom: 2 }]}>API 키 미설정 — 실제 이력 조회 불가</Text>
+                <Text style={{ fontSize: fontSize.xxs, color: C.pur + 'aa' }}>탭하여 data.go.kr API 키 입력 →</Text>
               </View>
             </TouchableOpacity>
           ) : (
-            <View style={[styles.offlineBanner, { backgroundColor: pal.gn + '12', borderColor: pal.gn + '40', marginBottom: spacing.sm }]}>
-              <Text style={{ fontSize: 14 }}>✅</Text>
-              <Text style={[styles.offlineBannerText, { color: pal.gn }]}>API 키 설정됨 — 실제 이력 조회 가능</Text>
+            <View style={[styles.offlineBanner, { backgroundColor: C.ok2 + '12', borderColor: C.ok2 + '40', marginBottom: spacing.sm }]}>
+              <Text style={{ fontSize: 15 }}>✅</Text>
+              <Text style={[styles.offlineBannerText, { color: C.ok2 }]}>API 키 설정됨 — 실제 이력 조회 가능</Text>
               <TouchableOpacity onPress={() => { setKeyInput(mtraceKey); setShowKeyModal(true); }}>
-                <Text style={{ fontSize: fontSize.xxs, color: pal.t3 }}>변경</Text>
+                <Text style={{ fontSize: fontSize.xxs, color: C.t3 }}>변경</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* 스캔 카드 */}
-          <View style={[styles.scanLaunchArea, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-            <Text style={[styles.scanTitle, { color: pal.tx }]}>🏷️ 축산물 이력번호 조회</Text>
-            <Text style={[styles.scanSub, { color: pal.t2 }]}>
+          <View style={[styles.scanLaunchArea, { backgroundColor: C.white, borderColor: C.border }]}>
+            <Text style={[styles.scanTitle, { color: C.t1 }]}>🏷️ 축산물 이력번호 조회</Text>
+            <Text style={[styles.scanSub, { color: C.t2 }]}>
               바코드·QR코드를 스캔하면{'\n'}도축 정보·등급·원산지를 즉시 확인합니다
             </Text>
             <TouchableOpacity
-              style={[styles.scanBigBtn, { backgroundColor: pal.ac }]}
+              style={[styles.scanBigBtn, { backgroundColor: C.red }]}
               onPress={() => { setScanning(true); setScanned(false); }}
             >
               <Text style={styles.scanBigIcon}>📷</Text>
@@ -376,11 +304,11 @@ export default function ScanScreen({ navigation }) {
           </View>
 
           {/* 직접 입력 — 독립 행 (preview 스타일: 전체 너비 + 내장 버튼) */}
-          <View style={[styles.lookupWrap, { backgroundColor: pal.s1, borderColor: manualInput ? pal.ac : pal.bd }]}>
+          <View style={[styles.lookupWrap, { backgroundColor: C.white, borderColor: manualInput ? C.red : C.border }]}>
             <TextInput
-              style={[styles.lookupInput, { color: pal.tx }]}
+              style={[styles.lookupInput, { color: C.t1 }]}
               placeholder="이력번호 15자리 직접 입력"
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={C.t3}
               value={manualInput}
               onChangeText={setManualInput}
               keyboardType="numeric"
@@ -389,13 +317,13 @@ export default function ScanScreen({ navigation }) {
               returnKeyType="search"
             />
             <TouchableOpacity
-              style={[styles.lookupBtn, { backgroundColor: manualLoading ? pal.bd : pal.ac }]}
+              style={[styles.lookupBtn, { backgroundColor: manualLoading ? C.border : C.red }]}
               onPress={handleManualLookup}
               disabled={manualLoading}
             >
               {manualLoading
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={{ fontSize: 16 }}>🔍</Text>
+                : <Text style={{ fontSize: 17 }}>🔍</Text>
               }
             </TouchableOpacity>
           </View>
@@ -403,28 +331,28 @@ export default function ScanScreen({ navigation }) {
           {/* 최근 조회 이력 */}
           {history.length > 0 && (
             <>
-              <Text style={[styles.recentTitle, { color: pal.t3 }]}>최근 조회 내역</Text>
+              <Text style={[styles.recentTitle, { color: C.t3 }]}>최근 조회 내역</Text>
               {history.map((h, i) => (
                 <TouchableOpacity
                   key={i}
-                  style={[styles.recentItem, { backgroundColor: pal.s1, borderColor: pal.bd }]}
+                  style={[styles.recentItem, { backgroundColor: C.white, borderColor: C.border }]}
                   onPress={() => setResult(h)}
                   activeOpacity={0.8}
                 >
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={[styles.recentNo, { color: pal.tx }]}>{h.traceNo}</Text>
+                      <Text style={[styles.recentNo, { color: C.t1 }]}>{h.traceNo}</Text>
                       {h.synced === false && (
-                        <View style={[styles.pendingBadge, { backgroundColor: pal.yw + '30' }]}>
-                          <Text style={[styles.pendingBadgeText, { color: pal.yw }]}>미동기화</Text>
+                        <View style={[styles.pendingBadge, { backgroundColor: C.warn + '30' }]}>
+                          <Text style={[styles.pendingBadgeText, { color: C.warn }]}>미동기화</Text>
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.recentInfo, { color: pal.t3 }]}>
+                    <Text style={[styles.recentInfo, { color: C.t3 }]}>
                       {h.animalType}{h.grade && h.grade !== 'N/A' ? ` · ${h.grade}등급` : ''} · {h.farmName}
                     </Text>
                   </View>
-                  <Text style={[styles.recentDate, { color: pal.t3 }]}>{h.scanTime?.split(' ')[1] || h.scanTime}</Text>
+                  <Text style={[styles.recentDate, { color: C.t3 }]}>{h.scanTime?.split(' ')[1] || h.scanTime}</Text>
                 </TouchableOpacity>
               ))}
             </>
@@ -432,7 +360,7 @@ export default function ScanScreen({ navigation }) {
           {history.length === 0 && (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🔍</Text>
-              <Text style={[styles.emptyText, { color: pal.t3 }]}>스캔 이력이 없습니다{'\n'}바코드를 스캔하거나 이력번호를 입력하세요</Text>
+              <Text style={[styles.emptyText, { color: C.t3 }]}>스캔 이력이 없습니다{'\n'}바코드를 스캔하거나 이력번호를 입력하세요</Text>
             </View>
           )}
         </ScrollView>
@@ -451,7 +379,7 @@ export default function ScanScreen({ navigation }) {
             <View style={styles.camOverlay}>
               <View style={styles.camTopBar}>
                 <TouchableOpacity onPress={() => setScanning(false)} style={styles.camCloseBtn}>
-                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>✕ 닫기</Text>
+                  <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>✕ 닫기</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.camCenter}>
@@ -471,9 +399,9 @@ export default function ScanScreen({ navigation }) {
       {/* 로딩 */}
       <Modal visible={loading} transparent animationType="fade">
         <View style={styles.loadingOverlay}>
-          <View style={[styles.loadingBox, { backgroundColor: pal.s1 }]}>
-            <ActivityIndicator size="large" color={pal.ac} />
-            <Text style={[styles.loadingText, { color: pal.t2 }]}>이력 정보 조회 중...</Text>
+          <View style={[styles.loadingBox, { backgroundColor: C.white }]}>
+            <ActivityIndicator size="large" color={C.red} />
+            <Text style={[styles.loadingText, { color: C.t2 }]}>이력 정보 조회 중...</Text>
           </View>
         </View>
       </Modal>
@@ -481,18 +409,18 @@ export default function ScanScreen({ navigation }) {
       {/* 결과 모달 */}
       <Modal visible={!!result && !loading} animationType="slide" presentationStyle="pageSheet">
         {result && (
-          <View style={{ flex: 1, backgroundColor: pal.bg }}>
-            <View style={[styles.resultHeader, { borderBottomColor: pal.bd, backgroundColor: pal.s1 }]}>
-              <Text style={[styles.resultTitle, { color: pal.tx }]}>🏷️ 이력 조회 결과</Text>
+          <View style={{ flex: 1, backgroundColor: C.bg }}>
+            <View style={[styles.resultHeader, { borderBottomColor: C.border, backgroundColor: C.white }]}>
+              <Text style={[styles.resultTitle, { color: C.t1 }]}>🏷️ 이력 조회 결과</Text>
               <TouchableOpacity onPress={() => setResult(null)}>
-                <Text style={[styles.resultClose, { color: pal.t2 }]}>✕</Text>
+                <Text style={[styles.resultClose, { color: C.t2 }]}>✕</Text>
               </TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
-              <View style={[styles.traceBox, { backgroundColor: pal.a2 + '18', borderColor: pal.a2 + '50' }]}>
-                <Text style={[styles.traceLabel, { color: pal.t2 }]}>이력번호</Text>
-                <Text style={[styles.traceNo, { color: pal.a2 }]}>{result.traceNo}</Text>
-                <Text style={[styles.traceTime, { color: pal.t3 }]}>조회: {result.scanTime}</Text>
+              <View style={[styles.traceBox, { backgroundColor: C.red2 + '18', borderColor: C.red2 + '50' }]}>
+                <Text style={[styles.traceLabel, { color: C.t2 }]}>이력번호</Text>
+                <Text style={[styles.traceNo, { color: C.red2 }]}>{result.traceNo}</Text>
+                <Text style={[styles.traceTime, { color: C.t3 }]}>조회: {result.scanTime}</Text>
               </View>
 
               <InfoSection title="📋 기본 정보">
@@ -510,17 +438,17 @@ export default function ScanScreen({ navigation }) {
                 <InfoRow label="도축일" value={result.slaughterDate} />
                 <InfoRow label="도축장" value={result.slaughterPlace} />
                 <InfoRow label="검사 결과" value={result.inspection}
-                  highlight={result.inspection === '적합'} highlightColor={pal.gn} />
+                  highlight={result.inspection === '적합'} highlightColor={C.ok2} />
               </InfoSection>
 
               {result.synced === false && (
                 <View style={[styles.offlineBanner, { marginHorizontal: 0, marginBottom: spacing.sm }]}>
-                  <Text style={[styles.offlineBannerText, { color: pal.yw }]}>
+                  <Text style={[styles.offlineBannerText, { color: C.warn }]}>
                     ⚠️ 오프라인 스캔 — 인터넷 연결 시 자동으로 서버에 동기화됩니다
                   </Text>
                 </View>
               )}
-              <PrimaryBtn label="✓ 숙성 관리에 등록" color={pal.ac}
+              <PrimaryBtn label="✓ 숙성 관리에 등록" color={C.red}
                 onPress={() => {
                   Alert.alert('등록', `이력번호 ${result.traceNo}를 숙성 관리에 등록합니다.`);
                   setResult(null);
@@ -536,15 +464,15 @@ export default function ScanScreen({ navigation }) {
       <Modal visible={showKeyModal} transparent animationType="fade">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <View style={styles.loadingOverlay}>
-            <View style={[styles.keyModalBox, { backgroundColor: pal.s1 }]}>
-              <Text style={[styles.keyModalTitle, { color: pal.tx }]}>🔑 Mtrace API 키 설정</Text>
-              <Text style={[styles.keyModalDesc, { color: pal.t2 }]}>
+            <View style={[styles.keyModalBox, { backgroundColor: C.white }]}>
+              <Text style={[styles.keyModalTitle, { color: C.t1 }]}>🔑 Mtrace API 키 설정</Text>
+              <Text style={[styles.keyModalDesc, { color: C.t2 }]}>
                 {'data.go.kr → 축산물이력제 API\n신청 후 발급받은 인증키를 입력하세요.'}
               </Text>
               <TextInput
-                style={[styles.keyInput, { color: pal.tx, borderColor: pal.bd, backgroundColor: pal.bg }]}
+                style={[styles.keyInput, { color: C.t1, borderColor: C.border, backgroundColor: C.bg }]}
                 placeholder="인증키 붙여넣기"
-                placeholderTextColor={pal.t3}
+                placeholderTextColor={C.t3}
                 value={keyInput}
                 onChangeText={setKeyInput}
                 autoCapitalize="none"
@@ -595,40 +523,40 @@ const OCR_DOC_TYPES = [
   },
 ];
 
-function OCRHub({ pal, navigation }) {
+function OCRHub({ navigation }) {
   return (
     <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 60 }}>
       {/* 안내 배너 */}
-      <View style={[styles.ocrBanner, { backgroundColor: pal.pu + '14', borderColor: pal.pu + '40' }]}>
+      <View style={[styles.ocrBanner, { backgroundColor: C.pur + '14', borderColor: C.pur + '40' }]}>
         <Text style={{ fontSize: 36 }}>🤖</Text>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.ocrBannerTitle, { color: pal.tx }]}>AI 서류 자동 인식</Text>
-          <Text style={[styles.ocrBannerSub, { color: pal.t3 }]}>
+          <Text style={[styles.ocrBannerTitle, { color: C.t1 }]}>AI 서류 자동 인식</Text>
+          <Text style={[styles.ocrBannerSub, { color: C.t3 }]}>
             서류를 촬영하면 텍스트를 읽어{'\n'}재고 및 직원 데이터를 자동으로 저장합니다.
           </Text>
         </View>
       </View>
 
       {/* 지원 서류 목록 */}
-      <Text style={[styles.ocrSectionLabel, { color: pal.t2 }]}>지원하는 서류 종류</Text>
+      <Text style={[styles.ocrSectionLabel, { color: C.t2 }]}>지원하는 서류 종류</Text>
       {OCR_DOC_TYPES.map(d => (
-        <View key={d.title} style={[styles.ocrDocCard, { backgroundColor: pal.s1, borderColor: pal.bd, borderLeftColor: d.color, borderLeftWidth: 4 }]}>
+        <View key={d.title} style={[styles.ocrDocCard, { backgroundColor: C.white, borderColor: C.border, borderLeftColor: d.color, borderLeftWidth: 4 }]}>
           <Text style={{ fontSize: 28 }}>{d.icon}</Text>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <Text style={[styles.ocrDocTitle, { color: pal.tx }]}>{d.title}</Text>
+              <Text style={[styles.ocrDocTitle, { color: C.t1 }]}>{d.title}</Text>
               <View style={[styles.ocrDocBadge, { backgroundColor: d.color + '20' }]}>
                 <Text style={[styles.ocrDocBadgeText, { color: d.color }]}>{d.badge}</Text>
               </View>
             </View>
-            <Text style={[styles.ocrDocDesc, { color: pal.t3 }]}>{d.desc}</Text>
+            <Text style={[styles.ocrDocDesc, { color: C.t3 }]}>{d.desc}</Text>
           </View>
         </View>
       ))}
 
       {/* OCR 시작 버튼 */}
       <TouchableOpacity
-        style={[styles.ocrStartBtn, { backgroundColor: pal.pu }]}
+        style={[styles.ocrStartBtn, { backgroundColor: C.pur }]}
         onPress={() => navigation.navigate('TraceOCR')}
         activeOpacity={0.85}
       >
@@ -639,7 +567,7 @@ function OCRHub({ pal, navigation }) {
         </View>
       </TouchableOpacity>
 
-      <Text style={[styles.ocrNotice, { color: pal.t3 }]}>
+      <Text style={[styles.ocrNotice, { color: C.t3 }]}>
         💡 인터넷 연결 필요 · 결과 확인 후 저장
       </Text>
     </ScrollView>
@@ -647,8 +575,8 @@ function OCRHub({ pal, navigation }) {
 }
 
 const InfoSection = ({ title, children }) => (
-  <View style={[styles.infoSection, { backgroundColor: colors.s1, borderColor: colors.bd }]}>
-    <Text style={[styles.infoSectionTitle, { color: colors.tx, backgroundColor: colors.s2, borderBottomColor: colors.bd }]}>
+  <View style={[styles.infoSection, { backgroundColor: C.white, borderColor: C.border }]}>
+    <Text style={[styles.infoSectionTitle, { color: C.t1, backgroundColor: C.bg2, borderBottomColor: C.border }]}>
       {title}
     </Text>
     {children}
@@ -656,19 +584,27 @@ const InfoSection = ({ title, children }) => (
 );
 
 const InfoRow = ({ label, value, highlight, highlightColor }) => (
-  <View style={[styles.infoRow, { borderBottomColor: colors.bd + '50' }]}>
-    <Text style={[styles.infoLabel, { color: colors.t2 }]}>{label}</Text>
-    <Text style={[styles.infoValue, { color: colors.tx }, highlight && { color: highlightColor || colors.ac, fontWeight: '800' }]}>
+  <View style={[styles.infoRow, { borderBottomColor: C.border + '50' }]}>
+    <Text style={[styles.infoLabel, { color: C.t2 }]}>{label}</Text>
+    <Text style={[styles.infoValue, { color: C.t1 }, highlight && { color: highlightColor || C.red, fontWeight: '800' }]}>
       {value}
     </Text>
   </View>
 );
 
 const styles = StyleSheet.create({
+  // V5 헤더
+  v5Header:        { backgroundColor:'#FFFFFF', borderBottomWidth:1, borderBottomColor:'#E2E8F0', overflow:'hidden' },
+  v5HeaderAccent:  { height:3, backgroundColor:'#B91C1C', position:'absolute', top:0, left:0, right:0 },
+  v5HeaderRow:     { paddingHorizontal:20, paddingTop:16, paddingBottom:13, flexDirection:'row', justifyContent:'space-between', alignItems:'center' },
+  v5PageTitle:     { fontSize:22, fontWeight:'900', color:'#0F172A', letterSpacing:-0.6 },
+  v5OnlineBadge:   { backgroundColor:'#DCFCE7', paddingHorizontal:12, paddingVertical:7, borderRadius:20 },
+  v5OnlineTxt:     { fontSize:14, fontWeight:'700', color:'#15803D' },
+
   // 세그먼트 탭바
   segmentBar: { flexDirection: 'row', borderBottomWidth: 1 },
-  segmentTab: { flex: 1, paddingVertical: 13, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
-  segmentText: { fontSize: fontSize.sm, fontWeight: '700' },
+  segmentTab: { flex: 1, paddingVertical: 15, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
+  segmentText: { fontSize: 16, fontWeight: '700' },
 
   // OCR 허브
   ocrBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, padding: spacing.md, marginBottom: spacing.lg, },
@@ -677,8 +613,8 @@ const styles = StyleSheet.create({
   ocrSectionLabel: { fontSize: fontSize.xs, fontWeight: '800', marginBottom: spacing.sm, letterSpacing: 0.5 },
   ocrDocCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, },
   ocrDocTitle: { fontSize: fontSize.sm, fontWeight: '900' },
-  ocrDocBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  ocrDocBadgeText: { fontSize: 10, fontWeight: '800' },
+  ocrDocBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  ocrDocBadgeText: { fontSize: 13, fontWeight: '800' },
   ocrDocDesc: { fontSize: fontSize.xs, lineHeight: 20 },
   ocrStartBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.lg, marginBottom: spacing.sm, },
   ocrStartIcon: { fontSize: 36 },
@@ -770,8 +706,8 @@ const styles = StyleSheet.create({
   },
   syncBannerTitle: { fontSize: fontSize.sm, fontWeight: '800', marginBottom: 2 },
   syncBannerSub: { fontSize: fontSize.xxs },
-  pendingBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
-  pendingBadgeText: { fontSize: 10, fontWeight: '800' },
+  pendingBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  pendingBadgeText: { fontSize: 13, fontWeight: '800' },
 
   loadingOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   loadingBox: { borderRadius: radius.lg, padding: 32, alignItems: 'center', ...shadow.md },

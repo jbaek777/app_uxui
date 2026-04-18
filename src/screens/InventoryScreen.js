@@ -3,7 +3,9 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Modal, TextInput, Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
+import { C, F, R, SH } from '../lib/v5';
 import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn, AlertBox } from '../components/UI';
 import { GaugeBar } from '../components/GaugeBar';
@@ -12,7 +14,7 @@ import { meatStore, salesStore, expiryLogStore, yieldStore, supplierStore } from
 
 const TABS = ['재고 현황', '판매내역', '수율 계산기', '소비기한', '거래처'];
 
-export default function InventoryScreen() {
+export default function InventoryScreen({ navigation }) {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
   const [tab, setTab] = useState(0);
@@ -55,28 +57,40 @@ export default function InventoryScreen() {
   const critical = meat.filter(m => getDdaySafe(m) <= 1 && !m.sold);
 
   return (
-    <View style={{ flex: 1, backgroundColor: pal.bg }}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* ── V5 헤더 ── */}
+      <View style={[styles.v5Header]}>
+        <View style={styles.v5HeaderAccent} />
+        <View style={styles.v5HeaderRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+            <View style={{ width: 33, height: 33, borderRadius: R.sm, backgroundColor: C.red, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="cube" size={17} color="#fff" />
+            </View>
+            <Text style={styles.v5PageTitle}>재고 관리</Text>
+          </View>
+        </View>
+      </View>
       {/* 탭 바 — 5개이므로 가로 스크롤 */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={[styles.tabBarScroll, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}
+        style={[styles.tabBarScroll, { backgroundColor: C.white, borderBottomColor: C.border }]}
         contentContainerStyle={styles.tabBarContent}
       >
         {TABS.map((t, i) => (
           <TouchableOpacity
             key={t}
-            style={[styles.tab, tab === i && { borderBottomColor: pal.ac }]}
+            style={[styles.tab, tab === i && { borderBottomColor: C.red }]}
             onPress={() => setTab(i)}
           >
-            <Text style={[styles.tabText, { color: tab === i ? pal.ac : pal.t3, fontSize: 24 }, tab === i && styles.tabTextActive]}>
+            <Text style={[styles.tabText, { color: tab === i ? C.red : C.t3 }, tab === i && styles.tabTextActive]}>
               {t}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {tab === 0 && <StockTab meat={meat} setMeat={setMeat} critical={critical} suppliers={suppliers} />}
+      {tab === 0 && <StockTab meat={meat} setMeat={setMeat} critical={critical} suppliers={suppliers} navigation={navigation} />}
       {tab === 1 && <SoldHistoryTab meat={meat} />}
       {tab === 2 && <YieldTab />}
       {tab === 3 && <ExpiryTab meat={meat} setMeat={setMeat} />}
@@ -88,10 +102,11 @@ export default function InventoryScreen() {
 // ── 재고 현황 탭 ──────────────────────────────────────────
 const FILTER_CHIPS = ['전체', '임박', '한우', '수입육'];
 
-function StockTab({ meat, setMeat, critical, suppliers }) {
+function StockTab({ meat, setMeat, critical, suppliers, navigation }) {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
   const [modal, setModal] = useState(false);
+  const [modePicker, setModePicker] = useState(false);
   const [supplierPicker, setSupplierPicker] = useState(false);
   const [form, setForm] = useState({ cut: '', origin: '', qty: '', buyPrice: '', sellPrice: '', expire: '', supplierId: '', supplierName: '' });
   const [search, setSearch] = useState('');
@@ -158,70 +173,69 @@ function StockTab({ meat, setMeat, critical, suppliers }) {
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
         {/* 2×2 요약 그리드 */}
         <View style={styles.summaryGrid}>
-          <SummaryBox icon="📦" label="재고 부위"  value={`${activeItems.length}종`}                                       color={pal.a2}   pal={pal} />
-          <SummaryBox icon="✅" label="판매완료"   value={`${soldItems.length}건`}                                          color={pal.gn}   pal={pal} />
-          <SummaryBox icon="💰" label="재고 가치"  value={`${(totalValue / 10000).toFixed(0)}만원`}                         color={pal.cyan} pal={pal} />
+          <SummaryBox ionicon="cube-outline" label="재고 부위"  value={`${activeItems.length}종`}                                       color={C.red} />
+          <SummaryBox ionicon="checkmark-circle-outline" label="판매완료"   value={`${soldItems.length}건`}                                          color={C.ok2} />
+          <SummaryBox ionicon="cash-outline" label="재고 가치"  value={`${(totalValue / 10000).toFixed(0)}만원`}                         color={C.blue2} />
           <SummaryBox
-            icon={lossRisk > 0 ? '⚠️' : '🛡️'}
+            ionicon={lossRisk > 0 ? 'alert-circle-outline' : 'shield-checkmark-outline'}
             label="손실위험"
             value={lossRisk > 0 ? `-${(lossRisk / 10000).toFixed(0)}만원` : '없음'}
-            color={lossRisk > 0 ? pal.rd : pal.gn}
-            pal={pal}
+            color={lossRisk > 0 ? C.red : C.ok2}
           />
         </View>
 
         {critical.length > 0 && (
-          <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.sm }}>
+          <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
             <AlertBox type="error" icon="🚨" title="소비기한 임박" message={critical.map(m => m.cut).join(', ')} />
           </View>
         )}
 
         {/* 검색 + 필터 */}
-        <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.sm }}>
-          <View style={[styles.searchBar, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-            <Text style={{ fontSize: 16, marginRight: 6 }}>🔍</Text>
+        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+          <View style={[styles.searchBar, { backgroundColor: C.white, borderColor: C.border }]}>
+            <Ionicons name="search-outline" size={16} color={C.t4} style={{ marginRight: 6 }} />
             <TextInput
-              style={[styles.searchInput, { color: pal.tx }]}
+              style={[styles.searchInput, { color: C.t1 }]}
               placeholder="부위, 원산지 검색..."
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={C.t3}
               value={search}
               onChangeText={setSearch}
             />
             {search.length > 0 && (
               <TouchableOpacity onPress={() => setSearch('')}>
-                <Text style={{ color: pal.t3, fontSize: 16 }}>✕</Text>
+                <Text style={{ color: C.t3, fontSize: 16 }}>✕</Text>
               </TouchableOpacity>
             )}
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }} contentContainerStyle={{ gap: 8 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ gap: 8 }}>
             {FILTER_CHIPS.map(chip => (
               <TouchableOpacity
                 key={chip}
-                style={[styles.filterChip, filter === chip && { backgroundColor: pal.ac, borderColor: pal.ac }]}
+                style={[styles.filterChip, filter === chip && { backgroundColor: C.red, borderColor: C.red }]}
                 onPress={() => setFilter(chip)}
               >
-                <Text style={[styles.filterChipText, { color: filter === chip ? '#fff' : pal.t2 }]}>{chip}</Text>
+                <Text style={[styles.filterChipText, { color: filter === chip ? '#fff' : C.t2 }]}>{chip}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
 
-        <View style={{ padding: spacing.md }}>
+        <View style={{ padding: 16 }}>
         {activeItems.length === 0 && (
-          <View style={[styles.stockEmptyBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-            <Text style={{ fontSize: 52, marginBottom: spacing.md }}>📦</Text>
-            <Text style={[styles.stockEmptyTitle, { color: pal.tx }]}>등록된 재고가 없습니다</Text>
-            <Text style={[styles.stockEmptyDesc, { color: pal.t3 }]}>
+          <View style={[styles.stockEmptyBox, { backgroundColor: C.white, borderColor: C.border }]}>
+            <Ionicons name="cube-outline" size={52} color={C.t4} style={{ marginBottom: 16 }} />
+            <Text style={[styles.stockEmptyTitle, { color: C.t1 }]}>등록된 재고가 없습니다</Text>
+            <Text style={[styles.stockEmptyDesc, { color: C.t3 }]}>
               + 재고 추가 버튼으로 첫 재고를 등록하면{'\n'}매입가·소비기한·마진율이 자동으로 관리됩니다
             </Text>
-            <View style={[styles.stockEmptyTip, { backgroundColor: pal.a2 + '15', borderColor: pal.a2 + '40' }]}>
-              <Text style={[styles.stockEmptyTipText, { color: pal.a2 }]}>
-                💡 거래명세서를 OCR 스캔하면{'\n'}부위·중량·원산지가 자동으로 채워집니다
+            <View style={[styles.stockEmptyTip, { backgroundColor: C.redS, borderColor: C.redS2 }]}>
+              <Text style={[styles.stockEmptyTipText, { color: C.red }]}>
+                <Ionicons name="bulb-outline" size={12} color={C.red} /> 거래명세서를 OCR 스캔하면{'\n'}부위·중량·원산지가 자동으로 채워집니다
               </Text>
             </View>
-            <View style={[styles.stockEmptyTip, { backgroundColor: pal.gn + '12', borderColor: pal.gn + '30', marginTop: 6 }]}>
-              <Text style={[styles.stockEmptyTipText, { color: pal.gn }]}>
-                📊 재고 등록 후 대시보드에서 마진 분석을 확인하세요
+            <View style={[styles.stockEmptyTip, { backgroundColor: C.okS, borderColor: C.ok2 + '30', marginTop: 6 }]}>
+              <Text style={[styles.stockEmptyTipText, { color: C.ok2 }]}>
+                <Ionicons name="bar-chart-outline" size={12} color={C.ok2} /> 재고 등록 후 대시보드에서 마진 분석을 확인하세요
               </Text>
             </View>
           </View>
@@ -229,23 +243,23 @@ function StockTab({ meat, setMeat, critical, suppliers }) {
 
         {filteredItems.length === 0 && activeItems.length > 0 && (
           <View style={styles.emptyBox}>
-            <Text style={[styles.emptyText, { color: pal.t3 }]}>검색 결과가 없습니다</Text>
+            <Text style={[styles.emptyText, { color: C.t3 }]}>검색 결과가 없습니다</Text>
           </View>
         )}
 
         {filteredItems.map(item => {
           const dday  = item.dday ?? 99;
-          const ddayColor = dday <= 2 ? pal.rd : dday <= 7 ? pal.a2 : pal.gn;
+          const ddayColor = dday <= 2 ? C.red : dday <= 7 ? C.warn2 : C.ok2;
           const ddayLabel = dday <= 0 ? '만료' : dday >= 90 ? '여유' : `D-${dday}`;
           const grade = item.grade || (item.origin?.match(/1\+\+|1\+|1|2|3/) || [''])[0] || '—';
           const isKorean = (item.origin || '').includes('한우') || (item.origin || '').includes('국내산');
-          const gradeColor = ['1++', 'A++'].includes(grade) ? pal.ac : grade === '1+' ? pal.a2 : isKorean ? pal.tx : pal.cyan;
+          const gradeColor = ['1++', 'A++'].includes(grade) ? C.red : grade === '1+' ? C.red2 : isKorean ? C.t1 : C.blue2;
           const marginPct = item.buyPrice > 0 && item.sellPrice > 0
             ? Math.round((item.sellPrice - item.buyPrice) / item.buyPrice * 100) : null;
           return (
             <TouchableOpacity
               key={item.id}
-              style={[styles.meatCard, { backgroundColor: pal.s1, borderColor: pal.bd, borderLeftColor: ddayColor, borderLeftWidth: 4 }]}
+              style={[styles.meatCard, { backgroundColor: C.white, borderColor: C.border, borderLeftColor: ddayColor, borderLeftWidth: 4 }]}
               activeOpacity={0.85}
             >
               {/* 카드 상단: 등급 박스 | 부위명 + 원산지 | D-day + 중량 */}
@@ -253,16 +267,19 @@ function StockTab({ meat, setMeat, critical, suppliers }) {
                 {/* 등급 박스 */}
                 <View style={[styles.gradeBox, { backgroundColor: gradeColor + '18', borderColor: gradeColor + '40' }]}>
                   <Text style={[styles.gradeText, { color: gradeColor }]} numberOfLines={1}>{grade}</Text>
-                  <Text style={[styles.gradeType, { color: pal.t3 }]}>{isKorean ? '한우' : '수입'}</Text>
+                  <Text style={[styles.gradeType, { color: C.t3 }]}>{isKorean ? '한우' : '수입'}</Text>
                 </View>
                 {/* 이름 + 원산지 */}
                 <View style={styles.cardMain}>
-                  <Text style={[styles.cardName, { color: pal.tx }]} numberOfLines={1}>{item.cut}</Text>
-                  <Text style={[styles.cardDetail, { color: pal.t2 }]} numberOfLines={1}>
+                  <Text style={[styles.cardName, { color: C.t1 }]} numberOfLines={1}>{item.cut}</Text>
+                  <Text style={[styles.cardDetail, { color: C.t2 }]} numberOfLines={1}>
                     {item.origin} · 판매가 {item.sellPrice?.toLocaleString()}원/kg
                   </Text>
                   {item.supplierName ? (
-                    <Text style={[styles.cardSupplier, { color: pal.t3 }]}>🏪 {item.supplierName}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 }}>
+                      <Ionicons name="storefront-outline" size={11} color={C.t3} />
+                      <Text style={[styles.cardSupplier, { color: C.t3 }]}>{item.supplierName}</Text>
+                    </View>
                   ) : null}
                 </View>
                 {/* D-day + 중량 */}
@@ -270,41 +287,44 @@ function StockTab({ meat, setMeat, critical, suppliers }) {
                   <View style={[styles.ddayPill, { backgroundColor: ddayColor + '18', borderColor: ddayColor + '40' }]}>
                     <Text style={[styles.ddayText, { color: ddayColor }]}>{ddayLabel}</Text>
                   </View>
-                  <Text style={[styles.cardQty, { color: pal.tx }]}>{item.qty}<Text style={{ color: pal.t3, fontSize: fontSize.xxs }}> kg</Text></Text>
+                  <Text style={[styles.cardQty, { color: C.t1 }]}>{item.qty}<Text style={{ color: C.t3, fontSize: F.xxs }}> kg</Text></Text>
                 </View>
               </View>
 
               {/* 가격 + 마진 행 */}
-              <View style={[styles.cardPriceRow, { borderTopColor: pal.bd + '60' }]}>
+              <View style={[styles.cardPriceRow, { borderTopColor: C.border + '60' }]}>
                 <View style={styles.priceStatBox}>
-                  <Text style={[styles.priceStatLabel, { color: pal.t3 }]}>매입가</Text>
-                  <Text style={[styles.priceStatVal, { color: pal.t2 }]}>{item.buyPrice?.toLocaleString()}원</Text>
+                  <Text style={[styles.priceStatLabel, { color: C.t3 }]}>매입가</Text>
+                  <Text style={[styles.priceStatVal, { color: C.t2 }]}>{item.buyPrice?.toLocaleString()}원</Text>
                 </View>
-                <View style={[styles.priceStatBox, { borderLeftWidth: 1, borderLeftColor: pal.bd + '50' }]}>
-                  <Text style={[styles.priceStatLabel, { color: pal.t3 }]}>판매가</Text>
-                  <Text style={[styles.priceStatVal, { color: pal.a2 }]}>{item.sellPrice?.toLocaleString()}원</Text>
+                <View style={[styles.priceStatBox, { borderLeftWidth: 1, borderLeftColor: C.border + '50' }]}>
+                  <Text style={[styles.priceStatLabel, { color: C.t3 }]}>판매가</Text>
+                  <Text style={[styles.priceStatVal, { color: C.red }]}>{item.sellPrice?.toLocaleString()}원</Text>
                 </View>
                 {marginPct !== null && (
-                  <View style={[styles.priceStatBox, { borderLeftWidth: 1, borderLeftColor: pal.bd + '50' }]}>
-                    <Text style={[styles.priceStatLabel, { color: pal.t3 }]}>마진</Text>
-                    <Text style={[styles.priceStatVal, { color: marginPct >= 30 ? pal.gn : pal.a2 }]}>+{marginPct}%</Text>
+                  <View style={[styles.priceStatBox, { borderLeftWidth: 1, borderLeftColor: C.border + '50' }]}>
+                    <Text style={[styles.priceStatLabel, { color: C.t3 }]}>마진</Text>
+                    <Text style={[styles.priceStatVal, { color: marginPct >= 30 ? C.ok2 : C.warn2 }]}>+{marginPct}%</Text>
                   </View>
                 )}
                 {dday <= 3 && (
-                  <View style={[styles.priceStatBox, { borderLeftWidth: 1, borderLeftColor: pal.rd + '40' }]}>
-                    <Text style={[styles.priceStatLabel, { color: pal.rd }]}>손실위험</Text>
-                    <Text style={[styles.priceStatVal, { color: pal.rd }]}>-{((item.qty * item.buyPrice) / 10000).toFixed(1)}만</Text>
+                  <View style={[styles.priceStatBox, { borderLeftWidth: 1, borderLeftColor: C.red + '40' }]}>
+                    <Text style={[styles.priceStatLabel, { color: C.red }]}>손실위험</Text>
+                    <Text style={[styles.priceStatVal, { color: C.red }]}>-{((item.qty * item.buyPrice) / 10000).toFixed(1)}만</Text>
                   </View>
                 )}
               </View>
 
               {/* 판매 완료 버튼 */}
               <TouchableOpacity
-                style={[styles.soldBtn, { borderTopColor: pal.bd + '60' }]}
+                style={[styles.soldBtn, { borderTopColor: C.border + '60' }]}
                 onPress={() => handleSold(item.id)}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.soldBtnText, { color: pal.gn }]}>✓ 판매 완료 처리</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Ionicons name="checkmark-circle" size={16} color={C.ok2} />
+                  <Text style={[styles.soldBtnText, { color: C.ok2 }]}>판매 완료 처리</Text>
+                </View>
               </TouchableOpacity>
             </TouchableOpacity>
           );
@@ -313,25 +333,99 @@ function StockTab({ meat, setMeat, critical, suppliers }) {
         </View>
       </ScrollView>
 
-      {/* FAB: 재고 추가 */}
+      {/* FAB: 재고 추가 (단일 / 계근 모드 선택) */}
       <TouchableOpacity
-        style={[styles.fab, { backgroundColor: pal.a2 }]}
-        onPress={() => setModal(true)}
+        style={[styles.fab, { backgroundColor: C.red }]}
+        onPress={() => setModePicker(true)}
         activeOpacity={0.85}
       >
         <Text style={styles.fabIcon}>+</Text>
         <Text style={styles.fabLabel}>재고 추가</Text>
       </TouchableOpacity>
 
+      {/* 모드 선택 모달 (단일 vs 계근) */}
+      <Modal visible={modePicker} transparent animationType="fade" onRequestClose={() => setModePicker(false)}>
+        <TouchableOpacity
+          style={styles.modePickOverlay}
+          activeOpacity={1}
+          onPress={() => setModePicker(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.modePickBox} onPress={(e) => e.stopPropagation && e.stopPropagation()}>
+            <View style={styles.modePickHeader}>
+              <Text style={styles.modePickTitle}>등록 방식 선택</Text>
+              <TouchableOpacity onPress={() => setModePicker(false)}>
+                <Ionicons name="close" size={22} color={C.t3} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.modeBtn}
+              onPress={() => { setModePicker(false); setModal(true); }}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.modeIconBox, { backgroundColor: C.blueS }]}>
+                <Ionicons name="cube-outline" size={24} color={C.blue} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modeTitle}>단일 입고</Text>
+                <Text style={styles.modeDesc}>부위 하나씩 — 부위명, 중량, 단가 직접 입력</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={C.t3} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modeBtn}
+              onPress={() => {
+                setModePicker(false);
+                if (navigation) navigation.navigate('CarcassWeighing');
+                else Alert.alert('오류', '네비게이션 사용 불가');
+              }}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.modeIconBox, { backgroundColor: C.redS }]}>
+                <Ionicons name="scale-outline" size={24} color={C.red} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.modeTitle}>계근 입고 (원두 분할)</Text>
+                  <View style={styles.newTag}><Text style={styles.newTagTxt}>NEW</Text></View>
+                </View>
+                <Text style={styles.modeDesc}>소 한 마리 → 산피/지육/발골 3단 계근 → 39부위 자동 분할</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={C.t3} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modeBtn}
+              onPress={() => {
+                setModePicker(false);
+                if (navigation) navigation.navigate('CarcassHistory');
+                else Alert.alert('오류', '네비게이션 사용 불가');
+              }}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.modeIconBox, { backgroundColor: C.blueS || '#DBEAFE' }]}>
+                <Ionicons name="time-outline" size={24} color={C.blue || '#1D4ED8'} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modeTitle}>계근 이력 보기</Text>
+                <Text style={styles.modeDesc}>지난 계근 입고 세션 · 수율 · 손익 요약 열람</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={C.t3} />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: pal.bg }}>
-          <View style={[styles.modalHeader, { borderBottomColor: pal.bd, backgroundColor: pal.s1 }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx }]}>재고 추가</Text>
+        <View style={{ flex: 1, backgroundColor: C.bg }}>
+          <View style={[styles.modalHeader, { borderBottomColor: C.border, backgroundColor: C.white }]}>
+            <Text style={[styles.modalTitle, { color: C.t1 }]}>재고 추가</Text>
             <TouchableOpacity onPress={() => setModal(false)}>
-              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
+              <Text style={[styles.closeBtn, { color: C.t2 }]}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+          <ScrollView contentContainerStyle={{ padding: 20 }}>
             {[
               { label: '부위명 *',              key: 'cut',       placeholder: '예: 등심' },
               { label: '원산지·등급',           key: 'origin',    placeholder: '예: 한우 1+' },
@@ -340,46 +434,49 @@ function StockTab({ meat, setMeat, critical, suppliers }) {
               { label: '판매가 (원/kg)',         key: 'sellPrice', placeholder: '비워두면 ×1.55 자동 적용', keyboardType: 'numeric' },
               { label: '소비기한 (YYYY-MM-DD)', key: 'expire',    placeholder: '2026-04-01' },
             ].map(f => (
-              <View key={f.key} style={{ marginBottom: spacing.md }}>
-                <Text style={[styles.fieldLabel, { color: pal.t2 }]}>{f.label}</Text>
+              <View key={f.key} style={{ marginBottom: 16 }}>
+                <Text style={[styles.fieldLabel, { color: C.t2 }]}>{f.label}</Text>
                 <TextInput
-                  style={[styles.input, { backgroundColor: pal.s2, borderColor: pal.bd, color: pal.tx }]}
+                  style={[styles.input, { backgroundColor: C.bg2, borderColor: C.border, color: C.t1 }]}
                   value={form[f.key]}
                   onChangeText={t => setForm({ ...form, [f.key]: t })}
                   placeholder={f.placeholder}
-                  placeholderTextColor={pal.t3}
+                  placeholderTextColor={C.t3}
                   keyboardType={f.keyboardType}
                 />
                 {f.key === 'sellPrice' && form.buyPrice ? (
-                  <Text style={{ fontSize: fontSize.xxs, color: pal.a2, marginTop: 4 }}>
-                    💡 권장: {Math.round((parseInt(form.buyPrice) || 0) * 1.55).toLocaleString()}원 (마진 35%)
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                    <Ionicons name="bulb-outline" size={11} color={C.red} />
+                    <Text style={{ fontSize: F.xxs, color: C.red }}>
+                      권장: {Math.round((parseInt(form.buyPrice) || 0) * 1.55).toLocaleString()}원 (마진 35%)
+                    </Text>
+                  </View>
                 ) : null}
               </View>
             ))}
 
             {/* 거래처 선택 */}
-            <View style={{ marginBottom: spacing.md }}>
-              <Text style={[styles.fieldLabel, { color: pal.t2 }]}>거래처 (선택)</Text>
+            <View style={{ marginBottom: 16 }}>
+              <Text style={[styles.fieldLabel, { color: C.t2 }]}>거래처 (선택)</Text>
               <TouchableOpacity
-                style={[styles.supplierPickerBtn, { backgroundColor: pal.s2, borderColor: form.supplierName ? pal.ac : pal.bd }]}
+                style={[styles.supplierPickerBtn, { backgroundColor: C.bg2, borderColor: form.supplierName ? C.red : C.border }]}
                 onPress={() => setSupplierPicker(true)}
               >
-                <Text style={{ color: form.supplierName ? pal.tx : pal.t3, fontSize: fontSize.sm, fontWeight: form.supplierName ? '700' : '400' }}>
+                <Text style={{ color: form.supplierName ? C.t1 : C.t3, fontSize: F.sm, fontWeight: form.supplierName ? '700' : '400' }}>
                   {form.supplierName || (suppliers.length === 0 ? '거래처를 먼저 등록하세요' : '거래처 선택')}
                 </Text>
                 {form.supplierName ? (
                   <TouchableOpacity onPress={() => setForm({ ...form, supplierId: '', supplierName: '' })}>
-                    <Text style={{ color: pal.t3, fontSize: 16 }}>✕</Text>
+                    <Text style={{ color: C.t3, fontSize: 16 }}>✕</Text>
                   </TouchableOpacity>
                 ) : (
-                  <Text style={{ color: pal.t3 }}>▼</Text>
+                  <Text style={{ color: C.t3 }}>▼</Text>
                 )}
               </TouchableOpacity>
             </View>
 
             <PrimaryBtn label="등록 완료" onPress={handleAdd} />
-            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
+            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: 12 }} />
           </ScrollView>
         </View>
       </Modal>
@@ -387,31 +484,31 @@ function StockTab({ meat, setMeat, critical, suppliers }) {
       {/* 거래처 선택 피커 모달 */}
       <Modal visible={supplierPicker} animationType="slide" transparent>
         <View style={styles.pickerOverlay}>
-          <View style={[styles.pickerBox, { backgroundColor: pal.s1 }]}>
-            <View style={[styles.pickerHeader, { borderBottomColor: pal.bd }]}>
-              <Text style={[styles.pickerTitle, { color: pal.tx }]}>거래처 선택</Text>
+          <View style={[styles.pickerBox, { backgroundColor: C.white }]}>
+            <View style={[styles.pickerHeader, { borderBottomColor: C.border }]}>
+              <Text style={[styles.pickerTitle, { color: C.t1 }]}>거래처 선택</Text>
               <TouchableOpacity onPress={() => setSupplierPicker(false)}>
-                <Text style={{ color: pal.t3, fontSize: 22 }}>✕</Text>
+                <Text style={{ color: C.t3, fontSize: 22 }}>✕</Text>
               </TouchableOpacity>
             </View>
             {suppliers.length === 0 ? (
-              <View style={{ padding: spacing.xl, alignItems: 'center' }}>
-                <Text style={{ color: pal.t3, fontSize: fontSize.sm }}>등록된 거래처가 없습니다</Text>
-                <Text style={{ color: pal.t3, fontSize: fontSize.xs, marginTop: 6 }}>거래처 탭에서 먼저 추가하세요</Text>
+              <View style={{ padding: 28, alignItems: 'center' }}>
+                <Text style={{ color: C.t3, fontSize: F.sm }}>등록된 거래처가 없습니다</Text>
+                <Text style={{ color: C.t3, fontSize: F.xs, marginTop: 6 }}>거래처 탭에서 먼저 추가하세요</Text>
               </View>
             ) : (
               <ScrollView style={{ maxHeight: 300 }}>
                 {suppliers.map(s => (
                   <TouchableOpacity
                     key={s.id}
-                    style={[styles.pickerItem, { borderBottomColor: pal.bd }]}
+                    style={[styles.pickerItem, { borderBottomColor: C.border }]}
                     onPress={() => {
                       setForm({ ...form, supplierId: s.id, supplierName: s.name });
                       setSupplierPicker(false);
                     }}
                   >
-                    <Text style={[styles.pickerItemName, { color: pal.tx }]}>{s.name}</Text>
-                    {s.phone ? <Text style={[styles.pickerItemSub, { color: pal.t3 }]}>{s.phone}</Text> : null}
+                    <Text style={[styles.pickerItemName, { color: C.t1 }]}>{s.name}</Text>
+                    {s.phone ? <Text style={[styles.pickerItemSub, { color: C.t3 }]}>{s.phone}</Text> : null}
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -443,20 +540,20 @@ function SoldHistoryTab({ meat }) {
   const totalProfit  = totalRevenue - totalCost;
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
       {soldItems.length === 0 ? (
         <View style={styles.emptyBox}>
-          <Text style={{ fontSize: 48, marginBottom: spacing.md }}>📋</Text>
-          <Text style={[styles.emptyText, { color: pal.t3 }]}>판매완료 내역이 없습니다</Text>
+          <Ionicons name="document-text-outline" size={48} color={C.t4} style={{ marginBottom: 16 }} />
+          <Text style={[styles.emptyText, { color: C.t3 }]}>판매완료 내역이 없습니다</Text>
         </View>
       ) : (
         <>
           {/* 합계 요약 */}
           <View style={styles.summaryGrid}>
-            <SummaryBox icon="📦" label="판매 건수"  value={`${soldItems.length}건`}                              color={pal.a2}   pal={pal} />
-            <SummaryBox icon="💰" label="총 매출액"  value={`${(totalRevenue / 10000).toFixed(0)}만원`}           color={pal.gn}   pal={pal} />
-            <SummaryBox icon="📉" label="총 매입액"  value={`${(totalCost / 10000).toFixed(0)}만원`}              color={pal.cyan} pal={pal} />
-            <SummaryBox icon="📈" label="총 마진"    value={`${(totalProfit / 10000).toFixed(0)}만원`}            color={totalProfit >= 0 ? pal.gn : pal.rd} pal={pal} />
+            <SummaryBox ionicon="cube-outline" label="판매 건수"  value={`${soldItems.length}건`}                              color={C.red} />
+            <SummaryBox ionicon="cash-outline" label="총 매출액"  value={`${(totalRevenue / 10000).toFixed(0)}만원`}           color={C.ok2} />
+            <SummaryBox ionicon="trending-down-outline" label="총 매입액"  value={`${(totalCost / 10000).toFixed(0)}만원`}              color={C.blue2} />
+            <SummaryBox ionicon="trending-up-outline" label="총 마진"    value={`${(totalProfit / 10000).toFixed(0)}만원`}            color={totalProfit >= 0 ? C.ok2 : C.red} />
           </View>
 
           {dates.map(date => {
@@ -466,36 +563,42 @@ function SoldHistoryTab({ meat }) {
             return (
               <View key={date} style={styles.soldGroup}>
                 <View style={styles.soldGroupHeader}>
-                  <Text style={[styles.soldGroupDate, { color: pal.t2 }]}>📅 {date}</Text>
-                  <Text style={[styles.soldGroupTotal, { color: pal.gn }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="calendar-outline" size={14} color={C.t2} />
+                    <Text style={[styles.soldGroupDate, { color: C.t2 }]}>{date}</Text>
+                  </View>
+                  <Text style={[styles.soldGroupTotal, { color: C.ok2 }]}>
                     매출 {(dayRev / 10000).toFixed(0)}만원 · 마진 {((dayRev - dayCost) / 10000).toFixed(0)}만원
                   </Text>
                 </View>
                 {items.map(item => (
-                  <View key={item.id} style={[styles.soldCard, { backgroundColor: pal.s1, borderColor: pal.gn + '40' }]}>
+                  <View key={item.id} style={[styles.soldCard, { backgroundColor: C.white, borderColor: C.ok2 + '40' }]}>
                     <View style={styles.soldCardTop}>
-                      <View style={[styles.soldBadge, { backgroundColor: pal.gn + '20' }]}>
-                        <Text style={{ fontSize: fontSize.xs, fontWeight: '800', color: pal.gn }}>✓ 판매완료</Text>
+                      <View style={[styles.soldBadge, { backgroundColor: C.ok2 + '20' }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Ionicons name="checkmark-circle" size={13} color={C.ok2} />
+                          <Text style={{ fontSize: F.xs, fontWeight: '800', color: C.ok2 }}>판매완료</Text>
+                        </View>
                       </View>
-                      <Text style={[styles.soldCardCut, { color: pal.tx }]}>{item.cut}</Text>
-                      <Text style={[styles.soldCardOrigin, { color: pal.t3 }]}>{item.origin}</Text>
+                      <Text style={[styles.soldCardCut, { color: C.t1 }]}>{item.cut}</Text>
+                      <Text style={[styles.soldCardOrigin, { color: C.t3 }]}>{item.origin}</Text>
                     </View>
                     <View style={styles.soldCardRow}>
                       <View style={styles.soldCardStat}>
-                        <Text style={[styles.soldStatLabel, { color: pal.t3 }]}>중량</Text>
-                        <Text style={[styles.soldStatVal, { color: pal.tx }]}>{item.qty}kg</Text>
+                        <Text style={[styles.soldStatLabel, { color: C.t3 }]}>중량</Text>
+                        <Text style={[styles.soldStatVal, { color: C.t1 }]}>{item.qty}kg</Text>
                       </View>
                       <View style={styles.soldCardStat}>
-                        <Text style={[styles.soldStatLabel, { color: pal.t3 }]}>매입가</Text>
-                        <Text style={[styles.soldStatVal, { color: pal.t2 }]}>{item.buyPrice.toLocaleString()}원</Text>
+                        <Text style={[styles.soldStatLabel, { color: C.t3 }]}>매입가</Text>
+                        <Text style={[styles.soldStatVal, { color: C.t2 }]}>{item.buyPrice.toLocaleString()}원</Text>
                       </View>
                       <View style={styles.soldCardStat}>
-                        <Text style={[styles.soldStatLabel, { color: pal.t3 }]}>판매가</Text>
-                        <Text style={[styles.soldStatVal, { color: pal.a2 }]}>{item.sellPrice.toLocaleString()}원</Text>
+                        <Text style={[styles.soldStatLabel, { color: C.t3 }]}>판매가</Text>
+                        <Text style={[styles.soldStatVal, { color: C.red }]}>{item.sellPrice.toLocaleString()}원</Text>
                       </View>
                       <View style={styles.soldCardStat}>
-                        <Text style={[styles.soldStatLabel, { color: pal.t3 }]}>마진</Text>
-                        <Text style={[styles.soldStatVal, { color: pal.gn }]}>
+                        <Text style={[styles.soldStatLabel, { color: C.t3 }]}>마진</Text>
+                        <Text style={[styles.soldStatVal, { color: C.ok2 }]}>
                           {(((item.sellPrice - item.buyPrice) * item.qty) / 10000).toFixed(1)}만원
                         </Text>
                       </View>
@@ -553,87 +656,90 @@ function YieldTab() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
-      <AlertBox type="info" icon="ℹ️" message="원육 중량과 정육 후 중량을 입력하면 수율과 실제 원가를 계산합니다." />
+    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+      <AlertBox type="info" message="원육 중량과 정육 후 중량을 입력하면 수율과 실제 원가를 계산합니다." />
 
-      <View style={{ marginBottom: spacing.md }}>
-        <Text style={[styles.fieldLabel, { color: pal.t2 }]}>부위명 (선택, 히스토리 식별용)</Text>
-        <TextInput style={[styles.inputLg, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+      <View style={{ marginBottom: 16 }}>
+        <Text style={[styles.fieldLabel, { color: C.t2 }]}>부위명 (선택, 히스토리 식별용)</Text>
+        <TextInput style={[styles.inputLg, { backgroundColor: C.white, borderColor: C.border, color: C.t1 }]}
           value={label} onChangeText={setLabel}
-          placeholder="예: 등심 3월 28일 작업" placeholderTextColor={pal.t3} />
+          placeholder="예: 등심 3월 28일 작업" placeholderTextColor={C.t3} />
       </View>
       <View style={styles.rowInputs}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.fieldLabel, { color: pal.t2 }]}>원육 중량 (kg)</Text>
-          <TextInput style={[styles.inputLg, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+          <Text style={[styles.fieldLabel, { color: C.t2 }]}>원육 중량 (kg)</Text>
+          <TextInput style={[styles.inputLg, { backgroundColor: C.white, borderColor: C.border, color: C.t1 }]}
             value={initWeight} onChangeText={setInitWeight}
-            placeholder="예: 15.0" placeholderTextColor={pal.t3} keyboardType="numeric" />
+            placeholder="예: 15.0" placeholderTextColor={C.t3} keyboardType="numeric" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.fieldLabel, { color: pal.t2 }]}>정육 후 중량 (kg)</Text>
-          <TextInput style={[styles.inputLg, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+          <Text style={[styles.fieldLabel, { color: C.t2 }]}>정육 후 중량 (kg)</Text>
+          <TextInput style={[styles.inputLg, { backgroundColor: C.white, borderColor: C.border, color: C.t1 }]}
             value={finalWeight} onChangeText={setFinalWeight}
-            placeholder="예: 12.5" placeholderTextColor={pal.t3} keyboardType="numeric" />
+            placeholder="예: 12.5" placeholderTextColor={C.t3} keyboardType="numeric" />
         </View>
       </View>
-      <View style={{ marginBottom: spacing.lg }}>
-        <Text style={[styles.fieldLabel, { color: pal.t2 }]}>매입가 (원/kg, 선택)</Text>
-        <TextInput style={[styles.inputLg, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+      <View style={{ marginBottom: 20 }}>
+        <Text style={[styles.fieldLabel, { color: C.t2 }]}>매입가 (원/kg, 선택)</Text>
+        <TextInput style={[styles.inputLg, { backgroundColor: C.white, borderColor: C.border, color: C.t1 }]}
           value={buyPrice} onChangeText={setBuyPrice}
-          placeholder="예: 98000" placeholderTextColor={pal.t3} keyboardType="numeric" />
+          placeholder="예: 98000" placeholderTextColor={C.t3} keyboardType="numeric" />
       </View>
 
       <PrimaryBtn label="수율 계산하기" onPress={calculate} />
-      {result && <OutlineBtn label="입력 초기화" onPress={clearInputs} style={{ marginTop: spacing.sm }} />}
+      {result && <OutlineBtn label="입력 초기화" onPress={clearInputs} style={{ marginTop: 12 }} />}
 
       {result && (
-        <View style={[styles.resultCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+        <View style={[styles.resultCard, { backgroundColor: C.white, borderColor: C.border }]}>
           <ResultRow label="수율" value={`${result.yieldPct}%`}
-            color={parseFloat(result.yieldPct) >= 80 ? pal.gn : pal.yw} big pal={pal} />
-          <ResultRow label="손실 중량" value={`${result.lossKg}kg`} color={pal.rd} pal={pal} />
+            color={parseFloat(result.yieldPct) >= 80 ? C.ok2 : C.warn2} big />
+          <ResultRow label="손실 중량" value={`${result.lossKg}kg`} color={C.red} />
           {result.realCost > 0 && <>
-            <ResultRow label="실제 원가 (손실 반영)" value={`${result.realCost.toLocaleString()}원/kg`} color={pal.a2} pal={pal} />
-            <ResultRow label="권장 판매가 (마진 55%)" value={`${result.recommend.toLocaleString()}원/kg`} color={pal.gn} big pal={pal} />
+            <ResultRow label="실제 원가 (손실 반영)" value={`${result.realCost.toLocaleString()}원/kg`} color={C.red} />
+            <ResultRow label="권장 판매가 (마진 55%)" value={`${result.recommend.toLocaleString()}원/kg`} color={C.ok2} big />
           </>}
         </View>
       )}
 
       {/* 히스토리 */}
       {history.length > 0 && (
-        <View style={{ marginTop: spacing.lg }}>
+        <View style={{ marginTop: 20 }}>
           <TouchableOpacity
-            style={[styles.historyToggle, { backgroundColor: pal.s1, borderColor: pal.bd }]}
+            style={[styles.historyToggle, { backgroundColor: C.white, borderColor: C.border }]}
             onPress={() => setShowHistory(v => !v)}
           >
-            <Text style={[styles.historyToggleText, { color: pal.a2 }]}>
-              📊 계산 히스토리 ({history.length}건)  {showHistory ? '▲ 접기' : '▼ 펼치기'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="bar-chart-outline" size={15} color={C.red} />
+              <Text style={[styles.historyToggleText, { color: C.red }]}>
+                계산 히스토리 ({history.length}건)  {showHistory ? '▲ 접기' : '▼ 펼치기'}
+              </Text>
+            </View>
           </TouchableOpacity>
           {showHistory && history.map(h => (
-            <View key={h.id} style={[styles.historyCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+            <View key={h.id} style={[styles.historyCard, { backgroundColor: C.white, borderColor: C.border }]}>
               <View style={styles.historyTop}>
-                <Text style={[styles.historyLabel, { color: pal.tx }]}>{h.label}</Text>
-                <Text style={[styles.historyDate, { color: pal.t3 }]}>{h.date}</Text>
+                <Text style={[styles.historyLabel, { color: C.t1 }]}>{h.label}</Text>
+                <Text style={[styles.historyDate, { color: C.t3 }]}>{h.date}</Text>
               </View>
               <View style={styles.historyRow}>
                 <View style={styles.historyStat}>
-                  <Text style={[styles.historyStatLabel, { color: pal.t3 }]}>원육</Text>
-                  <Text style={[styles.historyStatVal, { color: pal.t2 }]}>{h.initWeight}kg</Text>
+                  <Text style={[styles.historyStatLabel, { color: C.t3 }]}>원육</Text>
+                  <Text style={[styles.historyStatVal, { color: C.t2 }]}>{h.initWeight}kg</Text>
                 </View>
-                <Text style={{ color: pal.t3, fontSize: fontSize.lg }}>→</Text>
+                <Text style={{ color: C.t3, fontSize: F.h3 }}>→</Text>
                 <View style={styles.historyStat}>
-                  <Text style={[styles.historyStatLabel, { color: pal.t3 }]}>정육</Text>
-                  <Text style={[styles.historyStatVal, { color: pal.t2 }]}>{h.finalWeight}kg</Text>
+                  <Text style={[styles.historyStatLabel, { color: C.t3 }]}>정육</Text>
+                  <Text style={[styles.historyStatVal, { color: C.t2 }]}>{h.finalWeight}kg</Text>
                 </View>
-                <View style={[styles.historyYieldBadge, { backgroundColor: parseFloat(h.yieldPct) >= 80 ? pal.gn + '20' : pal.yw + '20' }]}>
-                  <Text style={{ fontSize: fontSize.md, fontWeight: '900', color: parseFloat(h.yieldPct) >= 80 ? pal.gn : pal.yw }}>
+                <View style={[styles.historyYieldBadge, { backgroundColor: parseFloat(h.yieldPct) >= 80 ? C.ok2 + '20' : C.warn2 + '20' }]}>
+                  <Text style={{ fontSize: F.body, fontWeight: '900', color: parseFloat(h.yieldPct) >= 80 ? C.ok2 : C.warn2 }}>
                     {h.yieldPct}%
                   </Text>
                 </View>
                 {h.realCost > 0 && (
                   <View style={styles.historyStat}>
-                    <Text style={[styles.historyStatLabel, { color: pal.t3 }]}>실제원가</Text>
-                    <Text style={[styles.historyStatVal, { color: pal.a2 }]}>{h.realCost.toLocaleString()}원</Text>
+                    <Text style={[styles.historyStatLabel, { color: C.t3 }]}>실제원가</Text>
+                    <Text style={[styles.historyStatVal, { color: C.red }]}>{h.realCost.toLocaleString()}원</Text>
                   </View>
                 )}
               </View>
@@ -677,7 +783,7 @@ function ExpiryTab({ meat, setMeat }) {
   const handleEditSave = () => {
     if (!newExpire.trim()) { Alert.alert('입력 오류', '날짜를 입력해주세요.'); return; }
     Alert.alert(
-      '⚠️ 소비기한 수정',
+      '소비기한 수정',
       `"${target.cut}"의 소비기한을 수정합니다.\n기존: ${target.expire}\n변경: ${newExpire}\n\n수정 이력이 로그에 남습니다.`,
       [
         { text: '취소', style: 'cancel' },
@@ -710,39 +816,48 @@ function ExpiryTab({ meat, setMeat }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
-      {today.length    > 0 && <ExpiryGroup label="🔴 오늘 만료"  items={today}    color={pal.rd} onEdit={openEdit} onLog={openLog} pal={pal} />}
-      {tomorrow.length > 0 && <ExpiryGroup label="🟡 내일 만료"  items={tomorrow} color={pal.yw} onEdit={openEdit} onLog={openLog} pal={pal} />}
-      {week.length     > 0 && <ExpiryGroup label="🟠 이번 주"    items={week}     color={pal.a2} onEdit={openEdit} onLog={openLog} pal={pal} />}
-      {later.length    > 0 && <ExpiryGroup label="🟢 이후"       items={later}    color={pal.gn} onEdit={openEdit} onLog={openLog} pal={pal} />}
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+      {today.length    > 0 && <ExpiryGroup icon="alert-circle" iconColor={C.red} label="오늘 만료"  items={today}    color={C.red} onEdit={openEdit} onLog={openLog} />}
+      {tomorrow.length > 0 && <ExpiryGroup icon="ellipse" iconColor={C.warn2} label="내일 만료"  items={tomorrow} color={C.warn2} onEdit={openEdit} onLog={openLog} />}
+      {week.length     > 0 && <ExpiryGroup icon="ellipse" iconColor={C.warn} label="이번 주"    items={week}     color={C.warn} onEdit={openEdit} onLog={openLog} />}
+      {later.length    > 0 && <ExpiryGroup icon="ellipse" iconColor={C.ok2} label="이후"       items={later}    color={C.ok2} onEdit={openEdit} onLog={openLog} />}
 
       {/* 소비기한 수정 모달 */}
       <Modal visible={editModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.editModalBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-            <Text style={[styles.editModalTitle, { color: pal.tx }]}>✏️ 소비기한 수정</Text>
-            <Text style={[styles.editModalSub, { color: pal.t3 }]}>
+          <View style={[styles.editModalBox, { backgroundColor: C.white, borderColor: C.border }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <Ionicons name="create-outline" size={18} color={C.t1} />
+              <Text style={[styles.editModalTitle, { color: C.t1 }]}>소비기한 수정</Text>
+            </View>
+            <Text style={[styles.editModalSub, { color: C.t3 }]}>
               {target?.cut}  현재: {target?.expire}
             </Text>
             {(target?.editCount > 0) && (
-              <View style={[styles.editWarningBox, { backgroundColor: pal.yw + '20', borderColor: pal.yw + '50' }]}>
-                <Text style={[styles.editWarningText, { color: pal.yw }]}>
-                  ⚠️ 이미 {target.editCount}회 수정된 항목입니다
-                </Text>
+              <View style={[styles.editWarningBox, { backgroundColor: C.warnS, borderColor: C.warn2 + '50' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="alert-circle-outline" size={14} color={C.warn2} />
+                  <Text style={[styles.editWarningText, { color: C.warn2 }]}>
+                    이미 {target.editCount}회 수정된 항목입니다
+                  </Text>
+                </View>
               </View>
             )}
-            <Text style={[styles.fieldLabel, { color: pal.t2, marginTop: spacing.md }]}>새 소비기한 (YYYY-MM-DD)</Text>
+            <Text style={[styles.fieldLabel, { color: C.t2, marginTop: 16 }]}>새 소비기한 (YYYY-MM-DD)</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: pal.bg, borderColor: pal.bd, color: pal.tx }]}
+              style={[styles.input, { backgroundColor: C.bg, borderColor: C.border, color: C.t1 }]}
               value={newExpire}
               onChangeText={setNewExpire}
               placeholder="예: 2026-04-10"
-              placeholderTextColor={pal.t3}
+              placeholderTextColor={C.t3}
             />
-            <Text style={[styles.editNotice, { color: pal.rd }]}>
-              🔴 수정 시 로그에 기록되며 취소할 수 없습니다
-            </Text>
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 }}>
+              <Ionicons name="alert-circle" size={14} color={C.red} />
+              <Text style={[styles.editNotice, { color: C.red }]}>
+                수정 시 로그에 기록되며 취소할 수 없습니다
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <OutlineBtn label="취소" onPress={() => setEditModal(false)} style={{ flex: 1 }} />
               <PrimaryBtn label="수정 확인" onPress={handleEditSave} style={{ flex: 1 }} />
             </View>
@@ -752,34 +867,37 @@ function ExpiryTab({ meat, setMeat }) {
 
       {/* 수정 로그 모달 */}
       <Modal visible={logModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: pal.bg }}>
-          <View style={[styles.modalHeader, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx }]}>📋 수정 이력 — {target?.cut}</Text>
+        <View style={{ flex: 1, backgroundColor: C.bg }}>
+          <View style={[styles.modalHeader, { backgroundColor: C.white, borderBottomColor: C.border }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="document-text-outline" size={18} color={C.t1} />
+              <Text style={[styles.modalTitle, { color: C.t1 }]}>수정 이력 — {target?.cut}</Text>
+            </View>
             <TouchableOpacity onPress={() => setLogModal(false)}>
-              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
+              <Text style={[styles.closeBtn, { color: C.t2 }]}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.md }}>
+          <ScrollView contentContainerStyle={{ padding: 16 }}>
             {(!target?.editLog || target.editLog.length === 0) ? (
               <View style={styles.emptyBox}>
-                <Text style={[styles.emptyText, { color: pal.t3 }]}>수정 이력이 없습니다</Text>
+                <Text style={[styles.emptyText, { color: C.t3 }]}>수정 이력이 없습니다</Text>
               </View>
             ) : (
               target.editLog.map((log, idx) => (
-                <View key={idx} style={[styles.logCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-                  <View style={[styles.logCountBadge, { backgroundColor: pal.yw + '20' }]}>
-                    <Text style={[styles.logCountText, { color: pal.yw }]}>수정 {log.count}회</Text>
+                <View key={idx} style={[styles.logCard, { backgroundColor: C.white, borderColor: C.border }]}>
+                  <View style={[styles.logCountBadge, { backgroundColor: C.warnS }]}>
+                    <Text style={[styles.logCountText, { color: C.warn2 }]}>수정 {log.count}회</Text>
                   </View>
-                  <Text style={[styles.logDateTime, { color: pal.t3 }]}>{log.date} {log.time}</Text>
+                  <Text style={[styles.logDateTime, { color: C.t3 }]}>{log.date} {log.time}</Text>
                   <View style={styles.logChangeRow}>
-                    <View style={[styles.logChangeBox, { backgroundColor: pal.rd + '15', borderColor: pal.rd + '40' }]}>
-                      <Text style={[styles.logChangeLabel, { color: pal.rd }]}>변경 전</Text>
-                      <Text style={[styles.logChangeVal, { color: pal.tx }]}>{log.oldExpire}</Text>
+                    <View style={[styles.logChangeBox, { backgroundColor: C.red + '15', borderColor: C.red + '40' }]}>
+                      <Text style={[styles.logChangeLabel, { color: C.red }]}>변경 전</Text>
+                      <Text style={[styles.logChangeVal, { color: C.t1 }]}>{log.oldExpire}</Text>
                     </View>
-                    <Text style={{ color: pal.t3, fontSize: 20 }}>→</Text>
-                    <View style={[styles.logChangeBox, { backgroundColor: pal.gn + '15', borderColor: pal.gn + '40' }]}>
-                      <Text style={[styles.logChangeLabel, { color: pal.gn }]}>변경 후</Text>
-                      <Text style={[styles.logChangeVal, { color: pal.tx }]}>{log.newExpire}</Text>
+                    <Text style={{ color: C.t3, fontSize: 20 }}>→</Text>
+                    <View style={[styles.logChangeBox, { backgroundColor: C.ok2 + '15', borderColor: C.ok2 + '40' }]}>
+                      <Text style={[styles.logChangeLabel, { color: C.ok2 }]}>변경 후</Text>
+                      <Text style={[styles.logChangeVal, { color: C.t1 }]}>{log.newExpire}</Text>
                     </View>
                   </View>
                 </View>
@@ -845,12 +963,12 @@ function SupplierTab({ suppliers, setSuppliers, meat }) {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
         {suppliers.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Text style={{ fontSize: 48, marginBottom: spacing.md }}>🏪</Text>
-            <Text style={[styles.emptyText, { color: pal.t3 }]}>등록된 거래처가 없습니다</Text>
-            <Text style={{ color: pal.t3, fontSize: fontSize.xs, marginTop: 8, textAlign: 'center' }}>
+            <Ionicons name="storefront-outline" size={48} color={C.t4} style={{ marginBottom: 16 }} />
+            <Text style={[styles.emptyText, { color: C.t3 }]}>등록된 거래처가 없습니다</Text>
+            <Text style={{ color: C.t3, fontSize: F.xs, marginTop: 8, textAlign: 'center' }}>
               + 거래처 추가 버튼으로 업체를 등록하면{'\n'}재고 입고 시 연결할 수 있습니다
             </Text>
           </View>
@@ -860,44 +978,54 @@ function SupplierTab({ suppliers, setSuppliers, meat }) {
             const months  = Object.keys(history).sort((a, b) => b.localeCompare(a));
             const totalBuy = Object.values(history).reduce((acc, v) => acc + v, 0);
             return (
-              <View key={s.id} style={[styles.supplierCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+              <View key={s.id} style={[styles.supplierCard, { backgroundColor: C.white, borderColor: C.border }]}>
                 <View style={styles.supplierCardTop}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.supplierName, { color: pal.tx }]}>{s.name}</Text>
-                    {s.phone ? <Text style={[styles.supplierPhone, { color: pal.t3 }]}>📞 {s.phone}</Text> : null}
-                    {s.memo  ? <Text style={[styles.supplierMemo,  { color: pal.t3 }]}>📝 {s.memo}</Text>  : null}
+                    <Text style={[styles.supplierName, { color: C.t1 }]}>{s.name}</Text>
+                    {s.phone ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                        <Ionicons name="call-outline" size={13} color={C.t3} />
+                        <Text style={[styles.supplierPhone, { color: C.t3 }]}>{s.phone}</Text>
+                      </View>
+                    ) : null}
+                    {s.memo ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="create-outline" size={13} color={C.t3} />
+                        <Text style={[styles.supplierMemo, { color: C.t3 }]}>{s.memo}</Text>
+                      </View>
+                    ) : null}
                   </View>
                   <View style={{ gap: 8 }}>
                     <TouchableOpacity
-                      style={[styles.supplierEditBtn, { borderColor: pal.ac + '60' }]}
+                      style={[styles.supplierEditBtn, { borderColor: C.red + '60' }]}
                       onPress={() => openEdit(s)}
                     >
-                      <Text style={{ color: pal.ac, fontSize: fontSize.xs, fontWeight: '700' }}>수정</Text>
+                      <Text style={{ color: C.red, fontSize: F.xs, fontWeight: '700' }}>수정</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.supplierEditBtn, { borderColor: pal.rd + '50' }]}
+                      style={[styles.supplierEditBtn, { borderColor: C.red + '50' }]}
                       onPress={() => handleDelete(s.id)}
                     >
-                      <Text style={{ color: pal.rd, fontSize: fontSize.xs, fontWeight: '700' }}>삭제</Text>
+                      <Text style={{ color: C.red, fontSize: F.xs, fontWeight: '700' }}>삭제</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 {/* 월별 매입액 */}
                 {months.length > 0 && (
-                  <View style={[styles.supplierHistSection, { borderTopColor: pal.bd }]}>
-                    <Text style={[styles.supplierHistTitle, { color: pal.t2 }]}>월별 매입 현황</Text>
+                  <View style={[styles.supplierHistSection, { borderTopColor: C.border }]}>
+                    <Text style={[styles.supplierHistTitle, { color: C.t2 }]}>월별 매입 현황</Text>
                     {months.map(m => (
                       <View key={m} style={styles.supplierHistRow}>
-                        <Text style={[styles.supplierHistMonth, { color: pal.t3 }]}>{m}</Text>
-                        <Text style={[styles.supplierHistAmt, { color: pal.ac }]}>
+                        <Text style={[styles.supplierHistMonth, { color: C.t3 }]}>{m}</Text>
+                        <Text style={[styles.supplierHistAmt, { color: C.red }]}>
                           {(history[m] / 10000).toFixed(0)}만원
                         </Text>
                       </View>
                     ))}
                     <View style={[styles.supplierHistRow, { marginTop: 4 }]}>
-                      <Text style={[styles.supplierHistMonth, { color: pal.t2, fontWeight: '800' }]}>누적 합계</Text>
-                      <Text style={[styles.supplierHistAmt, { color: pal.gn, fontWeight: '900' }]}>
+                      <Text style={[styles.supplierHistMonth, { color: C.t2, fontWeight: '800' }]}>누적 합계</Text>
+                      <Text style={[styles.supplierHistAmt, { color: C.ok2, fontWeight: '900' }]}>
                         {(totalBuy / 10000).toFixed(0)}만원
                       </Text>
                     </View>
@@ -908,38 +1036,38 @@ function SupplierTab({ suppliers, setSuppliers, meat }) {
           })
         )}
 
-        <PrimaryBtn label="+ 거래처 추가" onPress={openAdd} color={pal.pu} style={{ marginTop: spacing.sm }} />
+        <PrimaryBtn label="+ 거래처 추가" onPress={openAdd} style={{ marginTop: 12 }} />
       </ScrollView>
 
       {/* 거래처 추가/수정 모달 */}
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: pal.bg }}>
-          <View style={[styles.modalHeader, { borderBottomColor: pal.bd, backgroundColor: pal.s1 }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx }]}>{editTarget ? '거래처 수정' : '거래처 추가'}</Text>
+        <View style={{ flex: 1, backgroundColor: C.bg }}>
+          <View style={[styles.modalHeader, { borderBottomColor: C.border, backgroundColor: C.white }]}>
+            <Text style={[styles.modalTitle, { color: C.t1 }]}>{editTarget ? '거래처 수정' : '거래처 추가'}</Text>
             <TouchableOpacity onPress={() => setModal(false)}>
-              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
+              <Text style={[styles.closeBtn, { color: C.t2 }]}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+          <ScrollView contentContainerStyle={{ padding: 20 }}>
             {[
               { label: '업체명 *', key: 'name', placeholder: '예: 한국축산' },
               { label: '연락처',   key: 'phone', placeholder: '예: 010-1234-5678', keyboardType: 'phone-pad' },
               { label: '메모',     key: 'memo',  placeholder: '예: 등심·채끝 전문, 매주 화/금 입고' },
             ].map(f => (
-              <View key={f.key} style={{ marginBottom: spacing.md }}>
-                <Text style={[styles.fieldLabel, { color: pal.t2 }]}>{f.label}</Text>
+              <View key={f.key} style={{ marginBottom: 16 }}>
+                <Text style={[styles.fieldLabel, { color: C.t2 }]}>{f.label}</Text>
                 <TextInput
-                  style={[styles.input, { backgroundColor: pal.s2, borderColor: pal.bd, color: pal.tx }]}
+                  style={[styles.input, { backgroundColor: C.bg2, borderColor: C.border, color: C.t1 }]}
                   value={form[f.key]}
                   onChangeText={t => setForm({ ...form, [f.key]: t })}
                   placeholder={f.placeholder}
-                  placeholderTextColor={pal.t3}
+                  placeholderTextColor={C.t3}
                   keyboardType={f.keyboardType}
                 />
               </View>
             ))}
             <PrimaryBtn label={editTarget ? '수정 완료' : '추가 완료'} onPress={handleSave} />
-            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: spacing.sm }} />
+            <OutlineBtn label="취소" onPress={() => setModal(false)} style={{ marginTop: 12 }} />
           </ScrollView>
         </View>
       </Modal>
@@ -947,33 +1075,36 @@ function SupplierTab({ suppliers, setSuppliers, meat }) {
   );
 }
 
-const ExpiryGroup = ({ label, items, color, onEdit, onLog, pal }) => (
+const ExpiryGroup = ({ icon, iconColor, label, items, color, onEdit, onLog }) => (
   <View style={styles.expiryGroup}>
-    <Text style={[styles.expiryGroupLabel, { color }]}>{label}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+      <Ionicons name={icon} size={16} color={iconColor} />
+      <Text style={[styles.expiryGroupLabel, { color, marginBottom: 0 }]}>{label}</Text>
+    </View>
     {items.map(item => (
-      <View key={item.id} style={[styles.expiryRow, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
+      <View key={item.id} style={[styles.expiryRow, { backgroundColor: C.white, borderColor: C.border }]}>
         <View style={[styles.expiryDot, { backgroundColor: color }]} />
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={[styles.expiryName, { color: pal.tx }]}>{item.cut}</Text>
+            <Text style={[styles.expiryName, { color: C.t1 }]}>{item.cut}</Text>
             {item.editCount > 0 && (
-              <View style={[styles.editBadge, { backgroundColor: pal.yw + '25' }]}>
-                <Text style={[styles.editBadgeText, { color: pal.yw }]}>수정 {item.editCount}회</Text>
+              <View style={[styles.editBadge, { backgroundColor: C.warnS }]}>
+                <Text style={[styles.editBadgeText, { color: C.warn2 }]}>수정 {item.editCount}회</Text>
               </View>
             )}
           </View>
-          <Text style={[styles.expiryOrigin, { color: pal.t3 }]}>{item.origin}</Text>
+          <Text style={[styles.expiryOrigin, { color: C.t3 }]}>{item.origin}</Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={[styles.expiryQty, { color }]}>{item.qty}kg</Text>
-          <Text style={[styles.expiryDate, { color: pal.t3 }]}>{item.expire}</Text>
+          <Text style={[styles.expiryDate, { color: C.t3 }]}>{item.expire}</Text>
           <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
             {item.editCount > 0 && (
               <TouchableOpacity
-                style={[styles.expiryActionBtn, { borderColor: pal.t3 + '50' }]}
+                style={[styles.expiryActionBtn, { borderColor: C.t3 + '50' }]}
                 onPress={() => onLog(item)}
               >
-                <Text style={[styles.expiryActionText, { color: pal.t3 }]}>로그</Text>
+                <Text style={[styles.expiryActionText, { color: C.t3 }]}>로그</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -989,226 +1120,250 @@ const ExpiryGroup = ({ label, items, color, onEdit, onLog, pal }) => (
   </View>
 );
 
-const SummaryBox = ({ icon, label, value, color, pal }) => (
-  <View style={[styles.summaryBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-    <Text style={{ fontSize: 20, marginBottom: 4 }}>{icon}</Text>
+const SummaryBox = ({ ionicon, label, value, color }) => (
+  <View style={styles.summaryBox}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+      <Ionicons name={ionicon} size={13} color={C.t3} />
+      <Text style={styles.summaryLabel}>{label}</Text>
+    </View>
     <Text style={[styles.summaryVal, { color }]}>{value}</Text>
-    <Text style={[styles.summaryLabel, { color: pal.t3 }]}>{label}</Text>
   </View>
 );
 
-const ResultRow = ({ label, value, color, big, pal }) => (
-  <View style={[styles.resultRow, { borderBottomColor: pal.bd }]}>
-    <Text style={[styles.resultLabel, { color: pal.t2 }]}>{label}</Text>
-    <Text style={[styles.resultVal, { color, fontSize: big ? fontSize.xl : fontSize.lg }]}>{value}</Text>
+const ResultRow = ({ label, value, color, big }) => (
+  <View style={[styles.resultRow, { borderBottomColor: C.border }]}>
+    <Text style={[styles.resultLabel, { color: C.t2 }]}>{label}</Text>
+    <Text style={[styles.resultVal, { color, fontSize: big ? F.h2 : F.h3 }]}>{value}</Text>
   </View>
 );
 
 const styles = StyleSheet.create({
   // 탭바 — 가로 스크롤
+  // V5 헤더
+  v5Header:       { backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.border, overflow: 'hidden' },
+  v5HeaderAccent: { height: 3, backgroundColor: C.red, position: 'absolute', top: 0, left: 0, right: 0 },
+  v5HeaderRow:    { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 13, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  v5PageTitle:    { fontSize: F.h2 - 2, fontWeight: '900', color: C.t1, letterSpacing: -0.6 },
+
   tabBarScroll: { borderBottomWidth: 1, flexGrow: 0 },
   tabBarContent: { flexDirection: 'row' },
-  tab: { paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent', minWidth: 80 },
-  tabText: { fontSize: fontSize.lg, fontWeight: '600' },
+  tab: { paddingVertical: 15, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent', minWidth: 80 },
+  tabText: { fontSize: F.body, fontWeight: '600' },
   tabTextActive: { fontWeight: '900' },
 
   // 2×2 그리드
   summaryGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
-    gap: spacing.sm, padding: spacing.md,
+    gap: 8, padding: 12, backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.border,
   },
   summaryBox: {
-    width: '48%', borderRadius: radius.md, borderWidth: 1,
-    padding: spacing.md, alignItems: 'center', ...shadow.sm,
+    width: '48%', borderRadius: R.sm + 2,
+    padding: 11, paddingLeft: 13, backgroundColor: C.bg2,
   },
-  summaryVal:   { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 2 },
-  summaryLabel: { fontSize: fontSize.xxs, fontWeight: '600', textAlign: 'center' },
+  summaryVal:   { fontSize: F.h2 - 2, fontWeight: '900', marginBottom: 2, letterSpacing: -0.8 },
+  summaryLabel: { fontSize: F.xs, fontWeight: '600', color: C.t3 },
 
   // 검색 바 + 필터 칩
   searchBar: {
     flexDirection: 'row', alignItems: 'center',
-    borderRadius: radius.md, borderWidth: 1,
-    paddingHorizontal: spacing.md, paddingVertical: 10,
+    borderRadius: R.md, borderWidth: 1,
+    paddingHorizontal: 16, paddingVertical: 10,
   },
-  searchInput: { flex: 1, fontSize: fontSize.sm, fontWeight: '500', paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: F.sm, fontWeight: '500', paddingVertical: 0 },
   filterChip: {
-    paddingHorizontal: 14, paddingVertical: 7,
+    paddingHorizontal: 17, paddingVertical: 7,
     borderRadius: 20, borderWidth: 1.5,
     borderColor: 'transparent', backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  filterChipText: { fontSize: fontSize.xs, fontWeight: '700' },
+  filterChipText: { fontSize: F.xs, fontWeight: '700' },
 
   // 새 카드 스타일
-  meatCard: { borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.sm, overflow: 'hidden', ...shadow.sm },
-  cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: spacing.md },
+  meatCard: { borderRadius: R.md, borderWidth: 1, marginBottom: 12, overflow: 'hidden', ...SH.sm },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16 },
   gradeBox: {
-    width: 46, minHeight: 46, borderRadius: radius.sm, borderWidth: 1,
+    width: 46, minHeight: 46, borderRadius: R.sm, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  gradeText: { fontSize: fontSize.xs, fontWeight: '900', textAlign: 'center' },
-  gradeType: { fontSize: 9, fontWeight: '700', textAlign: 'center', marginTop: 1 },
+  gradeText: { fontSize: F.xs, fontWeight: '900', textAlign: 'center' },
+  gradeType: { fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 1 },
   cardMain: { flex: 1, gap: 2 },
-  cardName:     { fontSize: fontSize.md, fontWeight: '900' },
-  cardDetail:   { fontSize: fontSize.xs, fontWeight: '500' },
-  cardSupplier: { fontSize: fontSize.xxs, marginTop: 1 },
+  cardName:     { fontSize: F.body, fontWeight: '900' },
+  cardDetail:   { fontSize: F.xs, fontWeight: '500' },
+  cardSupplier: { fontSize: F.xxs, marginTop: 1 },
   cardRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
   ddayPill: {
-    paddingHorizontal: 10, paddingVertical: 4,
+    paddingHorizontal: 12, paddingVertical: 4,
     borderRadius: 20, borderWidth: 1.5,
   },
-  ddayText: { fontSize: fontSize.xs, fontWeight: '900' },
-  cardQty:  { fontSize: fontSize.md, fontWeight: '900' },
+  ddayText: { fontSize: F.xs, fontWeight: '900' },
+  cardQty:  { fontSize: F.body, fontWeight: '900' },
 
   cardPriceRow: {
     flexDirection: 'row', borderTopWidth: 1,
   },
   priceStatBox: { flex: 1, alignItems: 'center', paddingVertical: 8 },
-  priceStatLabel: { fontSize: 9, fontWeight: '700', marginBottom: 2 },
-  priceStatVal: { fontSize: fontSize.xs, fontWeight: '900' },
+  priceStatLabel: { fontSize: 11, fontWeight: '700', marginBottom: 2 },
+  priceStatVal: { fontSize: F.xs, fontWeight: '900' },
 
   // 기존 호환용
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
-  priceLabel: { fontSize: fontSize.xxs },
-  priceVal:   { fontSize: fontSize.sm, fontWeight: '800' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' },
+  priceLabel: { fontSize: F.xxs },
+  priceVal:   { fontSize: F.sm, fontWeight: '800' },
 
   soldBtn:     { paddingVertical: 11, borderTopWidth: 1, alignItems: 'center' },
-  soldBtnText: { fontSize: fontSize.sm, fontWeight: '800' },
+  soldBtnText: { fontSize: F.sm, fontWeight: '800' },
 
   emptyBox:  { alignItems: 'center', paddingVertical: 60 },
-  emptyText: { fontSize: fontSize.md, fontWeight: '600' },
+  emptyText: { fontSize: F.body, fontWeight: '600' },
 
   // 재고 현황 빈 상태
   stockEmptyBox: {
-    borderRadius: radius.lg, borderWidth: 1,
-    padding: spacing.xl, marginBottom: spacing.md,
-    alignItems: 'center', ...shadow.sm,
+    borderRadius: R.lg, borderWidth: 1,
+    padding: 28, marginBottom: 16,
+    alignItems: 'center', ...SH.sm,
   },
-  stockEmptyTitle: { fontSize: fontSize.md, fontWeight: '900', marginBottom: spacing.sm, textAlign: 'center' },
-  stockEmptyDesc:  { fontSize: fontSize.sm, fontWeight: '600', textAlign: 'center', lineHeight: 22, marginBottom: spacing.md, color: '#94a3b8' },
-  stockEmptyTip:   { borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, width: '100%' },
-  stockEmptyTipText: { fontSize: fontSize.xs, fontWeight: '700', textAlign: 'center', lineHeight: 20 },
+  stockEmptyTitle: { fontSize: F.body, fontWeight: '900', marginBottom: 12, textAlign: 'center' },
+  stockEmptyDesc:  { fontSize: F.sm, fontWeight: '600', textAlign: 'center', lineHeight: 22, marginBottom: 16, color: C.t4 },
+  stockEmptyTip:   { borderRadius: R.sm, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 12, width: '100%' },
+  stockEmptyTipText: { fontSize: F.xs, fontWeight: '700', textAlign: 'center', lineHeight: 20 },
 
   // 판매내역
-  soldGroup:       { marginBottom: spacing.lg },
-  soldGroupHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  soldGroupDate:   { fontSize: fontSize.sm, fontWeight: '800' },
-  soldGroupTotal:  { fontSize: fontSize.xs, fontWeight: '700' },
+  soldGroup:       { marginBottom: 20 },
+  soldGroupHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  soldGroupDate:   { fontSize: F.sm, fontWeight: '800' },
+  soldGroupTotal:  { fontSize: F.xs, fontWeight: '700' },
   soldCard: {
-    borderRadius: radius.md, borderWidth: 1.5,
-    padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm,
+    borderRadius: R.md, borderWidth: 1.5,
+    padding: 16, marginBottom: 12, ...SH.sm,
   },
-  soldCardTop:   { marginBottom: spacing.sm },
-  soldBadge:     { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 6 },
-  soldCardCut:   { fontSize: fontSize.md, fontWeight: '800' },
-  soldCardOrigin:{ fontSize: fontSize.xs, marginTop: 2 },
+  soldCardTop:   { marginBottom: 12 },
+  soldBadge:     { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginBottom: 6 },
+  soldCardCut:   { fontSize: F.body, fontWeight: '800' },
+  soldCardOrigin:{ fontSize: F.xs, marginTop: 2 },
   soldCardRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   soldCardStat:  { alignItems: 'center' },
-  soldStatLabel: { fontSize: fontSize.xxs, fontWeight: '600', marginBottom: 2 },
-  soldStatVal:   { fontSize: fontSize.sm, fontWeight: '800' },
+  soldStatLabel: { fontSize: F.xxs, fontWeight: '600', marginBottom: 2 },
+  soldStatVal:   { fontSize: F.sm, fontWeight: '800' },
 
   // 수율 계산기
-  rowInputs: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  fieldLabel: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 7 },
+  rowInputs: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  fieldLabel: { fontSize: F.sm, fontWeight: '700', marginBottom: 7 },
   inputLg: {
-    borderWidth: 1.5, borderRadius: radius.md,
-    paddingHorizontal: spacing.md, paddingVertical: 16,
-    fontSize: fontSize.lg, fontWeight: '700', textAlign: 'center', minHeight: 58,
+    borderWidth: 1.5, borderRadius: R.md,
+    paddingHorizontal: 16, paddingVertical: 16,
+    fontSize: F.h3, fontWeight: '700', textAlign: 'center', minHeight: 58,
   },
 
-  resultCard: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.lg, marginTop: spacing.lg, ...shadow.md },
-  resultRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1 },
-  resultLabel:{ fontSize: fontSize.sm, fontWeight: '600' },
+  resultCard: { borderRadius: R.lg, borderWidth: 1, padding: 20, marginTop: 20, ...SH.md },
+  resultRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1 },
+  resultLabel:{ fontSize: F.sm, fontWeight: '600' },
   resultVal:  { fontWeight: '900' },
 
-  historyToggle: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, alignItems: 'center', marginBottom: spacing.sm },
-  historyToggleText: { fontSize: fontSize.sm, fontWeight: '800' },
-  historyCard: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
-  historyTop:  { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
-  historyLabel:{ fontSize: fontSize.sm, fontWeight: '700' },
-  historyDate: { fontSize: fontSize.xs },
-  historyRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  historyToggle: { borderRadius: R.md, borderWidth: 1, padding: 16, alignItems: 'center', marginBottom: 12 },
+  historyToggleText: { fontSize: F.sm, fontWeight: '800' },
+  historyCard: { borderRadius: R.md, borderWidth: 1, padding: 16, marginBottom: 12, ...SH.sm },
+  historyTop:  { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  historyLabel:{ fontSize: F.sm, fontWeight: '700' },
+  historyDate: { fontSize: F.xs },
+  historyRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   historyStat: { alignItems: 'center' },
-  historyStatLabel: { fontSize: fontSize.xxs, fontWeight: '600', marginBottom: 2 },
-  historyStatVal:   { fontSize: fontSize.sm, fontWeight: '800' },
-  historyYieldBadge:{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  historyStatLabel: { fontSize: F.xxs, fontWeight: '600', marginBottom: 2 },
+  historyStatVal:   { fontSize: F.sm, fontWeight: '800' },
+  historyYieldBadge:{ paddingHorizontal: 15, paddingVertical: 6, borderRadius: 20 },
 
   // 소비기한
-  expiryGroup:      { marginBottom: spacing.lg },
-  expiryGroupLabel: { fontSize: fontSize.sm, fontWeight: '900', marginBottom: spacing.sm, letterSpacing: 0.5 },
+  expiryGroup:      { marginBottom: 20 },
+  expiryGroupLabel: { fontSize: F.sm, fontWeight: '900', letterSpacing: 0.5 },
   expiryRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: R.md, borderWidth: 1, padding: 16, marginBottom: 12, ...SH.sm,
   },
   expiryDot:    { width: 10, height: 10, borderRadius: 5 },
-  expiryName:   { fontSize: fontSize.md, fontWeight: '800' },
-  expiryOrigin: { fontSize: fontSize.xs, marginTop: 2 },
-  expiryQty:    { fontSize: fontSize.md, fontWeight: '900' },
-  expiryDate:   { fontSize: fontSize.xs, marginTop: 2 },
-  editBadge:    { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
-  editBadgeText:{ fontSize: fontSize.xxs, fontWeight: '800' },
+  expiryName:   { fontSize: F.body, fontWeight: '800' },
+  expiryOrigin: { fontSize: F.xs, marginTop: 2 },
+  expiryQty:    { fontSize: F.body, fontWeight: '900' },
+  expiryDate:   { fontSize: F.xs, marginTop: 2 },
+  editBadge:    { paddingHorizontal: 7, paddingVertical: 2, borderRadius: R.sm },
+  editBadgeText:{ fontSize: F.xxs, fontWeight: '800' },
   expiryActionBtn:  { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
-  expiryActionText: { fontSize: fontSize.xxs, fontWeight: '800' },
+  expiryActionText: { fontSize: F.xxs, fontWeight: '800' },
 
   // 수정 모달
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing.lg },
-  editModalBox: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.lg },
-  editModalTitle: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 6 },
-  editModalSub:   { fontSize: fontSize.sm, marginBottom: spacing.sm },
-  editWarningBox: { borderRadius: radius.sm, borderWidth: 1, padding: spacing.sm, marginBottom: spacing.sm },
-  editWarningText:{ fontSize: fontSize.sm, fontWeight: '700' },
-  editNotice:     { fontSize: fontSize.xs, fontWeight: '700', marginTop: spacing.sm },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 },
+  editModalBox: { borderRadius: R.lg, borderWidth: 1, padding: 20 },
+  editModalTitle: { fontSize: F.h3, fontWeight: '900' },
+  editModalSub:   { fontSize: F.sm, marginBottom: 12 },
+  editWarningBox: { borderRadius: R.sm, borderWidth: 1, padding: 12, marginBottom: 12 },
+  editWarningText:{ fontSize: F.sm, fontWeight: '700' },
+  editNotice:     { fontSize: F.xs, fontWeight: '700' },
 
   // 로그 모달
-  logCard: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
-  logCountBadge:  { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 6 },
-  logCountText:   { fontSize: fontSize.xs, fontWeight: '800' },
-  logDateTime:    { fontSize: fontSize.xs, marginBottom: spacing.sm },
-  logChangeRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  logChangeBox:   { flex: 1, borderRadius: radius.sm, borderWidth: 1, padding: spacing.sm, alignItems: 'center' },
-  logChangeLabel: { fontSize: fontSize.xxs, fontWeight: '700', marginBottom: 4 },
-  logChangeVal:   { fontSize: fontSize.sm, fontWeight: '800' },
+  logCard: { borderRadius: R.md, borderWidth: 1, padding: 16, marginBottom: 12, ...SH.sm },
+  logCountBadge:  { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginBottom: 6 },
+  logCountText:   { fontSize: F.xs, fontWeight: '800' },
+  logDateTime:    { fontSize: F.xs, marginBottom: 12 },
+  logChangeRow:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  logChangeBox:   { flex: 1, borderRadius: R.sm, borderWidth: 1, padding: 12, alignItems: 'center' },
+  logChangeLabel: { fontSize: F.xxs, fontWeight: '700', marginBottom: 4 },
+  logChangeVal:   { fontSize: F.sm, fontWeight: '800' },
 
-  modalHeader:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1 },
-  modalTitle: { fontSize: fontSize.lg, fontWeight: '900' },
-  closeBtn:   { fontSize: 22, padding: 4 },
-  input: { borderWidth: 1.5, borderRadius: radius.sm, padding: spacing.md, fontSize: fontSize.sm, minHeight: 52 },
+  modalHeader:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1 },
+  modalTitle: { fontSize: F.h3, fontWeight: '900' },
+  closeBtn:   { fontSize: 24, padding: 4 },
+  input: { borderWidth: 1.5, borderRadius: R.sm, padding: 16, fontSize: F.sm, minHeight: 52 },
 
   // 거래처 선택 버튼 (재고 추가 모달 내)
   supplierPickerBtn: {
-    borderWidth: 1.5, borderRadius: radius.sm, padding: spacing.md, minHeight: 52,
+    borderWidth: 1.5, borderRadius: R.sm, padding: 16, minHeight: 52,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
 
   // 거래처 선택 피커 모달
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  pickerBox:     { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32 },
-  pickerHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, borderBottomWidth: 1 },
-  pickerTitle:   { fontSize: fontSize.md, fontWeight: '900' },
-  pickerItem:    { paddingVertical: 14, paddingHorizontal: spacing.lg, borderBottomWidth: 1 },
-  pickerItemName:{ fontSize: fontSize.md, fontWeight: '700' },
-  pickerItemSub: { fontSize: fontSize.xs, marginTop: 2 },
+  pickerBox:     { borderTopLeftRadius: R.lg, borderTopRightRadius: R.lg, paddingBottom: 32 },
+  pickerHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1 },
+  pickerTitle:   { fontSize: F.body, fontWeight: '900' },
+  pickerItem:    { paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1 },
+  pickerItemName:{ fontSize: F.body, fontWeight: '700' },
+  pickerItemSub: { fontSize: F.xs, marginTop: 2 },
 
   // 거래처 카드
-  supplierCard:     { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm, ...shadow.sm },
-  supplierCardTop:  { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  supplierName:     { fontSize: fontSize.md, fontWeight: '900', marginBottom: 4 },
-  supplierPhone:    { fontSize: fontSize.xs, marginBottom: 2 },
-  supplierMemo:     { fontSize: fontSize.xs },
-  supplierEditBtn:  { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center' },
-  supplierHistSection: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1 },
-  supplierHistTitle:   { fontSize: fontSize.xs, fontWeight: '700', marginBottom: 6 },
+  supplierCard:     { borderRadius: R.md, borderWidth: 1, padding: 16, marginBottom: 12, ...SH.sm },
+  supplierCardTop:  { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  supplierName:     { fontSize: F.body, fontWeight: '900', marginBottom: 4 },
+  supplierPhone:    { fontSize: F.xs, marginBottom: 2 },
+  supplierMemo:     { fontSize: F.xs },
+  supplierEditBtn:  { paddingHorizontal: 12, paddingVertical: 6, borderRadius: R.sm, borderWidth: 1, alignItems: 'center' },
+  supplierHistSection: { marginTop: 16, paddingTop: 16, borderTopWidth: 1 },
+  supplierHistTitle:   { fontSize: F.xs, fontWeight: '700', marginBottom: 6 },
   supplierHistRow:     { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  supplierHistMonth:   { fontSize: fontSize.xs, fontWeight: '600' },
-  supplierHistAmt:     { fontSize: fontSize.xs, fontWeight: '800' },
+  supplierHistMonth:   { fontSize: F.xs, fontWeight: '600' },
+  supplierHistAmt:     { fontSize: F.xs, fontWeight: '800' },
 
   // FAB
   fab: {
     position: 'absolute', bottom: 24, right: 20,
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingVertical: 14, paddingHorizontal: 20,
-    borderRadius: 30, ...shadow.md,
+    borderRadius: 30, ...SH.md,
     elevation: 6,
   },
-  fabIcon:  { color: '#fff', fontSize: 22, fontWeight: '900', lineHeight: 24 },
-  fabLabel: { color: '#fff', fontSize: fontSize.sm, fontWeight: '900' },
+  fabIcon:  { color: '#fff', fontSize: 24, fontWeight: '900', lineHeight: 26 },
+  fabLabel: { color: '#fff', fontSize: F.sm, fontWeight: '900' },
+
+  // 모드 선택 (단일 / 계근)
+  modePickOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modePickBox:     { backgroundColor: C.white, borderTopLeftRadius: R.lg, borderTopRightRadius: R.lg, padding: 20, paddingBottom: 32 },
+  modePickHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modePickTitle:   { fontSize: F.h3, fontWeight: '900', color: C.t1 },
+  modeBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: C.bg2, borderRadius: R.md, padding: 14, marginBottom: 10,
+    borderWidth: 1, borderColor: C.border,
+  },
+  modeIconBox: { width: 48, height: 48, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center' },
+  modeTitle:   { fontSize: F.body, fontWeight: '900', color: C.t1 },
+  modeDesc:    { fontSize: F.xs, color: C.t3, marginTop: 2 },
+  newTag:      { backgroundColor: C.red, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  newTagTxt:   { color: '#fff', fontSize: 9, fontWeight: '900' },
 });

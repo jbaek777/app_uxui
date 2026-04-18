@@ -44,6 +44,37 @@ function validateBizNo(bizNo) {
   return (10 - (sum % 10)) % 10 === d[9];
 }
 
+// ── 국세청 사업자등록 실시간 상태 조회 ─────────────────────
+// 공공데이터포털 API: https://api.odcloud.kr/api/nts-businessman/v1/status
+async function checkBizStatus(bizNo) {
+  const raw = bizNo.replace(/-/g, '').trim();
+  const apiKey = process.env.EXPO_PUBLIC_MTRACE_API_KEY;
+  if (!apiKey) return { ok: true, status: '조회 불가(키 없음)', taxType: '' };
+  try {
+    const res = await fetch(
+      `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ b_no: [raw] }),
+      }
+    );
+    if (!res.ok) return { ok: true, status: '조회 실패', taxType: '' }; // 네트워크 오류 시 통과
+    const json = await res.json();
+    const item = json?.data?.[0];
+    if (!item) return { ok: true, status: '조회 불가', taxType: '' };
+    const isActive = item.b_stt_cd === '01'; // 01: 계속사업자, 02: 휴업, 03: 폐업
+    return {
+      ok: isActive,
+      status: item.b_stt || '알 수 없음',
+      taxType: item.tax_type || '',
+      endDt: item.end_dt || '',
+    };
+  } catch (_) {
+    return { ok: true, status: '조회 실패', taxType: '' }; // 오프라인 등 예외 시 통과
+  }
+}
+
 // 사업자번호 자동 하이픈 포맷 (000-00-00000)
 function formatBizNo(raw) {
   const n = raw.replace(/\D/g, '').slice(0, 10);
@@ -60,6 +91,7 @@ export default function OnboardingScreen({ onDone }) {
   const [step, setStep] = useState(1);
   const [biz, setBiz] = useState({ bizNo: '', bizName: '', owner: '', bizType: '개인사업자', addrSi: '', addrGu: '', addrDong: '' });
   const [bizNoError, setBizNoError] = useState('');
+  const [bizChecking, setBizChecking] = useState(false); // API 조회 중
   const [species, setSpecies] = useState([]);
   const [staff, setStaff] = useState([{ name: '', role: '사장', pin: '' }]);
 
@@ -104,16 +136,36 @@ export default function OnboardingScreen({ onDone }) {
   };
 
   // ─── 사장 다음 스텝 ──────────────────────────────────────
-  const nextStep = () => {
+  const nextStep = async () => {
     if (step === 1) {
       if (!biz.bizName || !biz.owner) {
         Alert.alert('입력 오류', '상호명과 대표자명을 입력해주세요.');
         return;
       }
       const bizNumRaw = biz.bizNo.replace(/-/g, '');
-      if (bizNumRaw.length === 10 && !validateBizNo(biz.bizNo)) {
-        Alert.alert('사업자번호 오류', '유효하지 않은 사업자등록번호입니다.\n번호를 확인해주세요.');
-        return;
+      if (bizNumRaw.length === 10) {
+        // 1단계: 체크섬 형식 검증
+        if (!validateBizNo(biz.bizNo)) {
+          Alert.alert('사업자번호 오류', '유효하지 않은 사업자등록번호입니다.\n번호를 확인해주세요.');
+          return;
+        }
+        // 2단계: 국세청 실시간 상태 조회
+        setBizChecking(true);
+        const result = await checkBizStatus(bizNumRaw);
+        setBizChecking(false);
+        if (!result.ok) {
+          const detail = result.endDt ? `\n폐업일: ${result.endDt}` : '';
+          Alert.alert(
+            '사업자 조회 실패',
+            `해당 사업자번호는 "${result.status}" 상태입니다.${detail}\n\n사업자번호를 다시 확인해주세요.`
+          );
+          setBizNoError(`사업자 상태: ${result.status}`);
+          return;
+        }
+        // 조회 성공 시 상태 텍스트로 안내
+        if (result.taxType) {
+          setBizNoError(''); // 에러 없음
+        }
       }
     }
     if (step === 2 && species.length === 0) {
@@ -405,10 +457,12 @@ export default function OnboardingScreen({ onDone }) {
               />
               {bizNoError ? (
                 <Text style={styles.errorText}>⚠ {bizNoError}</Text>
+              ) : bizChecking ? (
+                <Text style={[styles.validText, { color: '#D97706' }]}>🔍 국세청 조회 중...</Text>
               ) : biz.bizNo.replace(/-/g, '').length === 10 ? (
-                <Text style={styles.validText}>✓ 유효한 사업자번호입니다</Text>
+                <Text style={styles.validText}>✓ 형식 검증 완료 (다음 버튼 시 실시간 조회)</Text>
               ) : null}
-              <Text style={styles.hintText}>※ 입력 시 국세청 알고리즘으로 자동 검증됩니다</Text>
+              <Text style={styles.hintText}>※ 다음 버튼 클릭 시 국세청 API로 실시간 사업자 상태를 조회합니다</Text>
             </View>
 
             <Text style={styles.fieldLabel}>사업자 유형</Text>
@@ -536,9 +590,10 @@ export default function OnboardingScreen({ onDone }) {
           />
         )}
         <PrimaryBtn
-          label={step === totalSteps ? '시작하기 🚀' : '다음 →'}
+          label={bizChecking ? '사업자 확인 중...' : step === totalSteps ? '시작하기 🚀' : '다음 →'}
           onPress={nextStep}
           style={{ flex: 2 }}
+          disabled={bizChecking}
         />
       </View>
     </View>

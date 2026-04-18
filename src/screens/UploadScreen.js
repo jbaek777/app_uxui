@@ -4,18 +4,18 @@ import {
   Image, Alert, ActivityIndicator, Modal, TextInput,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { colors, darkColors, lightColors, radius, fontSize, spacing } from '../theme';
-import { useTheme } from '../lib/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
+import { C, F, R, SH } from '../lib/v5';
 import { meatStore, staffStore } from '../lib/dataStore';
 import { meatInventory as initMeat, staffData } from '../data/mockData';
 
 const DOC_TYPES = [
-  { key: '거래명세서',      icon: '📄', category: 'stock' },
-  { key: '도축 검사증명서', icon: '🏭', category: 'stock' },
-  { key: '이력확인서',      icon: '🔍', category: 'trace' },
-  { key: '보건증',          icon: '🏥', category: 'staff' },
-  { key: '위생교육 이수증', icon: '📚', category: 'staff' },
-  { key: '기타',            icon: '📋', category: 'etc'   },
+  { key: '거래명세서',      icon: 'document-text', category: 'stock' },
+  { key: '도축 검사증명서', icon: 'business',      category: 'stock' },
+  { key: '이력확인서',      icon: 'search',        category: 'trace' },
+  { key: '보건증',          icon: 'medkit',        category: 'staff' },
+  { key: '위생교육 이수증', icon: 'school',        category: 'staff' },
+  { key: '기타',            icon: 'clipboard',     category: 'etc'   },
 ];
 
 const SCHEMAS = {
@@ -59,9 +59,6 @@ function calcDday(expireStr) {
 }
 
 export default function UploadScreen({ navigation }) {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
-
   const [docType, setDocType] = useState('거래명세서');
   const [image, setImage]     = useState(null);
   const [loading, setLoading] = useState(false);
@@ -277,19 +274,22 @@ export default function UploadScreen({ navigation }) {
   };
 
   const docCategory = DOC_TYPES.find(d => d.key === docType)?.category;
-  const saveLabel = docCategory === 'stock' ? '📦 재고에 등록'
-    : docCategory === 'staff' ? '👤 직원 서류 등록'
-    : '💾 저장';
+  const saveLabel = docCategory === 'stock' ? '재고에 등록'
+    : docCategory === 'staff' ? '직원 서류 등록'
+    : '저장';
+  const saveIcon = docCategory === 'stock' ? 'cube'
+    : docCategory === 'staff' ? 'person'
+    : 'save';
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: pal.bg }}
-      contentContainerStyle={{ padding: spacing.md, paddingBottom: 48 }}>
+      style={{ flex: 1, backgroundColor: C.bg }}
+      contentContainerStyle={{ padding: 18, paddingBottom: 48 }}>
 
       {/* API 키 상태 배너 */}
       {!HAS_API_KEY && (
         <View style={styles.demoBanner}>
-          <Text style={styles.demoBannerIcon}>⚠️</Text>
+          <Ionicons name="warning" size={22} color={C.warn} />
           <View style={{ flex: 1 }}>
             <Text style={styles.demoBannerTitle}>데모 모드</Text>
             <Text style={styles.demoBannerSub}>.env.local에 EXPO_PUBLIC_ANTHROPIC_API_KEY 설정 시 실제 AI 분석 가능</Text>
@@ -298,65 +298,71 @@ export default function UploadScreen({ navigation }) {
       )}
 
       {/* 문서 종류 */}
-      <Text style={[styles.sectionTitle, { color: pal.tx }]}>📂 문서 종류</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <Ionicons name="folder-open" size={18} color={C.t2} />
+        <Text style={styles.sectionTitle}>문서 종류</Text>
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.sm }}>
+        contentContainerStyle={{ gap: 10, paddingBottom: 10 }}>
         {DOC_TYPES.map(dt => (
           <TouchableOpacity
             key={dt.key}
-            style={[styles.typeBtn, { backgroundColor: pal.s1, borderColor: pal.bd },
-              docType === dt.key && { borderColor: '#3d7ef5', backgroundColor: isDark ? '#1e3a5f' : '#eff6ff' }]}
+            style={[styles.typeBtn,
+              docType === dt.key && { borderColor: C.red, backgroundColor: C.redS }]}
             onPress={() => { setDocType(dt.key); setImage(null); setResult(null); }}>
-            <Text style={styles.typeIcon}>{dt.icon}</Text>
-            <Text style={[styles.typeLabel, { color: pal.t2 },
-              docType === dt.key && { color: '#3d7ef5', fontWeight: '800' }]}>{dt.key}</Text>
+            <Ionicons name={dt.icon} size={24} color={docType === dt.key ? C.red : C.t3} />
+            <Text style={[styles.typeLabel,
+              docType === dt.key && { color: C.red, fontWeight: '800' }]}>{dt.key}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
       {/* 카테고리 안내 */}
       {docCategory === 'stock' && (
-        <View style={[styles.categoryBadge, { backgroundColor: isDark ? '#1a3a1a' : '#f0fdf4', borderColor: '#22c55e' }]}>
-          <Text style={{ fontSize: fontSize.xs, color: '#16a34a', fontWeight: '700' }}>
-            📦 분석 후 재고에 자동 등록됩니다
+        <View style={[styles.categoryBadge, { backgroundColor: C.okS, borderColor: C.ok2 }]}>
+          <Ionicons name="cube" size={14} color={C.ok} style={{ marginRight: 6 }} />
+          <Text style={{ fontSize: F.xs, color: C.ok, fontWeight: '700' }}>
+            분석 후 재고에 자동 등록됩니다
           </Text>
         </View>
       )}
       {docCategory === 'staff' && (
-        <View style={[styles.categoryBadge, { backgroundColor: isDark ? '#1a1a3a' : '#f5f3ff', borderColor: '#8b5cf6' }]}>
-          <Text style={{ fontSize: fontSize.xs, color: '#7c3aed', fontWeight: '700' }}>
-            👤 분석 후 직원 서류가 자동 업데이트됩니다
+        <View style={[styles.categoryBadge, { backgroundColor: C.purS, borderColor: C.pur }]}>
+          <Ionicons name="person" size={14} color={C.pur} style={{ marginRight: 6 }} />
+          <Text style={{ fontSize: F.xs, color: C.pur, fontWeight: '700' }}>
+            분석 후 직원 서류가 자동 업데이트됩니다
           </Text>
         </View>
       )}
 
       {/* 업로드 영역 */}
-      <View style={[styles.uploadZone, { borderColor: pal.bd, backgroundColor: pal.s1 }]}>
+      <View style={styles.uploadZone}>
         {image ? (
           <>
             <Image source={{ uri: image.uri }} style={styles.preview} />
             <TouchableOpacity onPress={() => { setImage(null); setResult(null); }} style={styles.clearBtn}>
-              <Text style={styles.clearBtnText}>✕ 다시 선택</Text>
+              <Ionicons name="close-circle" size={16} color={C.red3} />
+              <Text style={styles.clearBtnText}> 다시 선택</Text>
             </TouchableOpacity>
           </>
         ) : (
-          <View style={{ alignItems: 'center', padding: spacing.lg }}>
-            <Text style={{ fontSize: 52, marginBottom: spacing.md }}>📄</Text>
-            <Text style={[styles.uploadTitle, { color: pal.tx }]}>서류 사진을 올려주세요</Text>
-            <Text style={[styles.uploadSub, { color: pal.t3 }]}>카메라 촬영 또는 갤러리에서 선택</Text>
+          <View style={{ alignItems: 'center', padding: 24 }}>
+            <Ionicons name="document-text-outline" size={52} color={C.t4} style={{ marginBottom: 14 }} />
+            <Text style={styles.uploadTitle}>서류 사진을 올려주세요</Text>
+            <Text style={styles.uploadSub}>카메라 촬영 또는 갤러리에서 선택</Text>
           </View>
         )}
       </View>
 
       {/* 버튼들 */}
       <View style={styles.btnRow}>
-        <TouchableOpacity style={[styles.imgBtn, { backgroundColor: colors.a2 }]} onPress={() => pickImage(true)}>
-          <Text style={styles.imgBtnIcon}>📷</Text>
+        <TouchableOpacity style={[styles.imgBtn, { backgroundColor: C.red }]} onPress={() => pickImage(true)}>
+          <Ionicons name="camera" size={22} color="#fff" />
           <Text style={styles.imgBtnText}>카메라</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.imgBtn, { backgroundColor: pal.s1, borderWidth: 1.5, borderColor: pal.bd }]} onPress={() => pickImage(false)}>
-          <Text style={styles.imgBtnIcon}>🖼️</Text>
-          <Text style={[styles.imgBtnText, { color: pal.t2 }]}>갤러리</Text>
+        <TouchableOpacity style={[styles.imgBtn, { backgroundColor: C.white, borderWidth: 1.5, borderColor: C.border }]} onPress={() => pickImage(false)}>
+          <Ionicons name="images" size={22} color={C.t2} />
+          <Text style={[styles.imgBtnText, { color: C.t2 }]}>갤러리</Text>
         </TouchableOpacity>
       </View>
 
@@ -370,31 +376,39 @@ export default function UploadScreen({ navigation }) {
             <Text style={styles.ocrBtnText}>AI 분석 중...</Text>
           </View>
         ) : (
-          <Text style={styles.ocrBtnText}>{HAS_API_KEY ? '✨ AI 자동 분석' : '🔍 데모로 확인'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name={HAS_API_KEY ? 'sparkles' : 'search'} size={18} color="#fff" />
+            <Text style={styles.ocrBtnText}>{HAS_API_KEY ? 'AI 자동 분석' : '데모로 확인'}</Text>
+          </View>
         )}
       </TouchableOpacity>
 
       {/* 결과 */}
       {result && (
-        <View style={[styles.resultCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <View style={[styles.resultHeader, { backgroundColor: pal.bg, borderBottomColor: pal.bd }]}>
-            <Text style={[styles.resultTitle, { color: pal.tx }]}>✅ 인식 결과</Text>
-            <View style={[styles.modeBadge, isDemo && { backgroundColor: '#fef9c3', borderColor: '#fde68a' }]}>
-              <Text style={[styles.modeBadgeText, isDemo && { color: colors.yw }]}>
-                {isDemo ? '📋 데모' : '✨ AI'}
+        <View style={styles.resultCard}>
+          <View style={styles.resultHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="checkmark-circle" size={20} color={C.ok} />
+              <Text style={styles.resultTitle}>인식 결과</Text>
+            </View>
+            <View style={[styles.modeBadge, isDemo && { backgroundColor: C.warnS, borderColor: C.warn2 }]}>
+              <Ionicons name={isDemo ? 'clipboard' : 'sparkles'} size={12} color={isDemo ? C.warn : C.pur} />
+              <Text style={[styles.modeBadgeText, isDemo && { color: C.warn }]}>
+                {isDemo ? ' 데모' : ' AI'}
               </Text>
             </View>
           </View>
           {isDemo && (
             <View style={styles.demoNotice}>
-              <Text style={styles.demoNoticeText}>⚠️ 데모 데이터입니다. 실제 문서 내용이 아닙니다.</Text>
+              <Ionicons name="warning" size={14} color="#92400e" />
+              <Text style={styles.demoNoticeText}> 데모 데이터입니다. 실제 문서 내용이 아닙니다.</Text>
             </View>
           )}
           {Object.entries(result).map(([key, value]) =>
             value ? (
-              <View key={key} style={[styles.resultRow, { borderBottomColor: pal.bd + '50' }]}>
-                <Text style={[styles.resultKey, { color: pal.t3 }]}>{key}</Text>
-                <Text style={[styles.resultVal, { color: pal.tx }]}>{value}</Text>
+              <View key={key} style={styles.resultRow}>
+                <Text style={styles.resultKey}>{key}</Text>
+                <Text style={styles.resultVal}>{value}</Text>
               </View>
             ) : null
           )}
@@ -405,10 +419,13 @@ export default function UploadScreen({ navigation }) {
               disabled={saving}>
               {saving
                 ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={styles.saveBtnText}>{saveLabel}</Text>}
+                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name={saveIcon} size={16} color="#fff" />
+                    <Text style={styles.saveBtnText}>{saveLabel}</Text>
+                  </View>}
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.cancelBtn, { borderColor: pal.bd }]} onPress={() => setResult(null)}>
-              <Text style={[styles.cancelBtnText, { color: pal.t2 }]}>취소</Text>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setResult(null)}>
+              <Text style={styles.cancelBtnText}>취소</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -416,18 +433,21 @@ export default function UploadScreen({ navigation }) {
 
       {/* 촬영 가이드 */}
       {!image && !result && (
-        <View style={[styles.guideCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <Text style={[styles.guideTitle, { color: pal.tx }]}>📖 촬영 가이드</Text>
+        <View style={styles.guideCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <Ionicons name="book-outline" size={18} color={C.t1} />
+            <Text style={styles.guideTitle}>촬영 가이드</Text>
+          </View>
           {[
-            { icon: '🔆', title: '밝은 곳에서 촬영', sub: '직사광선 반사 주의, 형광등 아래 권장' },
-            { icon: '📐', title: '문서 전체가 보이게', sub: '모서리 4개가 화면 안에 들어오게' },
-            { icon: '🔍', title: '글자가 선명하게', sub: '흔들리지 않게 고정 후 촬영' },
+            { icon: 'sunny',   title: '밝은 곳에서 촬영', sub: '직사광선 반사 주의, 형광등 아래 권장' },
+            { icon: 'scan',    title: '문서 전체가 보이게', sub: '모서리 4개가 화면 안에 들어오게' },
+            { icon: 'search',  title: '글자가 선명하게', sub: '흔들리지 않게 고정 후 촬영' },
           ].map(g => (
             <View key={g.title} style={styles.guideRow}>
-              <Text style={styles.guideIcon}>{g.icon}</Text>
+              <Ionicons name={g.icon} size={22} color={C.red} style={{ marginTop: 2 }} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.guideRowTitle, { color: pal.tx }]}>{g.title}</Text>
-                <Text style={[styles.guideRowSub, { color: pal.t3 }]}>{g.sub}</Text>
+                <Text style={styles.guideRowTitle}>{g.title}</Text>
+                <Text style={styles.guideRowSub}>{g.sub}</Text>
               </View>
             </View>
           ))}
@@ -436,16 +456,22 @@ export default function UploadScreen({ navigation }) {
 
       {/* ── 재고 등록 확인 모달 ── */}
       <Modal visible={stockModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: pal.bg }}>
-          <View style={[styles.modalHeader, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx }]}>📦 재고 등록</Text>
+        <View style={{ flex: 1, backgroundColor: C.bg }}>
+          {/* V5 modal header with red accent */}
+          <View style={styles.modalHeader}>
+            <View style={styles.modalHeaderAccent} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Ionicons name="cube" size={20} color={C.red} />
+              <Text style={styles.modalTitle}>재고 등록</Text>
+            </View>
             <TouchableOpacity onPress={() => setStockModal(false)}>
-              <Text style={{ fontSize: 20, color: pal.t2 }}>✕</Text>
+              <Ionicons name="close" size={22} color={C.t3} />
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
-            <View style={[styles.modalNotice, { backgroundColor: isDark ? '#1a3a1a' : '#f0fdf4', borderColor: '#22c55e' }]}>
-              <Text style={{ fontSize: fontSize.xs, color: '#16a34a', fontWeight: '600', lineHeight: 20 }}>
+          <ScrollView contentContainerStyle={{ padding: 24 }}>
+            <View style={styles.modalNotice}>
+              <Ionicons name="information-circle" size={16} color={C.ok} style={{ marginRight: 6, marginTop: 2 }} />
+              <Text style={{ fontSize: F.xs, color: C.ok, fontWeight: '600', lineHeight: 20, flex: 1 }}>
                 OCR로 인식한 내용을 확인·수정 후 등록하세요.{'\n'}소비기한과 판매가는 직접 입력이 필요합니다.
               </Text>
             </View>
@@ -458,12 +484,12 @@ export default function UploadScreen({ navigation }) {
               { label: '판매가 (원/kg)', key: 'sellPrice', placeholder: '예: 158000', keyboard: 'number-pad' },
               { label: '소비기한 * (YYYY.MM.DD)', key: 'expire', placeholder: '예: 2026.04.12', keyboard: 'default' },
             ].map(f => (
-              <View key={f.key} style={{ marginBottom: spacing.md }}>
-                <Text style={[styles.fieldLabel, { color: pal.t2 }]}>{f.label}</Text>
+              <View key={f.key} style={{ marginBottom: 16 }}>
+                <Text style={styles.fieldLabel}>{f.label}</Text>
                 <TextInput
-                  style={[styles.fieldInput, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
+                  style={styles.fieldInput}
                   placeholder={f.placeholder}
-                  placeholderTextColor={pal.t3}
+                  placeholderTextColor={C.t4}
                   keyboardType={f.keyboard}
                   value={stockForm[f.key]}
                   onChangeText={v => setStockForm(prev => ({ ...prev, [f.key]: v }))}
@@ -477,12 +503,15 @@ export default function UploadScreen({ navigation }) {
               disabled={saving}>
               {saving
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.confirmBtnText}>✅ 재고에 추가</Text>}
+                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                    <Text style={styles.confirmBtnText}>재고에 추가</Text>
+                  </View>}
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.cancelBtn, { borderColor: pal.bd, marginTop: spacing.sm }]}
+              style={[styles.cancelBtn, { marginTop: 10 }]}
               onPress={() => setStockModal(false)}>
-              <Text style={[styles.cancelBtnText, { color: pal.t2 }]}>취소</Text>
+              <Text style={styles.cancelBtnText}>취소</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -494,77 +523,76 @@ export default function UploadScreen({ navigation }) {
 const styles = StyleSheet.create({
   demoBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a',
-    borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md,
+    backgroundColor: C.warnS, borderWidth: 1, borderColor: C.warn2 + '40',
+    borderRadius: R.md, padding: 16, marginBottom: 16,
   },
-  demoBannerIcon: { fontSize: 20 },
-  demoBannerTitle: { fontSize: fontSize.sm, fontWeight: '800', color: '#92400e', marginBottom: 2 },
-  demoBannerSub: { fontSize: fontSize.xs, color: '#b45309', lineHeight: 18 },
+  demoBannerTitle: { fontSize: F.sm, fontWeight: '800', color: '#92400e', marginBottom: 2 },
+  demoBannerSub: { fontSize: F.xs, color: C.warn, lineHeight: 18 },
 
-  sectionTitle: { fontSize: fontSize.md, fontWeight: '800', marginBottom: spacing.sm },
+  sectionTitle: { fontSize: F.body, fontWeight: '800', color: C.t1 },
 
   typeBtn: {
     alignItems: 'center', borderWidth: 1.5,
-    borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 16, minWidth: 80,
+    borderRadius: R.md, paddingVertical: 12, paddingHorizontal: 16, minWidth: 80,
+    backgroundColor: C.white, borderColor: C.border,
   },
-  typeIcon:  { fontSize: 24, marginBottom: 5 },
-  typeLabel: { fontSize: fontSize.xs, fontWeight: '600', textAlign: 'center' },
+  typeLabel: { fontSize: F.xs, fontWeight: '600', textAlign: 'center', color: C.t2, marginTop: 5 },
 
   categoryBadge: {
-    borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 8,
-    marginBottom: spacing.sm, marginTop: 4,
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderRadius: R.sm, paddingHorizontal: 12, paddingVertical: 8,
+    marginBottom: 10, marginTop: 4,
   },
 
   uploadZone: {
-    borderWidth: 2, borderStyle: 'dashed',
-    borderRadius: radius.lg, marginBottom: spacing.md,
+    borderWidth: 2, borderStyle: 'dashed', borderColor: C.border,
+    borderRadius: R.lg, marginBottom: 16, backgroundColor: C.white,
     minHeight: 160, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   preview:      { width: '100%', height: 220, resizeMode: 'contain' },
-  clearBtn:     { padding: spacing.sm, alignSelf: 'center', marginBottom: spacing.sm },
-  clearBtnText: { fontSize: fontSize.sm, color: colors.rd, fontWeight: '700' },
-  uploadTitle:  { fontSize: fontSize.md, fontWeight: '800', marginBottom: 6 },
-  uploadSub:    { fontSize: fontSize.xs },
+  clearBtn:     { flexDirection: 'row', alignItems: 'center', padding: 10, alignSelf: 'center', marginBottom: 10 },
+  clearBtnText: { fontSize: F.sm, color: C.red3, fontWeight: '700' },
+  uploadTitle:  { fontSize: F.body, fontWeight: '800', marginBottom: 6, color: C.t1 },
+  uploadSub:    { fontSize: F.xs, color: C.t3 },
 
-  btnRow:     { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
-  imgBtn:     { flex: 1, paddingVertical: 14, borderRadius: radius.md, alignItems: 'center', gap: 4 },
-  imgBtnIcon: { fontSize: 22 },
-  imgBtnText: { color: '#fff', fontSize: fontSize.sm, fontWeight: '800' },
+  btnRow:     { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  imgBtn:     { flex: 1, flexDirection: 'row', paddingVertical: 14, borderRadius: R.md, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  imgBtnText: { color: '#fff', fontSize: F.sm, fontWeight: '800' },
 
   ocrBtn: {
-    backgroundColor: colors.pu, paddingVertical: 16, borderRadius: radius.md,
-    alignItems: 'center', marginBottom: spacing.md,
+    backgroundColor: C.pur, paddingVertical: 16, borderRadius: R.md,
+    alignItems: 'center', marginBottom: 16,
   },
-  ocrBtnText: { color: '#fff', fontSize: fontSize.md, fontWeight: '900', letterSpacing: 0.3 },
+  ocrBtnText: { color: '#fff', fontSize: F.body, fontWeight: '900', letterSpacing: 0.3 },
 
-  resultCard:   { borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden', marginBottom: spacing.md },
-  resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1 },
-  resultTitle:  { fontSize: fontSize.md, fontWeight: '800' },
-  modeBadge:    { backgroundColor: '#f3e8ff', borderWidth: 1, borderColor: '#e9d5ff', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  modeBadgeText:{ fontSize: fontSize.xs, color: colors.pu, fontWeight: '800' },
-  demoNotice:   { backgroundColor: '#fffbeb', padding: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#fde68a' },
-  demoNoticeText:{ fontSize: fontSize.xs, color: '#92400e', fontWeight: '600' },
-  resultRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 12, borderBottomWidth: 1 },
-  resultKey:    { fontSize: fontSize.sm, width: 130, fontWeight: '600' },
-  resultVal:    { fontSize: fontSize.sm, flex: 1, fontWeight: '700' },
-  resultBtns:   { flexDirection: 'row', gap: spacing.sm, padding: spacing.md },
-  saveBtn:      { flex: 1, backgroundColor: colors.gn, paddingVertical: 13, borderRadius: radius.md, alignItems: 'center' },
-  saveBtnText:  { color: '#fff', fontSize: fontSize.sm, fontWeight: '800' },
-  cancelBtn:    { flex: 1, borderWidth: 1.5, paddingVertical: 13, borderRadius: radius.md, alignItems: 'center' },
-  cancelBtnText:{ fontSize: fontSize.sm, fontWeight: '600' },
+  resultCard:   { borderRadius: R.lg, borderWidth: 1, borderColor: C.border, overflow: 'hidden', marginBottom: 16, backgroundColor: C.white },
+  resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.bg2 },
+  resultTitle:  { fontSize: F.body, fontWeight: '800', color: C.t1 },
+  modeBadge:    { flexDirection: 'row', alignItems: 'center', backgroundColor: C.purS, borderWidth: 1, borderColor: C.pur + '30', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  modeBadgeText:{ fontSize: F.xs, color: C.pur, fontWeight: '800' },
+  demoNotice:   { flexDirection: 'row', alignItems: 'center', backgroundColor: C.warnS, padding: 10, borderBottomWidth: 1, borderBottomColor: C.warn2 + '30' },
+  demoNoticeText:{ fontSize: F.xs, color: '#92400e', fontWeight: '600' },
+  resultRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border + '50' },
+  resultKey:    { fontSize: F.sm, width: 130, fontWeight: '600', color: C.t3 },
+  resultVal:    { fontSize: F.sm, flex: 1, fontWeight: '700', color: C.t1 },
+  resultBtns:   { flexDirection: 'row', gap: 10, padding: 16 },
+  saveBtn:      { flex: 1, backgroundColor: C.ok, paddingVertical: 13, borderRadius: R.md, alignItems: 'center', justifyContent: 'center' },
+  saveBtnText:  { color: '#fff', fontSize: F.sm, fontWeight: '800' },
+  cancelBtn:    { flex: 1, borderWidth: 1.5, borderColor: C.border, paddingVertical: 13, borderRadius: R.md, alignItems: 'center' },
+  cancelBtnText:{ fontSize: F.sm, fontWeight: '600', color: C.t2 },
 
-  guideCard:     { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginTop: spacing.sm },
-  guideTitle:    { fontSize: fontSize.md, fontWeight: '800', marginBottom: spacing.md },
-  guideRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: spacing.md },
-  guideIcon:     { fontSize: 24, marginTop: 2 },
-  guideRowTitle: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 3 },
-  guideRowSub:   { fontSize: fontSize.xs, lineHeight: 19 },
+  guideCard:     { borderRadius: R.lg, borderWidth: 1, borderColor: C.border, padding: 16, marginTop: 10, backgroundColor: C.white, ...SH.sm },
+  guideTitle:    { fontSize: F.body, fontWeight: '800', color: C.t1 },
+  guideRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: 16 },
+  guideRowTitle: { fontSize: F.sm, fontWeight: '700', marginBottom: 3, color: C.t1 },
+  guideRowSub:   { fontSize: F.xs, lineHeight: 19, color: C.t3 },
 
-  modalHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1 },
-  modalTitle:      { fontSize: fontSize.lg, fontWeight: '900' },
-  modalNotice:     { borderWidth: 1, borderRadius: radius.sm, padding: 12, marginBottom: spacing.lg },
-  fieldLabel:      { fontSize: fontSize.sm, fontWeight: '700', marginBottom: 6 },
-  fieldInput:      { borderWidth: 1.5, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 12, fontSize: fontSize.md },
-  confirmBtn:      { backgroundColor: colors.gn, paddingVertical: 16, borderRadius: radius.md, alignItems: 'center', marginTop: spacing.sm },
-  confirmBtnText:  { color: '#fff', fontSize: fontSize.md, fontWeight: '900' },
+  modalHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.white },
+  modalHeaderAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: C.red },
+  modalTitle:      { fontSize: F.h3, fontWeight: '900', color: C.t1 },
+  modalNotice:     { flexDirection: 'row', borderWidth: 1, borderColor: C.ok2 + '30', backgroundColor: C.okS, borderRadius: R.sm, padding: 12, marginBottom: 24 },
+  fieldLabel:      { fontSize: F.sm, fontWeight: '700', marginBottom: 6, color: C.t2 },
+  fieldInput:      { borderWidth: 1.5, borderRadius: R.sm, paddingHorizontal: 14, paddingVertical: 12, fontSize: F.body, backgroundColor: C.white, borderColor: C.border, color: C.t1 },
+  confirmBtn:      { backgroundColor: C.ok, paddingVertical: 16, borderRadius: R.md, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  confirmBtnText:  { color: '#fff', fontSize: F.body, fontWeight: '900' },
 });

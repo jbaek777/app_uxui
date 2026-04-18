@@ -3,6 +3,7 @@ import { registerRootComponent } from 'expo';
 import React, { useState, useEffect } from 'react';
 import { View, Text, Platform, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -27,6 +28,9 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import ScanScreen from './src/screens/ScanScreen';
 import AgingScreen from './src/screens/AgingScreen';
 import InventoryScreen from './src/screens/InventoryScreen';
+import CarcassWeighingScreen from './src/screens/CarcassWeighingScreen';
+import CarcassHistoryScreen from './src/screens/CarcassHistoryScreen';
+import CarcassSessionDetailScreen from './src/screens/CarcassSessionDetailScreen';
 import DocumentScreen from './src/screens/DocumentScreen';
 import HygieneScreen from './src/screens/HygieneScreen';
 import ClosingScreen from './src/screens/ClosingScreen';
@@ -81,6 +85,9 @@ function InventoryStack() {
   return (
     <Stack.Navigator screenOptions={headerOpts}>
       <Stack.Screen name="Inventory" component={InventoryScreen} options={{ title: '📦 재고·수율' }} />
+      <Stack.Screen name="CarcassWeighing" component={CarcassWeighingScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="CarcassHistory" component={CarcassHistoryScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="CarcassSessionDetail" component={CarcassSessionDetailScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -116,19 +123,32 @@ function SettingsStack({ bizData }) {
   );
 }
 
-// ── 탭 아이콘 + 레이블 ───────────────────────────────────
-function TabIcon({ emoji, label, focused, tabColor, pal }) {
+// ── 탭 아이콘 + 레이블 (HTML 프로토타입 V5 스타일) ──────────
+function TabIcon({ iconOn, iconOff, label, focused }) {
+  const RED = '#B91C1C';
+  const GRAY = '#94A3B8';
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-      <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>
+    <View style={{ alignItems: 'center', justifyContent: 'center', paddingTop: 2 }}>
+      <Ionicons
+        name={focused ? iconOn : iconOff}
+        size={24}
+        color={focused ? RED : GRAY}
+        style={{ marginBottom: 3 }}
+      />
       <Text style={{
-        fontSize: 13,
-        fontWeight: focused ? '800' : '600',
-        color: focused ? tabColor : pal.t3,
-        textAlign: 'center',
+        fontSize: 10,
+        fontWeight: focused ? '800' : '500',
+        color: focused ? RED : GRAY,
+        letterSpacing: -0.2,
       }}>
         {label}
       </Text>
+      {focused && (
+        <View style={{
+          width: 4, height: 4, borderRadius: 2,
+          backgroundColor: RED, marginTop: 3,
+        }} />
+      )}
     </View>
   );
 }
@@ -181,10 +201,8 @@ function MainTabs({ bizData }) {
   const isStaff = role === 'staff';
   const insets = useSafeAreaInsets();
 
-  // Safe Area 반영 탭바 높이
-  // iOS: 50 + 홈인디케이터(insets.bottom)
-  // Android: 56 + 소프트 내비게이션 바(insets.bottom)
-  const TAB_H = (Platform.OS === 'ios' ? 50 : 56) + insets.bottom;
+  // Safe Area 반영 탭바 높이 — HTML 프로토타입: padding 10px top + 22px bottom
+  const TAB_H = 60 + insets.bottom;
 
   return (
     <View style={{ flex: 1 }}>
@@ -193,44 +211,63 @@ function MainTabs({ bizData }) {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: pal.s1,
-            borderTopColor: pal.bd,
+            backgroundColor: 'rgba(242,244,248,0.98)',
+            borderTopColor: '#E2E8F0',
             borderTopWidth: 1,
             height: TAB_H,
-            paddingBottom: insets.bottom + (Platform.OS === 'ios' ? 0 : 4),
-            paddingTop: 6,
+            paddingBottom: insets.bottom,
+            paddingTop: 0,
+            elevation: 0,
           },
           tabBarShowLabel: false,
         }}
       >
+        {/* 1. 홈 */}
         <Tab.Screen
           name="HomeTab"
           component={HomeStack}
-          options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="홈" focused={focused} tabColor={pal.ac} pal={pal} /> }}
+          options={{
+            tabBarIcon: ({ focused }) =>
+              <TabIcon iconOn="home" iconOff="home-outline" label="홈" focused={focused} />,
+          }}
         />
-        <Tab.Screen
-          name="TraceTab"
-          component={TraceStack}
-          options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" label="스캔" focused={focused} tabColor={pal.a2} pal={pal} /> }}
-        />
-        {/* 재고 탭 — 사장만 */}
+        {/* 2. 재고 — 사장만 */}
         {!isStaff && (
           <Tab.Screen
             name="InventoryTab"
             component={InventoryStack}
-            options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📦" label="재고" focused={focused} tabColor={pal.gn} pal={pal} /> }}
+            options={{
+              tabBarIcon: ({ focused }) =>
+                <TabIcon iconOn="cube" iconOff="cube-outline" label="재고" focused={focused} />,
+            }}
           />
         )}
+        {/* 3. 조회/스캔 */}
+        <Tab.Screen
+          name="TraceTab"
+          component={TraceStack}
+          options={{
+            tabBarIcon: ({ focused }) =>
+              <TabIcon iconOn="scan" iconOff="scan-outline" label="조회" focused={focused} />,
+          }}
+        />
+        {/* 4. 서류 */}
         <Tab.Screen
           name="DocsTab"
           component={DocsStack}
-          options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🖨️" label="서류" focused={focused} tabColor={pal.pu} pal={pal} /> }}
+          options={{
+            tabBarIcon: ({ focused }) =>
+              <TabIcon iconOn="document-text" iconOff="document-text-outline" label="서류" focused={focused} />,
+          }}
         />
-        {/* 설정 탭 — 사장만 */}
+        {/* 5. 설정 — 사장만 */}
         {!isStaff && (
           <Tab.Screen
             name="SettingsTab"
-            options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" label="설정" focused={focused} tabColor={pal.cyan} pal={pal} /> }}
+            options={{
+              tabBarIcon: ({ focused }) =>
+                <TabIcon iconOn="settings" iconOff="settings-outline" label="설정" focused={focused} />,
+            }}
           >
             {() => <SettingsStack bizData={bizData} />}
           </Tab.Screen>
@@ -241,12 +278,11 @@ function MainTabs({ bizData }) {
             name="OwnerTab"
             component={OwnerReturnScreen}
             options={{
-              tabBarIcon: ({ focused }) => <TabIcon emoji="🔐" label="사장전환" focused={focused} tabColor="#E8950A" pal={pal} />,
+              tabBarIcon: ({ focused }) =>
+                <TabIcon iconOn="lock-closed" iconOff="lock-closed-outline" label="사장전환" focused={focused} />,
             }}
             listeners={({ navigation }) => ({
-              tabPress: (e) => {
-                e.preventDefault();
-              },
+              tabPress: (e) => { e.preventDefault(); },
             })}
           />
         )}

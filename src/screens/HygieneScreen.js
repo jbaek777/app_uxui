@@ -5,8 +5,8 @@ import {
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
-import { colors, darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
-import { useTheme } from '../lib/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
+import { C, F, R, SH } from '../lib/v5';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { hygieneStore } from '../lib/dataStore';
 
@@ -25,12 +25,20 @@ const sharePDF = async (html, filename) => {
   await Sharing.shareAsync(dest, { mimeType: 'application/pdf', dialogTitle: filename });
 };
 
+// ── 카테고리 아이콘 매핑 ─────────────────────────────────────
+const CAT_ICONS = {
+  personal: 'hand-left-outline',
+  before:   'search-outline',
+  during:   'cog-outline',
+  after:    'checkmark-circle-outline',
+};
+
 // ── 자체위생관리점검표 구조 ──────────────────────────────────
 const CATEGORIES = [
   {
     id: 'personal',
     label: '개인위생 (공통)',
-    icon: '🙌',
+    icon: 'hand-left-outline',
     items: [
       '건강상태 (설사, 구토, 발열, 황달, 화농성 상처 등) 이상 없음',
       '청결한 위생복 (위생모, 위생화, 앞치마 등) 착용',
@@ -42,7 +50,7 @@ const CATEGORIES = [
   {
     id: 'before',
     label: '작업전 위생상태',
-    icon: '🔍',
+    icon: 'search-outline',
     items: [
       '작업장 바닥, 벽 청결 상태',
       '작업대 및 도마 세척·소독 상태',
@@ -58,7 +66,7 @@ const CATEGORIES = [
   {
     id: 'during',
     label: '작업중 위생상태',
-    icon: '⚙️',
+    icon: 'cog-outline',
     items: [
       '원료육 해동 방법 적절 (냉장 해동 또는 흐르는 물)',
       '교차오염 방지 (원료육·가공품·완제품 분리)',
@@ -75,7 +83,7 @@ const CATEGORIES = [
   {
     id: 'after',
     label: '작업후 위생상태',
-    icon: '✅',
+    icon: 'checkmark-circle-outline',
     items: [
       '작업대, 도마, 칼 등 세척·소독 후 건조',
       '작업장 바닥, 벽, 배수로 청소 및 소독',
@@ -93,8 +101,6 @@ const OX_OPTIONS = [
 ];
 
 export default function HygieneScreen() {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
   const [logs, setLogs] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const isFirst = useRef(true);
@@ -160,7 +166,7 @@ export default function HygieneScreen() {
     setLogs(prev => [newLog, ...prev]);
     hygieneStore.addLog(newLog);
     setModal(false);
-    Alert.alert('점검 완료 ✓', `위생점검이 저장되었습니다.\n결과: ${status === 'pass' ? '✅ 적합' : status === 'warning' ? '⚠ 보통' : '❌ 불량'}`);
+    Alert.alert('점검 완료', `위생점검이 저장되었습니다.\n결과: ${status === 'pass' ? '적합' : status === 'warning' ? '보통' : '불량'}`);
   };
 
   const handleExportPDF = async (log) => {
@@ -211,17 +217,30 @@ export default function HygieneScreen() {
   const hygieneScore = logs.length === 0 ? '--' : Math.round((pass / logs.length) * 100);
 
   return (
-    <View style={[styles.container, { backgroundColor: pal.bg }]}>
-      <View style={styles.statRow}>
-        <StatBox value={`${logs.length}건`} label="이번 달" color={pal.a2} pal={pal} />
-        <StatBox value={`${pass}건`} label="적합 판정" color={pal.gn} pal={pal} />
-        <StatBox value={logs.length === 0 ? '--점' : `${hygieneScore}점`} label="위생 점수" color={pal.ac} pal={pal} />
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* ── V5 헤더 ── */}
+      <View style={styles.v5Header}>
+        <View style={styles.v5HeaderAccent} />
+        <View style={styles.v5HeaderRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+            <View style={{ width: 33, height: 33, borderRadius: R.sm, backgroundColor: C.red, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="shield-checkmark" size={17} color="#fff" />
+            </View>
+            <Text style={styles.v5PageTitle}>위생 점검</Text>
+          </View>
+        </View>
       </View>
 
-      <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm }}>
-        <PrimaryBtn label="📋 자체위생관리점검 시작" onPress={openModal} />
+      <View style={styles.statRow}>
+        <StatBox value={`${logs.length}건`} label="이번 달" color={C.red2} />
+        <StatBox value={`${pass}건`} label="적합 판정" color={C.ok2} />
+        <StatBox value={logs.length === 0 ? '--점' : `${hygieneScore}점`} label="위생 점수" color={C.red} />
+      </View>
+
+      <View style={{ paddingHorizontal: 24, marginBottom: 16, gap: 8 }}>
+        <PrimaryBtn label="자체위생관리점검 시작" onPress={openModal} />
         <OutlineBtn
-          label="📅 월별 PDF 내보내기"
+          label="월별 PDF 내보내기"
           onPress={() => {
             if (logs.length === 0) { Alert.alert('기록 없음', '내보낼 점검 기록이 없습니다.'); return; }
             setMonthModal(true);
@@ -229,32 +248,39 @@ export default function HygieneScreen() {
         />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}>
+      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 100 }}>
         {logs.length === 0 && (
-          <View style={[styles.emptyBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-            <Text style={{ fontSize: 40, marginBottom: 10 }}>🧼</Text>
-            <Text style={[styles.emptyTitle, { color: pal.tx }]}>아직 점검 기록이 없습니다</Text>
-            <Text style={[styles.emptyDesc, { color: pal.t3 }]}>위의 버튼을 눌러 오늘의 위생점검을 시작하세요</Text>
+          <View style={styles.emptyBox}>
+            <Ionicons name="sparkles-outline" size={40} color={C.t4} style={{ marginBottom: 10 }} />
+            <Text style={styles.emptyTitle}>아직 점검 기록이 없습니다</Text>
+            <Text style={styles.emptyDesc}>위의 버튼을 눌러 오늘의 위생점검을 시작하세요</Text>
           </View>
         )}
         {logs.map(log => {
-          const statusColor = log.status === 'pass' ? pal.gn : log.status === 'warning' ? pal.yw : pal.rd;
+          const statusColor = log.status === 'pass' ? C.ok2 : log.status === 'warning' ? C.warn2 : C.red2;
+          const statusBg = log.status === 'pass' ? C.okS : log.status === 'warning' ? C.warnS : C.redS;
           return (
           <TouchableOpacity key={log.id} activeOpacity={0.85} onPress={() => handleExportPDF(log)}>
-            <View style={[styles.logCard, { backgroundColor: pal.s1, borderColor: pal.bd, overflow: 'hidden' }]}>
+            <View style={[styles.logCard, { overflow: 'hidden' }]}>
               <View style={[styles.logAccent, { backgroundColor: statusColor }]} />
               <View style={styles.logTop}>
                 <View>
-                  <Text style={[styles.logDate, { color: pal.tx }]}>{log.date} {log.time}</Text>
-                  <Text style={[styles.logMeta, { color: pal.t3 }]}>점검자: {log.inspector}</Text>
+                  <Text style={styles.logDate}>{log.date} {log.time}</Text>
+                  <Text style={styles.logMeta}>점검자: {log.inspector}</Text>
                 </View>
-                <View style={[styles.badge, { backgroundColor: log.status === 'pass' ? pal.gn + '20' : log.status === 'warning' ? pal.yw + '20' : pal.rd + '20' }]}>
-                  <Text style={[styles.badgeText, { color: log.status === 'pass' ? pal.gn : log.status === 'warning' ? pal.yw : pal.rd }]}>
-                    {log.status === 'pass' ? '✅ 적합' : log.status === 'warning' ? '⚠ 보통' : '❌ 불량'}
+                <View style={[styles.badge, { backgroundColor: statusBg }]}>
+                  <Ionicons
+                    name={log.status === 'pass' ? 'checkmark-circle' : log.status === 'warning' ? 'warning' : 'close-circle'}
+                    size={14}
+                    color={statusColor}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={[styles.badgeText, { color: statusColor }]}>
+                    {log.status === 'pass' ? '적합' : log.status === 'warning' ? '보통' : '불량'}
                   </Text>
                 </View>
               </View>
-              <Text style={[styles.pdfHint, { color: pal.t3 }]}>탭하여 PDF 내보내기 →</Text>
+              <Text style={styles.pdfHint}>탭하여 PDF 내보내기</Text>
             </View>
           </TouchableOpacity>
           );
@@ -264,25 +290,25 @@ export default function HygieneScreen() {
       {/* 월 선택 모달 */}
       <Modal visible={monthModal} animationType="slide" transparent>
         <View style={styles.monthOverlay}>
-          <View style={[styles.monthSheet, { backgroundColor: pal.bg, borderColor: pal.bd }]}>
-            <View style={[styles.monthHeader, { borderBottomColor: pal.bd }]}>
-              <Text style={[styles.monthTitle, { color: pal.tx }]}>월 선택</Text>
+          <View style={styles.monthSheet}>
+            <View style={styles.monthHeader}>
+              <Text style={styles.monthTitle}>월 선택</Text>
               <TouchableOpacity onPress={() => setMonthModal(false)}>
-                <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
+                <Text style={styles.closeBtn}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ padding: spacing.md }}>
+            <ScrollView contentContainerStyle={{ padding: 16 }}>
               {availableMonths.map(m => (
                 <TouchableOpacity
                   key={m.year + m.month}
-                  style={[styles.monthItem, { backgroundColor: pal.s1, borderColor: pal.bd }]}
+                  style={styles.monthItem}
                   onPress={() => handleMonthlyExport(m)}
                 >
                   <View>
-                    <Text style={[styles.monthItemLabel, { color: pal.tx }]}>{m.label}</Text>
-                    <Text style={[styles.monthItemCount, { color: pal.t3 }]}>점검 {m.count}건</Text>
+                    <Text style={styles.monthItemLabel}>{m.label}</Text>
+                    <Text style={styles.monthItemCount}>점검 {m.count}건</Text>
                   </View>
-                  <Text style={[styles.monthItemArrow, { color: pal.ac }]}>PDF →</Text>
+                  <Text style={styles.monthItemArrow}>PDF</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -292,38 +318,38 @@ export default function HygieneScreen() {
 
       {/* 점검 모달 */}
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.modalWrap, { backgroundColor: pal.bg }]}>
-          <View style={[styles.modalHeader, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
-            <Text style={[styles.modalTitle, { color: pal.tx }]}>
+        <View style={{ flex: 1, backgroundColor: C.bg }}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
               {page === 0 ? '자체위생관리점검' : page <= CATEGORIES.length ? CATEGORIES[page - 1].label : '점검자 확인'}
             </Text>
             <TouchableOpacity onPress={() => setModal(false)}>
-              <Text style={[styles.closeBtn, { color: pal.t2 }]}>✕</Text>
+              <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
 
           {/* 진행 표시 */}
           {page > 0 && (
-            <View style={[styles.progressWrap, { backgroundColor: pal.bd }]}>
-              <View style={[styles.progressFill, { width: `${(page / (CATEGORIES.length + 1)) * 100}%`, backgroundColor: pal.ac }]} />
+            <View style={styles.progressWrap}>
+              <View style={[styles.progressFill, { width: `${(page / (CATEGORIES.length + 1)) * 100}%` }]} />
             </View>
           )}
 
           {/* 시작 화면 */}
           {page === 0 && (
             <View style={styles.stepWrap}>
-              <Text style={[styles.stepTitle, { color: pal.tx }]}>자체위생관리{'\n'}점검을 시작합니다</Text>
-              <Text style={[styles.stepDesc, { color: pal.t3 }]}>
+              <Text style={styles.stepTitle}>자체위생관리{'\n'}점검을 시작합니다</Text>
+              <Text style={styles.stepDesc}>
                 총 4단계, 29개 항목을 순서대로 점검합니다.{'\n'}각 항목에 O(양호) / △(보통) / X(불량)을 선택하세요.
               </Text>
               {CATEGORIES.map((cat, i) => (
-                <View key={cat.id} style={[styles.stepPreview, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-                  <Text style={{ fontSize: 22 }}>{cat.icon}</Text>
-                  <Text style={[styles.stepPreviewLabel, { color: pal.tx }]}>{i + 1}단계 · {cat.label}</Text>
-                  <Text style={[styles.stepPreviewCount, { color: pal.t3 }]}>{cat.items.length}항목</Text>
+                <View key={cat.id} style={styles.stepPreview}>
+                  <Ionicons name={cat.icon} size={22} color={C.red} />
+                  <Text style={styles.stepPreviewLabel}>{i + 1}단계 · {cat.label}</Text>
+                  <Text style={styles.stepPreviewCount}>{cat.items.length}항목</Text>
                 </View>
               ))}
-              <PrimaryBtn label="점검 시작 →" onPress={() => setPage(1)} style={{ marginTop: spacing.xl }} />
+              <PrimaryBtn label="점검 시작" onPress={() => setPage(1)} style={{ marginTop: 32 }} />
             </View>
           )}
 
@@ -333,22 +359,25 @@ export default function HygieneScreen() {
             const done = isCatDone(cat);
             return (
               <>
-                <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}>
-                  <Text style={[styles.catDesc, { color: pal.t3 }]}>{cat.icon} {cat.label} — {cat.items.length}개 항목</Text>
+                <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
+                    <Ionicons name={cat.icon} size={18} color={C.t3} />
+                    <Text style={styles.catDesc}>{cat.label} — {cat.items.length}개 항목</Text>
+                  </View>
                   {cat.items.map((item, i) => {
                     const val = checks[`${cat.id}_${i}`];
                     return (
-                      <View key={i} style={[styles.checkItem, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-                        <Text style={[styles.checkNum, { color: pal.t3 }]}>{i + 1}</Text>
-                        <Text style={[styles.checkLabel, { color: pal.tx, flex: 1 }]}>{item}</Text>
+                      <View key={i} style={styles.checkItem}>
+                        <Text style={styles.checkNum}>{i + 1}</Text>
+                        <Text style={[styles.checkLabel, { flex: 1 }]}>{item}</Text>
                         <View style={styles.oxRow}>
                           {OX_OPTIONS.map(opt => (
                             <TouchableOpacity
                               key={opt.value}
-                              style={[styles.oxBtn, { borderColor: val === opt.value ? opt.color : pal.bd, backgroundColor: val === opt.value ? opt.color + '20' : pal.s2 }]}
+                              style={[styles.oxBtn, { borderColor: val === opt.value ? opt.color : C.border, backgroundColor: val === opt.value ? opt.color + '20' : C.bg2 }]}
                               onPress={() => setItemCheck(cat.id, i, opt.value)}
                             >
-                              <Text style={[styles.oxLabel, { color: val === opt.value ? opt.color : pal.t3, fontWeight: val === opt.value ? '900' : '600' }]}>
+                              <Text style={[styles.oxLabel, { color: val === opt.value ? opt.color : C.t3, fontWeight: val === opt.value ? '900' : '600' }]}>
                                 {opt.label}
                               </Text>
                             </TouchableOpacity>
@@ -358,12 +387,12 @@ export default function HygieneScreen() {
                     );
                   })}
 
-                  <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg }}>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 24 }}>
                     {page > 1 && (
-                      <OutlineBtn label="← 이전" onPress={() => setPage(p => p - 1)} style={{ flex: 1 }} />
+                      <OutlineBtn label="이전" onPress={() => setPage(p => p - 1)} style={{ flex: 1 }} />
                     )}
                     <PrimaryBtn
-                      label={done ? (page < CATEGORIES.length ? `다음 단계 →` : '마지막 단계 →') : `${cat.items.filter((_, i) => !checks[`${cat.id}_${i}`]).length}개 남음`}
+                      label={done ? (page < CATEGORIES.length ? '다음 단계' : '마지막 단계') : `${cat.items.filter((_, i) => !checks[`${cat.id}_${i}`]).length}개 남음`}
                       onPress={done ? () => setPage(p => p + 1) : undefined}
                       style={{ flex: 2, opacity: done ? 1 : 0.5 }}
                     />
@@ -376,24 +405,27 @@ export default function HygieneScreen() {
           {/* 점검자 입력 + 최종 저장 */}
           {page === CATEGORIES.length + 1 && (
             <View style={styles.stepWrap}>
-              <Text style={[styles.stepTitle, { color: pal.tx }]}>점검 완료!</Text>
+              <Text style={styles.stepTitle}>점검 완료!</Text>
               <View style={styles.resultRow}>
                 <ResultChip count={Object.values(checks).filter(v => v === 'O').length} label="양호" color="#22c55e" />
                 <ResultChip count={Object.values(checks).filter(v => v === '△').length} label="보통" color="#f59e0b" />
                 <ResultChip count={Object.values(checks).filter(v => v === 'X').length} label="불량" color="#ef4444" />
               </View>
-              <View style={[styles.inspectorBox, { backgroundColor: pal.s1, borderColor: pal.a2 + '60' }]}>
-                <Text style={[styles.inspectorLabel, { color: pal.a2 }]}>✍️ 점검자 이름</Text>
+              <View style={styles.inspectorBox}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <Ionicons name="create-outline" size={16} color={C.red2} />
+                  <Text style={styles.inspectorLabel}>점검자 이름</Text>
+                </View>
                 <TextInput
-                  style={[styles.inspectorInput, { backgroundColor: pal.s2, borderColor: pal.bd, color: pal.tx }]}
+                  style={styles.inspectorInput}
                   value={inspector}
                   onChangeText={setInspector}
                   placeholder="이름을 입력하세요"
-                  placeholderTextColor={pal.t3}
+                  placeholderTextColor={C.t3}
                 />
               </View>
-              <PrimaryBtn label="✓ 저장하기" onPress={handleSave} style={{ marginTop: spacing.lg }} />
-              <OutlineBtn label="← 이전으로" onPress={() => setPage(CATEGORIES.length)} style={{ marginTop: spacing.sm }} />
+              <PrimaryBtn label="저장하기" onPress={handleSave} style={{ marginTop: 24 }} />
+              <OutlineBtn label="이전으로" onPress={() => setPage(CATEGORIES.length)} style={{ marginTop: 8 }} />
             </View>
           )}
         </View>
@@ -402,12 +434,12 @@ export default function HygieneScreen() {
   );
 }
 
-function StatBox({ value, label, color, pal }) {
+function StatBox({ value, label, color }) {
   return (
-    <View style={[styles.statBox, { backgroundColor: pal.s1, borderColor: pal.bd, overflow: 'hidden' }]}>
+    <View style={[styles.statBox, { overflow: 'hidden' }]}>
       <View style={[styles.statAccent, { backgroundColor: color }]} />
       <Text style={[styles.statVal, { color }]}>{value}</Text>
-      <Text style={[styles.statLbl, { color: pal.t3 }]}>{label}</Text>
+      <Text style={styles.statLbl}>{label}</Text>
     </View>
   );
 }
@@ -512,65 +544,70 @@ function genHygieneLogHTML(log) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  statRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, paddingBottom: spacing.sm },
-  statBox: { flex: 1, borderRadius: radius.md, borderWidth: 1, paddingTop: 16, paddingBottom: 12, paddingHorizontal: spacing.sm, alignItems: 'center' },
-  statAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 4 },
-  statVal: { fontSize: fontSize.lg, fontWeight: '900', marginBottom: 4 },
-  statLbl: { fontSize: fontSize.xxs, fontWeight: '600', textAlign: 'center' },
+  // V5 헤더
+  v5Header:       { backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.border, overflow: 'hidden' },
+  v5HeaderAccent: { height: 3, backgroundColor: C.red, position: 'absolute', top: 0, left: 0, right: 0 },
+  v5HeaderRow:    { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 13, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  v5PageTitle:    { fontSize: F.h2 - 2, fontWeight: '900', color: C.t1, letterSpacing: -0.6 },
 
-  emptyBox: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.xl, alignItems: 'center', marginBottom: spacing.md },
-  emptyTitle: { fontSize: fontSize.md, fontWeight: '800', marginBottom: 6 },
-  emptyDesc: { fontSize: fontSize.sm, textAlign: 'center' },
+  statRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
+  statBox: { flex: 1, borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.white, paddingTop: 16, paddingBottom: 12, paddingHorizontal: 8, alignItems: 'center', ...SH.sm },
+  statAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 4, borderTopLeftRadius: R.md, borderTopRightRadius: R.md },
+  statVal: { fontSize: F.h3, fontWeight: '900', marginBottom: 4 },
+  statLbl: { fontSize: F.xxs, fontWeight: '600', textAlign: 'center', color: C.t3 },
 
-  logCard: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm },
+  emptyBox: { borderRadius: R.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.white, padding: 32, alignItems: 'center', marginBottom: 16, ...SH.sm },
+  emptyTitle: { fontSize: F.body, fontWeight: '800', marginBottom: 6, color: C.t1 },
+  emptyDesc: { fontSize: F.sm, textAlign: 'center', color: C.t3 },
+
+  logCard: { borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.white, padding: 16, marginBottom: 8, ...SH.sm },
   logAccent: { position: 'absolute', top: 0, left: 0, bottom: 0, width: 4 },
   logTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingLeft: 8 },
-  logDate: { fontSize: fontSize.md, fontWeight: '700', marginBottom: 3 },
-  logMeta: { fontSize: fontSize.xs },
-  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  badgeText: { fontSize: fontSize.xs, fontWeight: '800' },
-  pdfHint: { fontSize: 11, marginTop: 6, textAlign: 'right', paddingLeft: 8 },
+  logDate: { fontSize: F.body, fontWeight: '700', marginBottom: 3, color: C.t1 },
+  logMeta: { fontSize: F.xs, color: C.t3 },
+  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: R.full, flexDirection: 'row', alignItems: 'center' },
+  badgeText: { fontSize: F.xs, fontWeight: '800' },
+  pdfHint: { fontSize: F.xxs, marginTop: 6, textAlign: 'right', paddingLeft: 8, color: C.t4 },
 
   modalWrap: { flex: 1 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1 },
-  modalTitle: { fontSize: fontSize.lg, fontWeight: '900' },
-  closeBtn: { fontSize: 22, padding: 4 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.white },
+  modalTitle: { fontSize: F.h3, fontWeight: '900', color: C.t1 },
+  closeBtn: { fontSize: 22, padding: 4, color: C.t2 },
 
-  progressWrap: { height: 5, overflow: 'hidden' },
-  progressFill: { height: 5 },
+  progressWrap: { height: 5, overflow: 'hidden', backgroundColor: C.border },
+  progressFill: { height: 5, backgroundColor: C.red },
 
-  stepWrap: { flex: 1, padding: spacing.lg },
-  stepTitle: { fontSize: fontSize.xxl, fontWeight: '900', lineHeight: 44, marginTop: spacing.sm, marginBottom: spacing.md },
-  stepDesc: { fontSize: fontSize.sm, lineHeight: 22, marginBottom: spacing.lg },
-  stepPreview: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm },
-  stepPreviewLabel: { fontSize: fontSize.sm, fontWeight: '700', flex: 1 },
-  stepPreviewCount: { fontSize: fontSize.xs },
+  stepWrap: { flex: 1, padding: 24 },
+  stepTitle: { fontSize: F.h2, fontWeight: '900', lineHeight: 44, marginTop: 8, marginBottom: 16, color: C.t1 },
+  stepDesc: { fontSize: F.sm, lineHeight: 22, marginBottom: 24, color: C.t3 },
+  stepPreview: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.white, padding: 16, marginBottom: 8, ...SH.sm },
+  stepPreviewLabel: { fontSize: F.sm, fontWeight: '700', flex: 1, color: C.t1 },
+  stepPreviewCount: { fontSize: F.xs, color: C.t3 },
 
-  catDesc: { fontSize: fontSize.sm, fontWeight: '700', marginBottom: spacing.md },
-  checkItem: { borderRadius: radius.sm, borderWidth: 1, padding: spacing.sm, marginBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  checkNum: { fontSize: 11, fontWeight: '800', width: 18, textAlign: 'center' },
-  checkLabel: { fontSize: 13, lineHeight: 18 },
+  catDesc: { fontSize: F.sm, fontWeight: '700', color: C.t3 },
+  checkItem: { borderRadius: R.sm, borderWidth: 1, borderColor: C.border, backgroundColor: C.white, padding: 8, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  checkNum: { fontSize: F.xxs, fontWeight: '800', width: 18, textAlign: 'center', color: C.t3 },
+  checkLabel: { fontSize: F.sm, lineHeight: 18, color: C.t1 },
   oxRow: { flexDirection: 'row', gap: 4 },
-  oxBtn: { width: 36, height: 36, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  oxLabel: { fontSize: 14 },
+  oxBtn: { width: 38, height: 38, borderRadius: R.sm, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  oxLabel: { fontSize: F.body },
 
-  resultRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  resultChip: { flex: 1, borderRadius: radius.md, borderWidth: 1, padding: spacing.md, alignItems: 'center' },
-  resultChipCount: { fontSize: fontSize.xl, fontWeight: '900' },
-  resultChipLabel: { fontSize: fontSize.xs, fontWeight: '700', marginTop: 2 },
+  resultRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
+  resultChip: { flex: 1, borderRadius: R.md, borderWidth: 1, padding: 16, alignItems: 'center' },
+  resultChipCount: { fontSize: F.h2, fontWeight: '900' },
+  resultChipLabel: { fontSize: F.xs, fontWeight: '700', marginTop: 2 },
 
-  inspectorBox: { borderRadius: radius.md, borderWidth: 1.5, padding: spacing.md },
-  inspectorLabel: { fontSize: fontSize.sm, fontWeight: '800', marginBottom: spacing.sm },
-  inspectorInput: { borderWidth: 1.5, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: 14, fontSize: fontSize.md, minHeight: 52 },
+  inspectorBox: { borderRadius: R.md, borderWidth: 1.5, borderColor: C.red2 + '60', backgroundColor: C.white, padding: 16 },
+  inspectorLabel: { fontSize: F.sm, fontWeight: '800', color: C.red2 },
+  inspectorInput: { borderWidth: 1.5, borderColor: C.border, borderRadius: R.sm, paddingHorizontal: 16, paddingVertical: 14, fontSize: F.body, minHeight: 52, backgroundColor: C.bg2, color: C.t1 },
 
   // 월 선택 모달
   monthOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  monthSheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderWidth: 1, maxHeight: '60%' },
-  monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderBottomWidth: 1 },
-  monthTitle: { fontSize: fontSize.lg, fontWeight: '900' },
-  monthItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm },
-  monthItemLabel: { fontSize: fontSize.md, fontWeight: '700', marginBottom: 2 },
-  monthItemCount: { fontSize: fontSize.xs },
-  monthItemArrow: { fontSize: fontSize.sm, fontWeight: '800' },
+  monthSheet: { borderTopLeftRadius: R.xl, borderTopRightRadius: R.xl, borderWidth: 1, borderColor: C.border, backgroundColor: C.bg, maxHeight: '60%' },
+  monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 24, borderBottomWidth: 1, borderBottomColor: C.border },
+  monthTitle: { fontSize: F.h3, fontWeight: '900', color: C.t1 },
+  monthItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.white, padding: 16, marginBottom: 8, ...SH.sm },
+  monthItemLabel: { fontSize: F.body, fontWeight: '700', marginBottom: 2, color: C.t1 },
+  monthItemCount: { fontSize: F.xs, color: C.t3 },
+  monthItemArrow: { fontSize: F.sm, fontWeight: '800', color: C.red },
 });

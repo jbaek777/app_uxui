@@ -10,11 +10,11 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Share, Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
-import { useTheme } from '../lib/ThemeContext';
-import { darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
+import { C, F, R, SH } from '../lib/v5';
 import { meatStore } from '../lib/dataStore';
 import { meats as mockMeats } from '../data/mockData';
 
@@ -149,9 +149,6 @@ function buildCSV(months, bizName) {
 
 // ── 컴포넌트 ────────────────────────────────────────────────
 export default function TaxReportScreen() {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
-
   const [loading, setLoading] = useState(true);
   const [months, setMonths] = useState([]);
   const [bizName, setBizName] = useState('');
@@ -238,8 +235,8 @@ export default function TaxReportScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: pal.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={pal.ac} />
+      <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={C.red} />
       </View>
     );
   }
@@ -249,251 +246,279 @@ export default function TaxReportScreen() {
     : '0.0';
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: pal.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}>
-
-      {/* 헤더 + 연도 선택 */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
-        <View style={{ flex: 1 }}>
-          <Text style={[s.pageTitle, { color: pal.tx }]}>세무 리포트</Text>
-          {bizName ? <Text style={[s.pageSub, { color: pal.t3 }]}>{bizName} · {bizNo}</Text> : null}
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* V5 Header */}
+      <View style={s.v5Header}>
+        <View style={s.v5HeaderAccent} />
+        <View style={s.v5HeaderContent}>
+          <View style={s.v5HeaderIcon}>
+            <Ionicons name="receipt-outline" size={18} color={C.white} />
+          </View>
+          <Text style={s.v5HeaderTitle}>세무 리포트</Text>
         </View>
-        <TouchableOpacity
-          style={[s.exportBtn, { backgroundColor: pal.gn + '20', borderColor: pal.gn + '60' }]}
-          onPress={handleExportCSV}
-          disabled={exporting}
-        >
-          {exporting
-            ? <ActivityIndicator size="small" color={pal.gn} />
-            : <Text style={[s.exportBtnText, { color: pal.gn }]}>📥 CSV</Text>
-          }
-        </TouchableOpacity>
       </View>
 
-      {/* 연도 탭 */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.lg }}>
-        {years.map(y => (
-          <TouchableOpacity
-            key={y}
-            style={[s.yearTab, {
-              backgroundColor: selectedYear === y ? pal.ac : pal.s1,
-              borderColor: selectedYear === y ? pal.ac : pal.bd,
-            }]}
-            onPress={() => setSelectedYear(y)}
-          >
-            <Text style={[s.yearTabText, { color: selectedYear === y ? '#fff' : pal.t2 }]}>{y}년</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
 
-      {filteredMonths.length === 0 ? (
-        <View style={[s.emptyBox, { backgroundColor: pal.s1, borderColor: pal.bd }]}>
-          <Text style={{ fontSize: 40, marginBottom: spacing.sm }}>📊</Text>
-          <Text style={[s.emptyTitle, { color: pal.tx }]}>{selectedYear}년 데이터 없음</Text>
-          <Text style={[s.emptyDesc, { color: pal.t3 }]}>
-            재고를 판매 완료 처리하면{'\n'}자동으로 매출이 집계됩니다
-          </Text>
-        </View>
-      ) : (
-        <>
-          {/* 연간 요약 카드 */}
-          <View style={[s.annualCard, { backgroundColor: pal.s2, borderColor: pal.ac + '40' }]}>
-            <Text style={[s.annualYear, { color: pal.t2 }]}>{selectedYear}년 연간 요약</Text>
-            <View style={s.annualRow}>
-              <StatBox label="총 매출" value={`${fmt(annualTotal.sales)}원`} color={pal.gn} pal={pal} />
-              <StatBox label="총 매입" value={`${fmt(annualTotal.cost)}원`} color={pal.a2} pal={pal} />
-              <StatBox label="마진율" value={`${marginPct}%`} color={pal.cyan} pal={pal} />
-            </View>
-            <View style={[s.taxNotice, { backgroundColor: pal.s1 + '80', borderColor: pal.bd }]}>
-              <Text style={[s.taxNoticeText, { color: pal.t2 }]}>
-                🧾 식육(생육) 면세 · 부가세 신고 시 참고용 자료
-              </Text>
-            </View>
+        {/* 헤더 + 연도 선택 */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}>
+          <View style={{ flex: 1 }}>
+            {bizName ? <Text style={[s.pageSub, { color: C.t3 }]}>{bizName} · {bizNo}</Text> : null}
           </View>
+          <TouchableOpacity
+            style={[s.exportBtn, { backgroundColor: C.okS, borderColor: C.ok2 + '60' }]}
+            onPress={handleExportCSV}
+            disabled={exporting}
+          >
+            {exporting
+              ? <ActivityIndicator size="small" color={C.ok2} />
+              : <>
+                  <Ionicons name="download-outline" size={16} color={C.ok2} style={{ marginRight: 4 }} />
+                  <Text style={[s.exportBtnText, { color: C.ok2 }]}>CSV</Text>
+                </>
+            }
+          </TouchableOpacity>
+        </View>
 
-          {/* 분기별 요약 */}
-          {quarterSummary.length > 0 && (
-            <>
-              <Text style={[s.sectionTitle, { color: pal.t3 }]}>분기별 현황</Text>
-              <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg, flexWrap: 'wrap' }}>
-                {quarterSummary.map(q => (
-                  <View key={q.q} style={[s.quarterCard, { backgroundColor: pal.s1, borderColor: pal.bd, flex: 1, minWidth: '45%' }]}>
-                    <Text style={[s.quarterLabel, { color: pal.t3 }]}>{q.q}분기</Text>
-                    <Text style={[s.quarterSales, { color: pal.tx }]}>{fmt(q.totalSales)}원</Text>
-                    <Text style={[s.quarterMargin, { color: q.totalMargin >= 0 ? pal.gn : pal.rd }]}>
-                      마진 {fmt(q.totalMargin)}원
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </>
-          )}
+        {/* 연도 탭 */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
+          {years.map(y => (
+            <TouchableOpacity
+              key={y}
+              style={[s.yearTab, {
+                backgroundColor: selectedYear === y ? C.red : C.white,
+                borderColor: selectedYear === y ? C.red : C.border,
+              }]}
+              onPress={() => setSelectedYear(y)}
+            >
+              <Text style={[s.yearTabText, { color: selectedYear === y ? '#fff' : C.t2 }]}>{y}년</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-          {/* 월별 상세 */}
-          <Text style={[s.sectionTitle, { color: pal.t3 }]}>월별 매출 상세</Text>
-          {filteredMonths.map(m => {
-            const mPct = m.totalSales > 0 ? ((m.totalMargin / m.totalSales) * 100).toFixed(1) : '0.0';
-            const isExpanded = expandedMonth === m.month;
-            return (
-              <TouchableOpacity
-                key={m.month}
-                style={[s.monthCard, { backgroundColor: pal.s1, borderColor: pal.bd }]}
-                onPress={() => setExpandedMonth(isExpanded ? null : m.month)}
-                activeOpacity={0.8}
-              >
-                {/* 월 요약 행 */}
-                <View style={s.monthHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.monthTitle, { color: pal.tx }]}>{formatMonth(m.month)}</Text>
-                    <Text style={[s.monthSub, { color: pal.t3 }]}>판매 {m.salesCount}건 · {m.totalQty.toFixed(1)}kg</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[s.monthSales, { color: pal.tx }]}>{fmt(m.totalSales)}원</Text>
-                    <Text style={[s.monthMargin, { color: m.totalMargin >= 0 ? pal.gn : pal.rd }]}>
-                      마진 {mPct}%
-                    </Text>
-                  </View>
-                  <Text style={[s.chevron, { color: pal.t3 }]}>{isExpanded ? '▲' : '▼'}</Text>
-                </View>
-
-                {/* 확장: 세부 항목 */}
-                {isExpanded && (
-                  <View style={[s.expandBox, { borderTopColor: pal.bd }]}>
-                    {/* 세무 요약 테이블 */}
-                    <TaxRow label="총 매출액" value={`${fmt(m.totalSales)}원`} pal={pal} />
-                    <TaxRow label="총 매입액" value={`${fmt(m.totalCost)}원`} pal={pal} />
-                    <TaxRow label="매출이익" value={`${fmt(m.totalMargin)}원`} pal={pal} highlight={m.totalMargin >= 0 ? pal.gn : pal.rd} />
-                    <TaxRow label="면세 매출" value={`${fmt(m.exemptSales)}원`} pal={pal} />
-                    <TaxRow label="과세 매출" value={`${fmt(m.taxableSales)}원`} pal={pal} />
-                    <View style={{ marginTop: spacing.sm }}>
-                      <Text style={[s.taxNote, { color: pal.t3 }]}>
-                        ※ 식육(생육)은 부가세 면세 품목 (부가가치세법 제26조)
-                      </Text>
-                    </View>
-
-                    {/* 판매 항목 목록 */}
-                    {m.items.length > 0 && (
-                      <>
-                        <Text style={[s.itemListTitle, { color: pal.t2, marginTop: spacing.sm }]}>판매 내역</Text>
-                        {m.items.map((item, idx) => (
-                          <View key={idx} style={[s.itemRow, { borderBottomColor: pal.bd + '40' }]}>
-                            <Text style={[s.itemCut, { color: pal.tx }]}>{item.cut}</Text>
-                            <Text style={[s.itemOrigin, { color: pal.t3 }]}>{item.origin}</Text>
-                            <Text style={[s.itemQty, { color: pal.t2 }]}>{item.qty}kg</Text>
-                            <Text style={[s.itemPrice, { color: pal.tx }]}>{fmt(item.sellPrice * item.qty)}원</Text>
-                          </View>
-                        ))}
-                      </>
-                    )}
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-
-          {/* 부가세 안내 */}
-          <View style={[s.vatGuide, { backgroundColor: pal.s1, borderColor: pal.cyan + '40' }]}>
-            <Text style={[s.vatGuideTitle, { color: pal.cyan }]}>💡 부가세 신고 안내</Text>
-            <Text style={[s.vatGuideText, { color: pal.t2 }]}>
-              • 식육(생육·냉장·냉동) → <Text style={{ color: pal.gn, fontWeight: '700' }}>면세</Text>{'\n'}
-              • 가공품(소시지·햄·베이컨 등) → <Text style={{ color: pal.rd, fontWeight: '700' }}>과세 (10%)</Text>{'\n'}
-              • 부가세 신고 기간: 1기(1~6월) 7월 25일 / 2기(7~12월) 1월 25일{'\n'}
-              • 본 리포트는 참고용이며 세무사 확인을 권장합니다
+        {filteredMonths.length === 0 ? (
+          <View style={[s.emptyBox, { backgroundColor: C.white, borderColor: C.border }]}>
+            <View style={{ width: 48, height: 48, borderRadius: R.md, backgroundColor: C.blueS, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+              <Ionicons name="bar-chart-outline" size={26} color={C.blue2} />
+            </View>
+            <Text style={[s.emptyTitle, { color: C.t1 }]}>{selectedYear}년 데이터 없음</Text>
+            <Text style={[s.emptyDesc, { color: C.t3 }]}>
+              재고를 판매 완료 처리하면{'\n'}자동으로 매출이 집계됩니다
             </Text>
           </View>
-        </>
-      )}
-    </ScrollView>
-  );
-}
+        ) : (
+          <>
+            {/* 연간 요약 카드 */}
+            <View style={[s.annualCard, { backgroundColor: C.bg2, borderColor: C.red + '40' }]}>
+              <Text style={[s.annualYear, { color: C.t2 }]}>{selectedYear}년 연간 요약</Text>
+              <View style={s.annualRow}>
+                <StatBox label="총 매출" value={`${fmt(annualTotal.sales)}원`} color={C.ok2} />
+                <StatBox label="총 매입" value={`${fmt(annualTotal.cost)}원`} color={C.red2} />
+                <StatBox label="마진율" value={`${marginPct}%`} color={C.blue2} />
+              </View>
+              <View style={[s.taxNotice, { backgroundColor: C.white + '80', borderColor: C.border }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="document-text-outline" size={14} color={C.t2} style={{ marginRight: 6 }} />
+                  <Text style={[s.taxNoticeText, { color: C.t2 }]}>
+                    식육(생육) 면세 · 부가세 신고 시 참고용 자료
+                  </Text>
+                </View>
+              </View>
+            </View>
 
-// ── 서브 컴포넌트 ────────────────────────────────────────────
-function StatBox({ label, value, color, pal }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ fontSize: 11, color: pal.t3, marginBottom: 4 }}>{label}</Text>
-      <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color }}>{value}</Text>
+            {/* 분기별 요약 */}
+            {quarterSummary.length > 0 && (
+              <>
+                <Text style={[s.sectionTitle, { color: C.t3 }]}>분기별 현황</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+                  {quarterSummary.map(q => (
+                    <View key={q.q} style={[s.quarterCard, { backgroundColor: C.white, borderColor: C.border, flex: 1, minWidth: '45%' }]}>
+                      <Text style={[s.quarterLabel, { color: C.t3 }]}>{q.q}분기</Text>
+                      <Text style={[s.quarterSales, { color: C.t1 }]}>{fmt(q.totalSales)}원</Text>
+                      <Text style={[s.quarterMargin, { color: q.totalMargin >= 0 ? C.ok2 : C.red }]}>
+                        마진 {fmt(q.totalMargin)}원
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {/* 월별 상세 */}
+            <Text style={[s.sectionTitle, { color: C.t3 }]}>월별 매출 상세</Text>
+            {filteredMonths.map(m => {
+              const mPct = m.totalSales > 0 ? ((m.totalMargin / m.totalSales) * 100).toFixed(1) : '0.0';
+              const isExpanded = expandedMonth === m.month;
+              return (
+                <TouchableOpacity
+                  key={m.month}
+                  style={[s.monthCard, { backgroundColor: C.white, borderColor: C.border }]}
+                  onPress={() => setExpandedMonth(isExpanded ? null : m.month)}
+                  activeOpacity={0.8}
+                >
+                  {/* 월 요약 행 */}
+                  <View style={s.monthHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.monthTitle, { color: C.t1 }]}>{formatMonth(m.month)}</Text>
+                      <Text style={[s.monthSub, { color: C.t3 }]}>판매 {m.salesCount}건 · {m.totalQty.toFixed(1)}kg</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[s.monthSales, { color: C.t1 }]}>{fmt(m.totalSales)}원</Text>
+                      <Text style={[s.monthMargin, { color: m.totalMargin >= 0 ? C.ok2 : C.red }]}>
+                        마진 {mPct}%
+                      </Text>
+                    </View>
+                    <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={C.t3} style={{ marginLeft: 4 }} />
+                  </View>
+
+                  {/* 확장: 세부 항목 */}
+                  {isExpanded && (
+                    <View style={[s.expandBox, { borderTopColor: C.border }]}>
+                      {/* 세무 요약 테이블 */}
+                      <TaxRow label="총 매출액" value={`${fmt(m.totalSales)}원`} />
+                      <TaxRow label="총 매입액" value={`${fmt(m.totalCost)}원`} />
+                      <TaxRow label="매출이익" value={`${fmt(m.totalMargin)}원`} highlight={m.totalMargin >= 0 ? C.ok2 : C.red} />
+                      <TaxRow label="면세 매출" value={`${fmt(m.exemptSales)}원`} />
+                      <TaxRow label="과세 매출" value={`${fmt(m.taxableSales)}원`} />
+                      <View style={{ marginTop: 8 }}>
+                        <Text style={[s.taxNote, { color: C.t3 }]}>
+                          ※ 식육(생육)은 부가세 면세 품목 (부가가치세법 제26조)
+                        </Text>
+                      </View>
+
+                      {/* 판매 항목 목록 */}
+                      {m.items.length > 0 && (
+                        <>
+                          <Text style={[s.itemListTitle, { color: C.t2, marginTop: 8 }]}>판매 내역</Text>
+                          {m.items.map((item, idx) => (
+                            <View key={idx} style={[s.itemRow, { borderBottomColor: C.border + '40' }]}>
+                              <Text style={[s.itemCut, { color: C.t1 }]}>{item.cut}</Text>
+                              <Text style={[s.itemOrigin, { color: C.t3 }]}>{item.origin}</Text>
+                              <Text style={[s.itemQty, { color: C.t2 }]}>{item.qty}kg</Text>
+                              <Text style={[s.itemPrice, { color: C.t1 }]}>{fmt(item.sellPrice * item.qty)}원</Text>
+                            </View>
+                          ))}
+                        </>
+                      )}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* 부가세 안내 */}
+            <View style={[s.vatGuide, { backgroundColor: C.white, borderColor: C.blue2 + '40' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <Ionicons name="bulb-outline" size={18} color={C.blue2} style={{ marginRight: 6 }} />
+                <Text style={[s.vatGuideTitle, { color: C.blue2 }]}>부가세 신고 안내</Text>
+              </View>
+              <Text style={[s.vatGuideText, { color: C.t2 }]}>
+                {'  '}식육(생육·냉장·냉동) <Ionicons name="arrow-forward" size={10} color={C.t3} /> <Text style={{ color: C.ok2, fontWeight: '700' }}>면세</Text>{'\n'}
+                {'  '}가공품(소시지·햄·베이컨 등) <Ionicons name="arrow-forward" size={10} color={C.t3} /> <Text style={{ color: C.red, fontWeight: '700' }}>과세 (10%)</Text>{'\n'}
+                {'  '}부가세 신고 기간: 1기(1~6월) 7월 25일 / 2기(7~12월) 1월 25일{'\n'}
+                {'  '}본 리포트는 참고용이며 세무사 확인을 권장합니다
+              </Text>
+            </View>
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
-function TaxRow({ label, value, pal, highlight }) {
+// ── 서브 컴포넌트 ────────────────────────────────────────────
+function StatBox({ label, value, color }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <Text style={{ fontSize: F.xxs, color: C.t3, marginBottom: 4 }}>{label}</Text>
+      <Text style={{ fontSize: F.sm, fontWeight: '900', color }}>{value}</Text>
+    </View>
+  );
+}
+
+function TaxRow({ label, value, highlight }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 }}>
-      <Text style={{ fontSize: fontSize.xs, color: pal.t3 }}>{label}</Text>
-      <Text style={{ fontSize: fontSize.xs, fontWeight: '700', color: highlight || pal.tx }}>{value}</Text>
+      <Text style={{ fontSize: F.xs, color: C.t3 }}>{label}</Text>
+      <Text style={{ fontSize: F.xs, fontWeight: '700', color: highlight || C.t1 }}>{value}</Text>
     </View>
   );
 }
 
 // ── 스타일 ───────────────────────────────────────────────────
 const s = StyleSheet.create({
-  pageTitle: { fontSize: fontSize.xl, fontWeight: '900' },
-  pageSub: { fontSize: fontSize.xs, marginTop: 2 },
+  // V5 Header
+  v5Header: { backgroundColor: C.white, ...SH.sm },
+  v5HeaderAccent: { height: 3, backgroundColor: C.red },
+  v5HeaderContent: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
+  v5HeaderIcon: { width: 33, height: 33, borderRadius: R.sm, backgroundColor: C.red, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  v5HeaderTitle: { fontSize: 22, fontWeight: '900', color: C.t1 },
+
+  pageSub: { fontSize: F.xs, marginTop: 2 },
   exportBtn: {
-    borderWidth: 1, borderRadius: radius.sm,
+    borderWidth: 1, borderRadius: R.sm,
     paddingHorizontal: 12, paddingVertical: 8,
     flexDirection: 'row', alignItems: 'center', gap: 4,
   },
-  exportBtnText: { fontSize: fontSize.sm, fontWeight: '800' },
+  exportBtnText: { fontSize: F.sm, fontWeight: '800' },
   yearTab: {
     paddingHorizontal: 16, paddingVertical: 8,
-    borderRadius: radius.sm, borderWidth: 1, marginRight: 8,
+    borderRadius: R.sm, borderWidth: 1, marginRight: 8,
   },
-  yearTabText: { fontSize: fontSize.sm, fontWeight: '700' },
+  yearTabText: { fontSize: F.sm, fontWeight: '700' },
   annualCard: {
-    borderRadius: radius.lg, borderWidth: 1.5,
-    padding: spacing.lg, marginBottom: spacing.lg,
+    borderRadius: R.lg, borderWidth: 1.5,
+    padding: 24, marginBottom: 24,
   },
-  annualYear: { fontSize: fontSize.xs, fontWeight: '700', marginBottom: spacing.md, textTransform: 'uppercase', letterSpacing: 0.5 },
-  annualRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  taxNotice: { borderRadius: radius.sm, borderWidth: 1, padding: 8 },
-  taxNoticeText: { fontSize: 11, textAlign: 'center' },
+  annualYear: { fontSize: F.xs, fontWeight: '700', marginBottom: 16, textTransform: 'uppercase', letterSpacing: 0.5 },
+  annualRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  taxNotice: { borderRadius: R.sm, borderWidth: 1, padding: 8 },
+  taxNoticeText: { fontSize: F.xxs, textAlign: 'center' },
   sectionTitle: {
-    fontSize: fontSize.xs, fontWeight: '800',
+    fontSize: F.xs, fontWeight: '800',
     textTransform: 'uppercase', letterSpacing: 0.5,
-    marginBottom: spacing.sm,
+    marginBottom: 8,
   },
   quarterCard: {
-    borderRadius: radius.md, borderWidth: 1,
-    padding: spacing.md,
+    borderRadius: R.md, borderWidth: 1,
+    padding: 16,
   },
-  quarterLabel: { fontSize: 11, fontWeight: '700', marginBottom: 4 },
-  quarterSales: { fontSize: fontSize.sm, fontWeight: '900', marginBottom: 2 },
-  quarterMargin: { fontSize: 11, fontWeight: '700' },
+  quarterLabel: { fontSize: F.xxs, fontWeight: '700', marginBottom: 4 },
+  quarterSales: { fontSize: F.sm, fontWeight: '900', marginBottom: 2 },
+  quarterMargin: { fontSize: F.xxs, fontWeight: '700' },
   monthCard: {
-    borderRadius: radius.md, borderWidth: 1,
-    marginBottom: spacing.sm, overflow: 'hidden',
+    borderRadius: R.md, borderWidth: 1,
+    marginBottom: 8, overflow: 'hidden',
   },
   monthHeader: {
     flexDirection: 'row', alignItems: 'center',
-    padding: spacing.md, gap: spacing.sm,
+    padding: 16, gap: 8,
   },
-  monthTitle: { fontSize: fontSize.sm, fontWeight: '800' },
-  monthSub: { fontSize: fontSize.xxs, marginTop: 2 },
-  monthSales: { fontSize: fontSize.sm, fontWeight: '900' },
-  monthMargin: { fontSize: fontSize.xxs, fontWeight: '700', marginTop: 2 },
-  chevron: { fontSize: 12, marginLeft: 4 },
-  expandBox: { borderTopWidth: 1, padding: spacing.md },
-  taxNote: { fontSize: 11, lineHeight: 16 },
-  itemListTitle: { fontSize: fontSize.xs, fontWeight: '700', marginBottom: 6 },
+  monthTitle: { fontSize: F.body, fontWeight: '800' },
+  monthSub: { fontSize: F.xxs, marginTop: 2 },
+  monthSales: { fontSize: F.body, fontWeight: '900' },
+  monthMargin: { fontSize: F.xxs, fontWeight: '700', marginTop: 2 },
+  expandBox: { borderTopWidth: 1, padding: 16 },
+  taxNote: { fontSize: F.xxs, lineHeight: 16 },
+  itemListTitle: { fontSize: F.xs, fontWeight: '700', marginBottom: 6 },
   itemRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 5, borderBottomWidth: 1, gap: 6,
   },
-  itemCut: { fontSize: fontSize.xs, fontWeight: '700', flex: 2 },
-  itemOrigin: { fontSize: 10, flex: 1 },
-  itemQty: { fontSize: fontSize.xs, flex: 1, textAlign: 'right' },
-  itemPrice: { fontSize: fontSize.xs, fontWeight: '700', flex: 2, textAlign: 'right' },
+  itemCut: { fontSize: F.xs, fontWeight: '700', flex: 2 },
+  itemOrigin: { fontSize: F.xxs, flex: 1 },
+  itemQty: { fontSize: F.xs, flex: 1, textAlign: 'right' },
+  itemPrice: { fontSize: F.xs, fontWeight: '700', flex: 2, textAlign: 'right' },
   vatGuide: {
-    borderRadius: radius.lg, borderWidth: 1,
-    padding: spacing.lg, marginTop: spacing.lg,
+    borderRadius: R.lg, borderWidth: 1,
+    padding: 24, marginTop: 24,
   },
-  vatGuideTitle: { fontSize: fontSize.sm, fontWeight: '900', marginBottom: spacing.sm },
-  vatGuideText: { fontSize: fontSize.xs, lineHeight: 22 },
+  vatGuideTitle: { fontSize: F.body, fontWeight: '900' },
+  vatGuideText: { fontSize: F.sm, lineHeight: 24 },
   emptyBox: {
-    borderRadius: radius.lg, borderWidth: 1,
-    padding: spacing.xl, alignItems: 'center',
+    borderRadius: R.lg, borderWidth: 1,
+    padding: 32, alignItems: 'center',
   },
-  emptyTitle: { fontSize: fontSize.md, fontWeight: '800', marginBottom: 6 },
-  emptyDesc: { fontSize: fontSize.xs, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontSize: F.body, fontWeight: '800', marginBottom: 6 },
+  emptyDesc: { fontSize: F.xs, textAlign: 'center', lineHeight: 20 },
 });
