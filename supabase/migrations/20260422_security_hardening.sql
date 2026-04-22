@@ -119,6 +119,15 @@ CREATE OR REPLACE FUNCTION apply_store_rls(tbl TEXT) RETURNS VOID AS $$
 DECLARE
   col_type TEXT;
 BEGIN
+  -- 테이블이 존재하지 않으면 조용히 스킵 (프로젝트마다 스키마가 달라서)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema='public' AND table_name=tbl
+  ) THEN
+    RAISE NOTICE '⏭  skip: table public.% not found', tbl;
+    RETURN;
+  END IF;
+
   -- 기존 store_id 컬럼이 TEXT(옛날 bizNo 포맷)이면 *_legacy 로 개명
   -- → 새 UUID 컬럼과 충돌 방지, 옛 데이터는 보존 (수동 백필용)
   SELECT data_type INTO col_type
