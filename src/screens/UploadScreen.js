@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { C, F, R, SH } from '../lib/v5';
 import { meatStore, staffStore } from '../lib/dataStore';
+import { supabase } from '../lib/supabase';
 import { meatInventory as initMeat, staffData } from '../data/mockData';
 
 const DOC_TYPES = [
@@ -34,9 +35,9 @@ const DEMO_DATA = {
   '위생교육 이수증': { '성명': '홍길동', '교육명': '식육위생교육', '이수일': '2026.03.24', '유효기한': '2027.03.24', '발급기관': '한국식품안전관리인증원', '이수시간': '8시간' },
 };
 
-const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || '';
-const HAS_API_KEY = GOOGLE_API_KEY.length > 10;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}`;
+// ※ Anthropic API 키는 클라이언트 번들에 넣지 않는다.
+// Supabase Edge Function `ocr-proxy` 가 서버사이드에서 대신 호출한다.
+// 프록시가 401/5xx 를 돌려주면 아래 runOCR 이 자동으로 데모 폴백한다.
 
 // OCR 결과에서 소비기한 계산 (도축일 기준 14일)
 function calcExpire(slaughterDate) {
@@ -97,22 +98,27 @@ export default function UploadScreen({ navigation }) {
     }
   };
 
+  // ─── OCR 실행 — Supabase Edge Function `ocr-proxy` 호출 ──────
+  // 키 노출 방지: Anthropic API 키는 서버(Edge Function)에만 존재.
+  // 프록시 미배포/미인증/서버 오류 시 DEMO_DATA 로 자동 폴백.
   const runOCR = async () => {
     if (!image) return;
     setLoading(true);
-    if (!HAS_API_KEY) {
-      await new Promise(r => setTimeout(r, 1200));
-      setResult(DEMO_DATA[docType] || { '서류명': docType, '날짜': '2026.03.29' });
+
+    // 데모 폴백 헬퍼
+    const fallbackToDemo = (reason) => {
+      setResult(DEMO_DATA[docType] || { '서류명': docType, '날짜': new Date().toLocaleDateString('ko-KR') });
       setIsDemo(true);
       setLoading(false);
-      return;
-    }
-    // base64 재확인
+      if (reason) console.warn('[OCR] demo fallback:', reason);
+    };
+
     if (!image.base64) {
       Alert.alert('이미지 오류', '이미지 데이터가 없습니다. 다시 촬영해주세요.');
       setLoading(false);
       return;
     }
+
     // Anthropic 지원 MIME: jpeg/png/gif/webp만 허용
     const SUPPORTED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     const mimeType = SUPPORTED.includes(image.mimeType) ? image.mimeType : 'image/jpeg';
@@ -120,47 +126,48 @@ export default function UploadScreen({ navigation }) {
     const schema = SCHEMAS[docType] || SCHEMAS['기타'];
     const prompt = `당신은 한국 축산물 관련 문서 분석 전문가입니다.\n이미지는 "${docType}" 문서입니다.\n다음 항목들을 추출하여 JSON으로만 반환하세요 (다른 텍스트 없이):\n${schema.map(k => `- ${k}`).join('\n')}\n없는 값은 "" 으로, 날짜는 YYYY.MM.DD 형식으로.`;
 
-    // 30초 타임아웃
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
-
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: [
-            { type: 'image', source: { type: 'base64', media_type: mimeType, data: image.base64 } },
-            { type: 'text', text: prompt },
-          ]}],
-        }),
+      // Supabase Edge Function 호출 (60초 타임아웃은 supabase-js 기본값)
+      const { data, error } = await supabase.functions.invoke('ocr-proxy', {
+        body: {
+          docType,
+          prompt,
+          imageBase64: image.base64,
+          mimeType,
+        },
       });
-      clearTimeout(timer);
-      const data = await response.json();
-      // 인증 오류 → 데모 모드로 자동 폴백
-      if (data.error?.type === 'authentication_error' || data.error?.message?.includes('x-api-key')) {
-        setResult(DEMO_DATA[docType] || { '서류명': docType, '날짜': new Date().toLocaleDateString('ko-KR') });
-        setIsDemo(true);
+
+      // 401(미로그인) · 404(함수 미배포) · 500/504(서버 오류) → 데모 폴백
+      if (error) {
+        if (error.context?.status === 504) {
+          Alert.alert('시간 초과', '요청 시간이 초과됐습니다 (30초). 인터넷 연결을 확인 후 다시 시도해주세요.');
+          setLoading(false);
+          return;
+        }
+        return fallbackToDemo(`invoke error: ${error.message}`);
+      }
+      if (data?.error) {
+        return fallbackToDemo(`proxy error: ${data.error}`);
+      }
+
+      // Anthropic 응답 파싱 (프록시는 { content, usage } 포맷으로 전달)
+      const raw = data?.content?.[0]?.text || '';
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) {
+        Alert.alert('OCR 오류', 'AI가 결과를 반환하지 못했습니다. 서류를 더 선명하게 촬영 후 다시 시도해주세요.');
         setLoading(false);
         return;
       }
-      if (data.error) throw new Error(data.error.message);
-      const raw = data.content?.[0]?.text || '';
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('AI가 결과를 반환하지 못했습니다. 서류를 더 선명하게 촬영 후 다시 시도해주세요.');
       const parsed = JSON.parse(match[0]);
-      if (Object.keys(parsed).length === 0) throw new Error('인식된 내용이 없습니다. 서류가 잘 보이도록 다시 촬영해주세요.');
+      if (Object.keys(parsed).length === 0) {
+        Alert.alert('OCR 오류', '인식된 내용이 없습니다. 서류가 잘 보이도록 다시 촬영해주세요.');
+        setLoading(false);
+        return;
+      }
       setResult(parsed);
       setIsDemo(false);
     } catch (e) {
-      clearTimeout(timer);
-      const msg = e.name === 'AbortError'
-        ? '요청 시간이 초과됐습니다 (30초). 인터넷 연결을 확인 후 다시 시도해주세요.'
-        : (e.message || 'AI 분석에 실패했습니다. 다시 시도해주세요.');
-      Alert.alert('OCR 오류', msg);
+      fallbackToDemo(e?.message || 'unknown');
     }
     setLoading(false);
   };
