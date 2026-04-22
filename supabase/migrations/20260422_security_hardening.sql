@@ -129,7 +129,8 @@ BEGIN
   -- 기존 전체 허용 정책 삭제 (이름 여러 버전 대응)
   EXECUTE format('DROP POLICY IF EXISTS "public_all" ON %I', tbl);
   EXECUTE format('DROP POLICY IF EXISTS "Allow all"  ON %I', tbl);
-  EXECUTE format('DROP POLICY IF EXISTS %L ON %I', 'Allow all for ' || tbl, tbl);
+  -- 정책명은 식별자이므로 %I 로 감싸야 함 (%L 은 문자열 리터럴 — 42601 에러 원인)
+  EXECUTE format('DROP POLICY IF EXISTS %I ON %I', 'Allow all for ' || tbl, tbl);
 
   -- 새 정책: 소속 store 만 접근 (사장 + 직원 모두) — SECURITY DEFINER 함수로 재귀 회피
   EXECUTE format('DROP POLICY IF EXISTS %s_store_access ON %I', tbl, tbl);
