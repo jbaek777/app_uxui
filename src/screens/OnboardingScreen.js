@@ -4,12 +4,23 @@ import {
   ScrollView, Alert, Modal, FlatList,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fontSize, spacing, radius, shadow } from '../theme';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { supabase } from '../lib/supabase';
 
 const SPECIES = ['한우', '육우', '한돈', '수입우', '닭', '오리'];
 const ROLES = ['사장', '직원'];
+
+// 축종별 아웃라인 아이콘 매핑 (MaterialCommunityIcons 는 기본 라인 스타일)
+const SPECIES_ICON = {
+  '한우':   'cow',
+  '육우':   'cow',
+  '수입우': 'cow',
+  '한돈':   'pig-variant',
+  '닭':     'food-drumstick-outline',
+  '오리':   'duck',
+};
 
 // ── 전국 시/도 → 구/군 데이터 ──────────────────────────────
 const ADDR_DATA = {
@@ -686,9 +697,12 @@ export default function OnboardingScreen({ onDone }) {
                     onPress={() => toggleSpecies(s)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.speciesEmoji}>
-                      {s === '한우' || s === '육우' || s === '수입우' ? '🐄' : s === '한돈' ? '🐷' : s === '닭' ? '🐔' : '🦆'}
-                    </Text>
+                    <MaterialCommunityIcons
+                      name={SPECIES_ICON[s] || 'paw'}
+                      size={40}
+                      color={sel ? colors.ac : colors.t2}
+                      style={{ marginBottom: 8 }}
+                    />
                     <Text style={[styles.speciesLabel, sel && styles.speciesLabelActive]}>{s}</Text>
                   </TouchableOpacity>
                 );
