@@ -47,6 +47,7 @@ import JobOwnerBrowseScreen from './src/screens/JobOwnerBrowseScreen';
 import JobProfileDetailScreen from './src/screens/JobProfileDetailScreen';
 import JobHeadhuntSentScreen from './src/screens/JobHeadhuntSentScreen';
 import JobHeadhuntInboxScreen from './src/screens/JobHeadhuntInboxScreen';
+import AdminScreen from './src/screens/AdminScreen';
 import { requestNotificationPermission, scheduleDailyHygieneReminder, scheduleDailyExpiryReminder } from './src/utils/notifications';
 
 const Tab = createBottomTabNavigator();
@@ -146,6 +147,7 @@ function SettingsStack({ bizData }) {
         {({ navigation }) => <SettingsScreen route={{ params: { biz: bizData } }} navigation={navigation} />}
       </Stack.Screen>
       <Stack.Screen name="Paywall" component={PaywallScreen} options={{ title: '💎 구독 관리' }} />
+      <Stack.Screen name="Admin" component={AdminScreen} options={{ title: '🔐 시스템 관리자' }} />
     </Stack.Navigator>
   );
 }

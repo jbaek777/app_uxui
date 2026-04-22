@@ -1,18 +1,26 @@
 /**
  * AdminScreen — 관리자 기능 잠금/해제 대시보드
- * 마스터 PIN으로 진입, feature_flags 테이블을 직접 수정
+ *
+ * 구조:
+ *   · 클라이언트는 supabase.functions.invoke('admin-toggle-feature') 만 호출
+ *   · service_role 키는 Edge Function 에만 존재 (번들 노출 금지)
+ *   · 관리자 PIN 은 서버 Secret (ADMIN_MASTER_PIN) 과 비교
+ *
+ * 진입:
+ *   · 기본 PIN '777777' — Supabase Secrets 에서 ADMIN_MASTER_PIN 으로 변경 가능
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Modal, TextInput, Alert, Switch, ActivityIndicator,
+  TextInput, Alert, Switch, ActivityIndicator,
 } from 'react-native';
 import { darkColors, lightColors, fontSize, spacing, radius, shadow } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
-import { supabaseAdmin } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useFeatureFlags } from '../lib/FeatureFlagsContext';
 
-const MASTER_PIN = '777777'; // 관리자 전용 PIN — 나중에 변경 가능하게 확장
+// PIN 은 더 이상 클라이언트에 저장하지 않음 — 서버 Secret(ADMIN_MASTER_PIN) 과 비교
+// Secret 미설정 시 서버가 '777777' 을 폴백 기본값으로 사용 (backward compat)
 
 const FEATURE_LIST = [
   { key: 'inventory', label: '재고 관리',     icon: '📦', desc: '재고 현황, 판매내역, 수율 계산' },
@@ -33,29 +41,63 @@ export default function AdminScreen({ navigation }) {
 
   const [authed, setAuthed] = useState(false);
   const [pin, setPin] = useState('');
-  const [saving, setSaving] = useState(null); // 저장 중인 feature_key
+  const [verifiedPin, setVerifiedPin] = useState(''); // 서버 요청에 실어보낼 PIN
+  const [saving, setSaving] = useState(null);         // 저장 중인 feature_key
 
-  const handlePinSubmit = () => {
-    if (pin === MASTER_PIN) {
+  // PIN 검증 — 더미 toggle 요청으로 서버와 대조 (잘못된 PIN 이면 403)
+  const handlePinSubmit = async () => {
+    if (!pin) {
+      Alert.alert('오류', 'PIN 을 입력해주세요.');
+      return;
+    }
+    setSaving('pin');
+    try {
+      // 현재 첫 기능의 상태를 그대로 유지하는 요청(멱등) → PIN 검증용
+      const firstKey = FEATURE_LIST[0].key;
+      const currentVal = flags[firstKey] !== false;
+      const { data, error } = await supabase.functions.invoke('admin-toggle-feature', {
+        body: {
+          action: 'toggle',
+          feature_key: firstKey,
+          is_free: currentVal,     // 그대로 유지 → 실제 변화 없음
+          master_pin: pin,
+        },
+      });
+      if (error || data?.error) {
+        const msg = data?.error || error?.message || '';
+        if (msg.includes('Invalid master PIN') || error?.context?.status === 403) {
+          Alert.alert('오류', '관리자 PIN 이 올바르지 않습니다.');
+        } else if (error?.context?.status === 404) {
+          Alert.alert('오류', 'admin-toggle-feature 함수가 아직 배포되지 않았습니다.');
+        } else {
+          Alert.alert('오류', `PIN 검증 실패: ${msg || '네트워크 오류'}`);
+        }
+        setPin('');
+        return;
+      }
+      setVerifiedPin(pin);
       setAuthed(true);
       setPin('');
-    } else {
-      Alert.alert('오류', '관리자 PIN이 올바르지 않습니다.');
-      setPin('');
+    } catch (e) {
+      Alert.alert('오류', e.message || 'PIN 검증 중 오류 발생');
+    } finally {
+      setSaving(null);
     }
   };
 
   const toggleFeature = async (key, currentValue) => {
-    if (!supabaseAdmin) {
-      Alert.alert('오류', '관리자 키가 설정되지 않았습니다.');
-      return;
-    }
     setSaving(key);
     try {
-      const { error } = await supabaseAdmin
-        .from('feature_flags')
-        .upsert({ feature_key: key, is_free: !currentValue, updated_at: new Date().toISOString() }, { onConflict: 'feature_key' });
+      const { data, error } = await supabase.functions.invoke('admin-toggle-feature', {
+        body: {
+          action: 'toggle',
+          feature_key: key,
+          is_free: !currentValue,
+          master_pin: verifiedPin,
+        },
+      });
       if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
       await reload();
     } catch (e) {
       Alert.alert('오류', `변경 실패: ${e.message}`);
@@ -64,13 +106,17 @@ export default function AdminScreen({ navigation }) {
   };
 
   const setAllFree = async (isFree) => {
-    if (!supabaseAdmin) return;
     setSaving('all');
     try {
-      const rows = FEATURE_LIST.map(f => ({
-        feature_key: f.key, is_free: isFree, updated_at: new Date().toISOString(),
-      }));
-      await supabaseAdmin.from('feature_flags').upsert(rows, { onConflict: 'feature_key' });
+      const { data, error } = await supabase.functions.invoke('admin-toggle-feature', {
+        body: {
+          action: 'bulk',
+          flags: FEATURE_LIST.map(f => ({ feature_key: f.key, is_free: isFree })),
+          master_pin: verifiedPin,
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
       await reload();
     } catch (e) {
       Alert.alert('오류', e.message);
@@ -96,8 +142,14 @@ export default function AdminScreen({ navigation }) {
           maxLength={6}
           onSubmitEditing={handlePinSubmit}
         />
-        <TouchableOpacity style={[styles.pinBtn, { backgroundColor: pal.ac }]} onPress={handlePinSubmit}>
-          <Text style={styles.pinBtnText}>확인</Text>
+        <TouchableOpacity
+          style={[styles.pinBtn, { backgroundColor: pal.ac, opacity: saving === 'pin' ? 0.6 : 1 }]}
+          onPress={handlePinSubmit}
+          disabled={saving === 'pin'}
+        >
+          {saving === 'pin'
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.pinBtnText}>확인</Text>}
         </TouchableOpacity>
       </View>
     );

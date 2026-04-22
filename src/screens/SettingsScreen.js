@@ -376,13 +376,18 @@ export default function SettingsScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* 앱 정보 */}
+      {/* 앱 정보 — 버전 영역 길게 누르면 관리자 PIN 화면 진입 (숨김 진입점) */}
       <SectionTitle icon="ℹ️" label="앱 정보" />
-      <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
+      <TouchableOpacity
+        activeOpacity={1}
+        delayLongPress={1500}
+        onLongPress={() => navigation.navigate('Admin')}
+        style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}
+      >
         <InfoRow label="앱 이름" value="MeatBig (미트빅)" />
         <InfoRow label="버전" value="v1.0.0" />
         <InfoRow label="계정" value={user?.email || '—'} last />
-      </View>
+      </TouchableOpacity>
 
       {/* 로그아웃 */}
       <TouchableOpacity
