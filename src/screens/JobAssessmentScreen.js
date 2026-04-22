@@ -37,6 +37,17 @@ import {
 
 const STORAGE_KEY = '@meatbig_job_assessment';
 
+// ── 응답 척도 짧은 키워드 (문항 카드 버튼 내부용) ────────
+// RATING_LABELS 는 "전혀\n못함" 식 2-line 풀텍스트 → 상단 척도 안내에만 사용.
+// 문항별 버튼은 가로 5칸 공간이 좁아 짧은 단어로 가독성 확보.
+const RATING_SHORT = {
+  1: '못함',
+  2: '보조',
+  3: '도움',
+  4: '혼자',
+  5: '숙련',
+};
+
 // ── 팔레트 (타 화면과 통일) ─────────────────────────────
 const C = {
   bg:     '#F2F4F8',
@@ -376,14 +387,14 @@ export default function JobAssessmentScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* 척도 안내 */}
+        {/* 척도 안내 — 상단 레전드 (풀텍스트 2줄) */}
         <View style={S.scaleBox}>
           <Text style={S.scaleLbl}>응답 척도</Text>
           <View style={S.scaleRow}>
             {RATING_LABELS.map(r => (
               <View key={r.v} style={S.scaleCell}>
                 <Text style={S.scaleNum}>{r.v}</Text>
-                <Text style={S.scaleTxt}>{r.label.replace('\n', ' ')}</Text>
+                <Text style={S.scaleTxt}>{r.label}</Text>
               </View>
             ))}
           </View>
@@ -414,8 +425,11 @@ export default function JobAssessmentScreen({ navigation }) {
                       activeOpacity={0.75}
                     >
                       <Text style={[S.rateNum, active && { color: '#fff' }]}>{r.v}</Text>
-                      <Text style={[S.rateLbl, active && { color: '#fff' }]}>
-                        {r.label}
+                      <Text
+                        style={[S.rateLbl, active && { color: '#fff' }]}
+                        numberOfLines={1}
+                      >
+                        {RATING_SHORT[r.v]}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -601,60 +615,67 @@ const S = StyleSheet.create({
   primaryBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '900' },
 
   // 섹션 진행
-  secHead: { marginBottom: 12 },
-  secTtl:  { fontSize: 17, fontWeight: '900', color: C.t1, letterSpacing: -0.3 },
-  secSb:   { fontSize: 12, color: C.t3, marginTop: 3 },
+  secHead: { marginBottom: 14 },
+  secTtl:  { fontSize: 20, fontWeight: '900', color: C.t1, letterSpacing: -0.3 },
+  secSb:   { fontSize: 13, color: C.t3, marginTop: 4 },
 
+  // 척도 안내 (상단 레전드) — 가독성 up
   scaleBox: {
     backgroundColor: C.white, borderRadius: 12,
     borderWidth: 1, borderColor: C.border,
-    padding: 10, marginBottom: 14,
+    padding: 14, marginBottom: 16,
   },
   scaleLbl: {
-    fontSize: 10, fontWeight: '800', color: C.t3,
-    letterSpacing: 0.5, marginBottom: 6,
+    fontSize: 12, fontWeight: '800', color: C.t3,
+    letterSpacing: 0.5, marginBottom: 10,
   },
-  scaleRow: { flexDirection: 'row', gap: 4 },
+  scaleRow: { flexDirection: 'row', gap: 4, alignItems: 'flex-start' },
   scaleCell: {
     flex: 1, alignItems: 'center',
-    paddingVertical: 4, paddingHorizontal: 2,
+    paddingVertical: 2, paddingHorizontal: 2,
   },
-  scaleNum: { fontSize: 13, fontWeight: '900', color: '#6D28D9' },
-  scaleTxt: { fontSize: 10, color: C.t3, textAlign: 'center', marginTop: 2 },
+  scaleNum: { fontSize: 20, fontWeight: '900', color: '#6D28D9', marginBottom: 4 },
+  scaleTxt: {
+    fontSize: 12, color: C.t2, textAlign: 'center',
+    lineHeight: 16, fontWeight: '600',
+  },
 
   // 문항 카드
   qCard: {
     backgroundColor: C.white, borderRadius: 14,
     borderWidth: 1, borderColor: C.border,
-    padding: 14, marginBottom: 10,
+    padding: 16, marginBottom: 12,
   },
-  qHead: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  qHead: { flexDirection: 'row', gap: 10, marginBottom: 14, alignItems: 'flex-start' },
   qNum: {
-    width: 26, height: 26, borderRadius: 8,
+    width: 30, height: 30, borderRadius: 9,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: C.bg2,
   },
   qNumDone: { backgroundColor: C.ok2 },
-  qNumTxt: { fontSize: 11, fontWeight: '900', color: C.t3 },
+  qNumTxt: { fontSize: 12, fontWeight: '900', color: C.t3 },
   qText: {
-    flex: 1, fontSize: 14, fontWeight: '700', color: C.t1,
-    lineHeight: 20,
+    flex: 1, fontSize: 16, fontWeight: '700', color: C.t1,
+    lineHeight: 24, paddingTop: 2,
   },
 
   rateRow: {
     flexDirection: 'row', gap: 6,
   },
   rateBtn: {
-    flex: 1, paddingVertical: 8, paddingHorizontal: 4,
-    borderRadius: 10, borderWidth: 1, borderColor: C.border,
+    flex: 1, paddingVertical: 12, paddingHorizontal: 4,
+    borderRadius: 12, borderWidth: 1.5, borderColor: C.border,
     backgroundColor: C.white,
-    alignItems: 'center', minHeight: 54,
+    alignItems: 'center', justifyContent: 'center', minHeight: 68,
   },
   rateBtnActive: {
     backgroundColor: '#6D28D9', borderColor: '#6D28D9',
   },
-  rateNum: { fontSize: 14, fontWeight: '900', color: '#6D28D9', marginBottom: 2 },
-  rateLbl: { fontSize: 10, color: C.t3, textAlign: 'center', lineHeight: 12 },
+  rateNum: { fontSize: 22, fontWeight: '900', color: '#6D28D9', marginBottom: 3 },
+  rateLbl: {
+    fontSize: 13, color: C.t2, textAlign: 'center',
+    fontWeight: '700', letterSpacing: -0.2,
+  },
 
   // 네비
   navRow: {
