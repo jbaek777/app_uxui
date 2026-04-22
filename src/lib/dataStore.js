@@ -17,18 +17,59 @@ const KEYS = {
 };
 
 // ─── 매장 정보 헬퍼 ─────────────────────────────────────
+// store_id (UUID) 는 온보딩 시 stores.id 를 AsyncStorage 에 캐시한 값.
+// RLS 정책이 child 테이블의 store_id UUID 기반이므로 반드시 UUID 필요.
+// 미설정 시(미온보딩 상태) insert 시도는 RLS 에 의해 거부됨 — 의도된 동작.
+
+export async function getStoreUuid() {
+  try {
+    // 1) 캐시된 UUID 우선
+    const cached = await AsyncStorage.getItem('@meatbig_store_uuid');
+    if (cached) return cached;
+
+    // 2) 캐시 없으면 Supabase 에서 조회 (내가 사장인 store 또는 소속된 store)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    // 내가 사장
+    let { data: ownerStore } = await supabase
+      .from('stores')
+      .select('id')
+      .eq('auth_uid', user.id)
+      .limit(1)
+      .maybeSingle();
+
+    let uuid = ownerStore?.id || null;
+
+    // 내가 직원
+    if (!uuid) {
+      const { data: mem } = await supabase
+        .from('store_members')
+        .select('store_id')
+        .eq('auth_uid', user.id)
+        .limit(1)
+        .maybeSingle();
+      uuid = mem?.store_id || null;
+    }
+
+    if (uuid) await AsyncStorage.setItem('@meatbig_store_uuid', uuid);
+    return uuid;
+  } catch {
+    return null;
+  }
+}
 
 export async function getStoreInfo() {
   try {
     const raw = await AsyncStorage.getItem('@meatbig_biz');
-    if (!raw) return {};
-    const data = JSON.parse(raw);
+    const data = raw ? JSON.parse(raw) : {};
+    const store_id = await getStoreUuid();    // UUID (RLS 필수)
     return {
-      store_id: (data.bizNo || '').replace(/-/g, ''),
-      store_name: data.bizName || '',
-      biz_type: data.bizType || '개인사업자',
-      region_si: data.addrSi || '',
-      region_gu: data.addrGu || '',
+      store_id,                                // UUID — 없으면 insert 거부됨
+      store_name:  data.bizName || '',
+      biz_type:    data.bizType || '개인사업자',
+      region_si:   data.addrSi || '',
+      region_gu:   data.addrGu || '',
       region_dong: data.addrDong || '',
     };
   } catch { return {}; }

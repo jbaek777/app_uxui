@@ -197,7 +197,11 @@ export default function OnboardingScreen({ onDone }) {
       await AsyncStorage.setItem('@meatbig_staff', JSON.stringify(valid));
       await AsyncStorage.setItem('@meatbig_invite_pin', invitePin);
 
-      // 2) Supabase stores 테이블 저장 (기기 변경 시 복원용)
+      // 2) 현재 사용자 확인 → auth_uid 자동 연결 (RLS 핵심)
+      const { data: { user } } = await supabase.auth.getUser();
+      const ownerAuthUid = user?.id || null;
+
+      // 3) Supabase stores 테이블 저장 (auth_uid로 소유권 명시)
       const { data: storeRow, error: storeErr } = await supabase
         .from('stores')
         .upsert({
@@ -211,21 +215,26 @@ export default function OnboardingScreen({ onDone }) {
           region_dong:biz.addrDong,
           species,
           invite_pin: invitePin,
+          auth_uid:   ownerAuthUid,    // ⭐ 소유자 식별
         }, { onConflict: 'store_id' })
         .select()
         .single();
 
-      // 3) store_members 저장 (사장 계정)
+      // 4) store_members 저장 (사장 계정은 본인 auth_uid 연결, 나머지 직원은 null)
       if (!storeErr && storeRow) {
         await supabase.from('store_members').upsert(
           valid.map(s => ({
             store_id: storeRow.id,
-            name: s.name,
-            role: s.role,
-            pin: s.pin,
+            name:     s.name,
+            role:     s.role,
+            pin:      s.pin,
+            // 사장 본인에게만 auth_uid 부여, 나머지 직원은 본인 로그인 시 연결
+            auth_uid: s.role === '사장' ? ownerAuthUid : null,
           })),
           { onConflict: 'store_id, name' }
         );
+        // ⭐ RLS 를 위한 store UUID 캐시 (child 테이블 insert 시 필수)
+        await AsyncStorage.setItem('@meatbig_store_uuid', storeRow.id);
       }
 
       Alert.alert(
@@ -279,10 +288,17 @@ export default function OnboardingScreen({ onDone }) {
         return;
       }
 
-      // Supabase 인증 성공 → store_members에 추가
+      // Supabase 인증 성공 → store_members에 추가 (auth_uid 연결)
+      const { data: { user } } = await supabase.auth.getUser();
       const { data: memberRow } = await supabase
         .from('store_members')
-        .insert({ store_id: storeRow.id, name: empName.trim(), role: '직원', pin: '' })
+        .insert({
+          store_id: storeRow.id,
+          name:     empName.trim(),
+          role:     '직원',
+          pin:      '',
+          auth_uid: user?.id || null,  // ⭐ 직원 계정 본인 연결
+        })
         .select()
         .single();
 
@@ -305,6 +321,10 @@ export default function OnboardingScreen({ onDone }) {
       await AsyncStorage.setItem('@meatbig_staff', JSON.stringify(updatedStaff));
       await AsyncStorage.setItem('@meatbig_onboarded', 'true');
       await AsyncStorage.setItem('@meatbig_invite_pin', storeRow.invite_pin);
+      // ⭐ RLS 를 위한 store UUID 캐시 (child 테이블 insert 시 필수)
+      if (storeRow?.id) {
+        await AsyncStorage.setItem('@meatbig_store_uuid', storeRow.id);
+      }
 
       onDone({ biz: bizData, staff: updatedStaff, currentUser: newEmployee });
     } catch (e) {

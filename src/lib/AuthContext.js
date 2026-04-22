@@ -44,25 +44,72 @@ export function AuthProvider({ children }) {
     await AsyncStorage.multiRemove([
       '@meatbig_onboarded', '@meatbig_biz', '@meatbig_staff',
       '@meatbig_invite_pin', '@meatbig_role', '@meatbig_current_staff',
+      '@meatbig_store_uuid',
     ]);
   }, []);
 
   // Supabase stores 테이블에서 가게 정보 불러오기 (기기 변경 시 복원)
   //
-  // ⚠️ 현재 stores 테이블 스키마에는 auth_uid 컬럼이 없어,
-  //    사용자별 소유권을 DB 레벨에서 식별할 수 없음.
-  //    따라서 "임의로 첫 store를 복원" 하는 방식은 안전하지 않음
-  //    (남의 가게가 복원되거나, 신규 가입자에게 무관한 store가 연결됨).
+  // 안전한 복원 경로:
+  //   1) 사장: stores.auth_uid = auth.uid() 매칭
+  //   2) 직원: store_members.auth_uid = auth.uid() → 연결된 store 로드
   //
-  //    올바른 복원 경로:
-  //     · 사장 재가입: 온보딩에서 사업자번호 재입력 → upsert(onConflict: store_id)로 이어감
-  //     · 직원 재가입: 온보딩에서 사업자번호 + 초대코드 입력
+  // 신규 가입자는 양쪽 모두 NULL → null 반환 → 온보딩 화면으로 진입
   //
-  //    이 함수는 stores 스키마에 auth_uid 컬럼이 추가되기 전까지 null 반환.
+  // 선행 조건: supabase/migrations/20260422_security_hardening.sql 적용
+  //   (stores.auth_uid, store_members.auth_uid 컬럼 + RLS 정책)
   const loadStoreFromCloud = useCallback(async () => {
-    // TODO: stores 테이블에 auth_uid 컬럼 추가 후, 아래 구현으로 복귀:
-    //   .from('stores').select('*').eq('auth_uid', user.id).maybeSingle()
-    return null;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      // 1) 내가 사장인 store 우선 조회
+      let { data: ownerStore } = await supabase
+        .from('stores')
+        .select('*')
+        .eq('auth_uid', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // 2) 사장 store 없으면, 직원으로 속한 store 조회
+      let storeRow = ownerStore;
+      if (!storeRow) {
+        const { data: membership } = await supabase
+          .from('store_members')
+          .select('store_id, stores(*)')
+          .eq('auth_uid', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        storeRow = membership?.stores || null;
+      }
+
+      if (!storeRow) return null;
+
+      const biz = {
+        bizNo:    storeRow.biz_no || storeRow.store_id || '',
+        bizName:  storeRow.store_name || '',
+        owner:    storeRow.owner || '',
+        bizType:  storeRow.biz_type || '개인사업자',
+        addrSi:   storeRow.region_si || '',
+        addrGu:   storeRow.region_gu || '',
+        addrDong: storeRow.region_dong || '',
+        species:  storeRow.species || [],
+      };
+      await AsyncStorage.setItem('@meatbig_biz', JSON.stringify(biz));
+      await AsyncStorage.setItem('@meatbig_onboarded', 'true');
+      if (storeRow.invite_pin) {
+        await AsyncStorage.setItem('@meatbig_invite_pin', storeRow.invite_pin);
+      }
+      // ⭐ 기기 변경 복원 시에도 store UUID 캐시 — RLS child 테이블 insert 에 필수
+      if (storeRow.id) {
+        await AsyncStorage.setItem('@meatbig_store_uuid', storeRow.id);
+      }
+      return biz;
+    } catch {
+      return null;
+    }
   }, []);
 
   // store_members에서 직원 정보 불러오기

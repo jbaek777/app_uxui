@@ -29,9 +29,26 @@ export default function LoginScreen({ onDone }) {
       Alert.alert('비밀번호 오류', '비밀번호는 6자리 이상이어야 합니다.');
       return;
     }
-    if (mode === 'signup' && pw !== pw2) {
-      Alert.alert('비밀번호 불일치', '비밀번호가 일치하지 않습니다.');
-      return;
+    // 회원가입 시 강화 정책 (8자+문자+숫자) — 기존 로그인 계정 호환 유지
+    if (mode === 'signup') {
+      if (pw.length < 8) {
+        Alert.alert('비밀번호 취약', '안전을 위해 비밀번호는 8자 이상을 권장합니다.');
+        return;
+      }
+      if (!/[A-Za-z]/.test(pw) || !/[0-9]/.test(pw)) {
+        Alert.alert('비밀번호 취약', '영문과 숫자를 함께 포함해주세요.');
+        return;
+      }
+      // 흔한 비밀번호 차단
+      const weak = ['12345678','password','qwerty123','meatbig123','test1234'];
+      if (weak.includes(pw.toLowerCase())) {
+        Alert.alert('비밀번호 취약', '추측하기 쉬운 비밀번호입니다. 다른 값으로 설정해주세요.');
+        return;
+      }
+      if (pw !== pw2) {
+        Alert.alert('비밀번호 불일치', '비밀번호가 일치하지 않습니다.');
+        return;
+      }
     }
 
     setLoading(true);
@@ -105,7 +122,7 @@ export default function LoginScreen({ onDone }) {
           <Text style={styles.label}>비밀번호</Text>
           <TextInput
             style={styles.input}
-            placeholder="6자리 이상"
+            placeholder={mode === 'signup' ? '8자 이상, 영문+숫자 포함' : '비밀번호'}
             placeholderTextColor={colors.t3}
             value={pw}
             onChangeText={setPw}
