@@ -48,32 +48,21 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Supabase stores 테이블에서 가게 정보 불러오기 (기기 변경 시 복원)
+  //
+  // ⚠️ 현재 stores 테이블 스키마에는 auth_uid 컬럼이 없어,
+  //    사용자별 소유권을 DB 레벨에서 식별할 수 없음.
+  //    따라서 "임의로 첫 store를 복원" 하는 방식은 안전하지 않음
+  //    (남의 가게가 복원되거나, 신규 가입자에게 무관한 store가 연결됨).
+  //
+  //    올바른 복원 경로:
+  //     · 사장 재가입: 온보딩에서 사업자번호 재입력 → upsert(onConflict: store_id)로 이어감
+  //     · 직원 재가입: 온보딩에서 사업자번호 + 초대코드 입력
+  //
+  //    이 함수는 stores 스키마에 auth_uid 컬럼이 추가되기 전까지 null 반환.
   const loadStoreFromCloud = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('stores')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
-      if (error || !data) return null;
-      // AsyncStorage에도 캐시
-      const biz = {
-        bizNo:    data.biz_no || data.store_id || '',
-        bizName:  data.store_name || '',
-        owner:    data.owner || '',
-        bizType:  data.biz_type || '개인사업자',
-        addrSi:   data.region_si || '',
-        addrGu:   data.region_gu || '',
-        addrDong: data.region_dong || '',
-        species:  data.species || [],
-      };
-      await AsyncStorage.setItem('@meatbig_biz', JSON.stringify(biz));
-      await AsyncStorage.setItem('@meatbig_onboarded', 'true');
-      if (data.invite_pin) {
-        await AsyncStorage.setItem('@meatbig_invite_pin', data.invite_pin);
-      }
-      return biz;
-    } catch { return null; }
+    // TODO: stores 테이블에 auth_uid 컬럼 추가 후, 아래 구현으로 복귀:
+    //   .from('stores').select('*').eq('auth_uid', user.id).maybeSingle()
+    return null;
   }, []);
 
   // store_members에서 직원 정보 불러오기
