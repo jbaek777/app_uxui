@@ -12,6 +12,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Alert, ActivityIndicator, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { C, F, R, SH } from '../lib/v5';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
@@ -37,6 +38,7 @@ const fmt = (n, digits = 0) => {
 };
 
 export default function CarcassWeighingScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
 
@@ -495,6 +497,8 @@ export default function CarcassWeighingScreen({ navigation }) {
       style={{ flex: 1, backgroundColor: C.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      {/* 상태바 영역 흰 배경 */}
+      <View style={{ height: insets.top, backgroundColor: C.white }} />
       {/* ── 헤더 ── */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backBtn}>

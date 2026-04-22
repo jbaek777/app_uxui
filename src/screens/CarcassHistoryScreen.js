@@ -13,6 +13,7 @@ import {
   ActivityIndicator, RefreshControl, Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { C, F, R, SH } from '../lib/v5';
 import { carcassStore } from '../lib/carcassStore';
@@ -75,6 +76,7 @@ function normalize(s) {
 }
 
 export default function CarcassHistoryScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefresh]  = useState(false);
   const [sessions, setSessions]   = useState([]);
@@ -117,6 +119,8 @@ export default function CarcassHistoryScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* 상태바 영역 흰 배경 */}
+      <View style={{ height: insets.top, backgroundColor: C.white }} />
       {/* 헤더 */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backBtn}>
