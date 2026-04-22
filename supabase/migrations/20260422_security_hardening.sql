@@ -117,9 +117,21 @@ CREATE POLICY sm_owner_write ON store_members
 -- 반복 정책 적용 함수 (공통 로직)
 CREATE OR REPLACE FUNCTION apply_store_rls(tbl TEXT) RETURNS VOID AS $$
 DECLARE
-  policy_name TEXT;
+  col_type TEXT;
 BEGIN
-  -- store_id 컬럼 추가 (이미 있으면 스킵)
+  -- 기존 store_id 컬럼이 TEXT(옛날 bizNo 포맷)이면 *_legacy 로 개명
+  -- → 새 UUID 컬럼과 충돌 방지, 옛 데이터는 보존 (수동 백필용)
+  SELECT data_type INTO col_type
+    FROM information_schema.columns
+   WHERE table_schema='public' AND table_name=tbl AND column_name='store_id';
+
+  IF col_type IS NOT NULL AND col_type <> 'uuid' THEN
+    -- 옛 인덱스도 함께 개명 (이름 충돌 방지)
+    EXECUTE format('ALTER INDEX IF EXISTS idx_%s_store_id RENAME TO idx_%s_store_id_legacy', tbl, tbl);
+    EXECUTE format('ALTER TABLE %I RENAME COLUMN store_id TO store_id_legacy', tbl);
+  END IF;
+
+  -- UUID store_id 컬럼 추가 (이미 UUID 면 스킵)
   EXECUTE format('ALTER TABLE %I ADD COLUMN IF NOT EXISTS store_id UUID', tbl);
   EXECUTE format('CREATE INDEX IF NOT EXISTS idx_%s_store_id ON %I(store_id)', tbl, tbl);
 
@@ -169,9 +181,18 @@ DROP FUNCTION IF EXISTS apply_store_rls(TEXT);
 --
 -- 추천 전략:
 --   1) 테스트 데이터라면 → 전부 DELETE 후 새로 시작
---   2) 실데이터라면      → 수동으로 owner_email 기반 매핑 작성
+--   2) 실데이터라면      → store_id_legacy (옛 bizNo TEXT) ↔ stores.store_id 매칭으로 UUID 백필
 --
--- 샘플 (필요시 주석 해제 후 수동 실행):
+-- 2) 실데이터 백필 샘플 (필요시 주석 해제 후 수동 실행):
+--
+-- UPDATE meat_inventory m
+--    SET store_id = s.id
+--   FROM stores s
+--  WHERE m.store_id IS NULL
+--    AND m.store_id_legacy = s.store_id;
+-- (다른 테이블 동일 패턴 반복)
+--
+-- 1) 테스트 데이터 삭제 샘플 (필요시 주석 해제 후 수동 실행):
 --
 -- DELETE FROM meat_inventory   WHERE store_id IS NULL;
 -- DELETE FROM sales_history    WHERE store_id IS NULL;
