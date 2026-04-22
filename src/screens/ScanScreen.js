@@ -29,8 +29,9 @@ async function checkOnline() {
   }
 }
 
-export default function ScanScreen({ navigation }) {
-  const [mode, setMode] = useState('trace'); // 'trace' | 'ocr'
+export default function ScanScreen({ navigation, embedded = false, initialMode = 'trace' }) {
+  // embedded=true: DocumentScreen(서류 허브) 내부에서 세그먼트로 렌더링 — 자체 헤더/모드탭 숨김
+  const [mode, setMode] = useState(initialMode); // 'trace' | 'ocr'
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -197,41 +198,44 @@ export default function ScanScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      {/* ── V5 헤더 + 탭 ── */}
-      <View style={[styles.v5Header]}>
-        <View style={styles.v5HeaderAccent} />
-        <View style={styles.v5HeaderRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-            <View style={{ width: 33, height: 33, borderRadius: 10, backgroundColor: '#B91C1C', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="scan" size={17} color="#fff" />
+      {/* ── V5 헤더 + 탭 (embedded 모드에서는 상위 DocsHub의 헤더·세그먼트로 대체) ── */}
+      {!embedded && (
+        <>
+          <View style={[styles.v5Header]}>
+            <View style={styles.v5HeaderAccent} />
+            <View style={styles.v5HeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                <View style={{ width: 33, height: 33, borderRadius: 10, backgroundColor: '#B91C1C', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="scan" size={17} color="#fff" />
+                </View>
+                <Text style={styles.v5PageTitle}>이력 조회</Text>
+              </View>
+              {isOnline
+                ? <View style={styles.v5OnlineBadge}><Text style={styles.v5OnlineTxt}>● 온라인</Text></View>
+                : <View style={[styles.v5OnlineBadge, { backgroundColor:'#FEF3C7' }]}><Text style={[styles.v5OnlineTxt, { color:'#B45309' }]}>● 오프라인</Text></View>
+              }
             </View>
-            <Text style={styles.v5PageTitle}>이력 조회</Text>
           </View>
-          {isOnline
-            ? <View style={styles.v5OnlineBadge}><Text style={styles.v5OnlineTxt}>● 온라인</Text></View>
-            : <View style={[styles.v5OnlineBadge, { backgroundColor:'#FEF3C7' }]}><Text style={[styles.v5OnlineTxt, { color:'#B45309' }]}>● 오프라인</Text></View>
-          }
-        </View>
-      </View>
-      {/* ── 상단 세그먼트 탭 ── */}
-      <View style={[styles.segmentBar, { backgroundColor: C.white, borderBottomColor: C.border }]}>
-        <TouchableOpacity
-          style={[styles.segmentTab, mode === 'trace' && { borderBottomColor: C.red }]}
-          onPress={() => setMode('trace')}
-        >
-          <Text style={[styles.segmentText, { color: mode === 'trace' ? C.red : C.t3 }, mode === 'trace' && { fontWeight: '900' }]}>
-            🏷️ 이력 조회
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.segmentTab, mode === 'ocr' && { borderBottomColor: C.pur }]}
-          onPress={() => setMode('ocr')}
-        >
-          <Text style={[styles.segmentText, { color: mode === 'ocr' ? C.pur : C.t3 }, mode === 'ocr' && { fontWeight: '900' }]}>
-            📄 서류 OCR
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <View style={[styles.segmentBar, { backgroundColor: C.white, borderBottomColor: C.border }]}>
+            <TouchableOpacity
+              style={[styles.segmentTab, mode === 'trace' && { borderBottomColor: C.red }]}
+              onPress={() => setMode('trace')}
+            >
+              <Text style={[styles.segmentText, { color: mode === 'trace' ? C.red : C.t3 }, mode === 'trace' && { fontWeight: '900' }]}>
+                🏷️ 이력 조회
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.segmentTab, mode === 'ocr' && { borderBottomColor: C.pur }]}
+              onPress={() => setMode('ocr')}
+            >
+              <Text style={[styles.segmentText, { color: mode === 'ocr' ? C.pur : C.t3 }, mode === 'ocr' && { fontWeight: '900' }]}>
+                📄 서류 OCR
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
 
       {/* OCR 탭 */}
       {mode === 'ocr' && <OCRHub navigation={navigation} />}

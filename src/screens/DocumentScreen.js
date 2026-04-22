@@ -10,6 +10,10 @@ import {
   genHygieneHTML, genTempHTML, genAgingHTML, genStaffHTML,
   genEducationAllHTML, genTaxReportHTML, printAndShare,
 } from '../lib/pdfTemplate';
+import ScreenHeader from '../components/ScreenHeader';
+import SegmentTabs from '../components/SegmentTabs';
+import ScanScreen from './ScanScreen';
+import UploadScreen from './UploadScreen';
 
 // ── V5 색상 상수 ──────────────────────────────────────────────
 const C = {
@@ -160,10 +164,18 @@ const ScBtn = ({ icon, label, iconColor, iconBg, onPress, plan }) => (
   </TouchableOpacity>
 );
 
+// ── 상단 세그먼트: 서류관리 / 이력조회 / 서류OCR ─────────────
+const SEGMENTS = [
+  { key: 'docs', label: '서류관리', icon: 'folder-outline' },
+  { key: 'scan', label: '이력조회', icon: 'scan-outline' },
+  { key: 'ocr',  label: '서류OCR', icon: 'camera-outline' },
+];
+
 export default function DocumentScreen({ navigation }) {
   const { role, canAccess } = useRole();
   const isStaff = role === 'staff';
 
+  const [segment, setSegment] = useState('docs'); // 'docs' | 'scan' | 'ocr'
   const [printModal, setPrintModal] = useState(false);
   const [printing, setPrinting] = useState(false);
 
@@ -192,81 +204,96 @@ export default function DocumentScreen({ navigation }) {
   return (
     <View style={S.container}>
 
-      {/* ── 헤더 ── */}
-      <View style={S.header}>
-        <View style={S.headerAccent} />
-        <View style={S.headerTop}>
-          <View style={S.brand}>
-            <View style={S.brandIc}>
-              <Ionicons name="document-text" size={18} color="#fff" />
+      {/* ── 공통 ScreenHeader (뒤로가기 + 일체감) ── */}
+      <ScreenHeader
+        title="서류·조회"
+        iconName="document-text-outline"
+        onBackPressOverride={() => {
+          // 탭 루트에서는 홈탭으로 이동
+          try { navigation.getParent?.()?.navigate?.('HomeTab'); } catch (_) {}
+        }}
+      />
+
+      {/* ── 상단 세그먼트 탭 ── */}
+      <SegmentTabs
+        tabs={SEGMENTS}
+        activeKey={segment}
+        onChange={setSegment}
+      />
+
+      {/* ── 세그먼트별 콘텐츠 ── */}
+      {segment === 'scan' && (
+        <ScanScreen embedded initialMode="trace" navigation={navigation} />
+      )}
+
+      {segment === 'ocr' && (
+        <UploadScreen embedded navigation={navigation} />
+      )}
+
+      {segment === 'docs' && (
+        <ScrollView contentContainerStyle={S.scroll}>
+
+          {/* ── 바로가기 그리드 (3x2) ── */}
+          <View style={S.scGrid}>
+            <ScBtn icon="shield-checkmark" label="위생 일지"  iconColor={C.blue2} iconBg={C.blueS} onPress={() => navigateSafe('Hygiene')} />
+            <ScBtn icon="thermometer"      label="온도 기록"  iconColor={C.blue2} iconBg={C.blueS} onPress={() => navigateSafe('Temp')} />
+            <ScBtn icon="calculator"       label="마감 정산"  iconColor={C.red}   iconBg={C.redS}  onPress={() => navigateSafe('Closing')} />
+            <ScBtn icon="nutrition"        label="숙성 관리"  iconColor={C.warn2} iconBg={C.warnS} onPress={() => navigateSafe('Aging')} />
+            <ScBtn icon="book"             label="교육 일지"  iconColor={C.ok2}   iconBg={C.okS}   onPress={() => navigateSafe('Education')} plan="basic" />
+            <ScBtn icon="bar-chart"        label="세무 리포트" iconColor={C.pur}  iconBg={C.purS}  onPress={() => navigateSafe('TaxReport')} plan="pro" />
+          </View>
+
+          {/* ── 서류 출력 섹션 ── */}
+          <View style={S.sec}><Text style={S.secT}>서류 출력</Text></View>
+          <View style={S.docList}>
+            {DOCS.map(doc => {
+              const locked = isStaff && OWNER_ONLY.includes(doc.screen);
+              const pillLocked = doc.plan === 'basic' ? '베이직↑' : doc.plan === 'pro' ? '프로↑' : null;
+              return (
+                <TouchableOpacity
+                  key={doc.id}
+                  style={[S.docItem, locked && { opacity: 0.5 }]}
+                  onPress={() => navigateSafe(doc.screen)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[S.docIc, { backgroundColor: doc.iconBg }]}>
+                    <Ionicons name={doc.icon} size={20} color={doc.iconColor} />
+                  </View>
+                  <View style={S.docTx}>
+                    <Text style={S.docNm}>{doc.title}</Text>
+                    <Text style={S.docSb}>{doc.desc}</Text>
+                  </View>
+                  {pillLocked ? (
+                    <View style={S.pillGray}><Text style={S.pillGrayTxt}>{pillLocked}</Text></View>
+                  ) : (
+                    <View style={S.pillBlue}><Text style={S.pillBlueTxt}>출력 가능</Text></View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* ── PDF 일괄 출력 버튼 ── */}
+          <TouchableOpacity style={S.bulkBtn} onPress={() => setPrintModal(true)} activeOpacity={0.85}>
+            <View style={S.bulkIc}>
+              <Ionicons name="print" size={22} color="#fff" />
             </View>
-            <Text style={S.brandNm}>서류 관리</Text>
+            <View style={S.bulkTx}>
+              <Text style={S.bulkTtl}>PDF 일괄 출력</Text>
+              <Text style={S.bulkSb}>위생·온도·숙성·교육·세무 PDF 생성 및 공유</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
+          </TouchableOpacity>
+
+          {/* ── 플랜 안내 ── */}
+          <View style={S.planNotice}>
+            <Text style={S.planNoticeTxt}>
+              교육일지는 베이직, 세무리포트는 프로 플랜에서 출력 가능합니다.
+            </Text>
           </View>
-        </View>
-      </View>
 
-      <ScrollView contentContainerStyle={S.scroll}>
-
-        {/* ── 바로가기 그리드 (3x2) ── */}
-        <View style={S.scGrid}>
-          <ScBtn icon="shield-checkmark" label="위생 일지"  iconColor={C.blue2} iconBg={C.blueS} onPress={() => navigateSafe('Hygiene')} />
-          <ScBtn icon="thermometer"      label="온도 기록"  iconColor={C.blue2} iconBg={C.blueS} onPress={() => navigateSafe('Temp')} />
-          <ScBtn icon="calculator"       label="마감 정산"  iconColor={C.red}   iconBg={C.redS}  onPress={() => navigateSafe('Closing')} />
-          <ScBtn icon="nutrition"        label="숙성 관리"  iconColor={C.warn2} iconBg={C.warnS} onPress={() => navigateSafe('Aging')} />
-          <ScBtn icon="book"             label="교육 일지"  iconColor={C.ok2}   iconBg={C.okS}   onPress={() => navigateSafe('Education')} plan="basic" />
-          <ScBtn icon="bar-chart"        label="세무 리포트" iconColor={C.pur}  iconBg={C.purS}  onPress={() => navigateSafe('TaxReport')} plan="pro" />
-        </View>
-
-        {/* ── 서류 출력 섹션 ── */}
-        <View style={S.sec}><Text style={S.secT}>서류 출력</Text></View>
-        <View style={S.docList}>
-          {DOCS.map(doc => {
-            const locked = isStaff && OWNER_ONLY.includes(doc.screen);
-            const pillLocked = doc.plan === 'basic' ? '베이직↑' : doc.plan === 'pro' ? '프로↑' : null;
-            return (
-              <TouchableOpacity
-                key={doc.id}
-                style={[S.docItem, locked && { opacity: 0.5 }]}
-                onPress={() => navigateSafe(doc.screen)}
-                activeOpacity={0.8}
-              >
-                <View style={[S.docIc, { backgroundColor: doc.iconBg }]}>
-                  <Ionicons name={doc.icon} size={20} color={doc.iconColor} />
-                </View>
-                <View style={S.docTx}>
-                  <Text style={S.docNm}>{doc.title}</Text>
-                  <Text style={S.docSb}>{doc.desc}</Text>
-                </View>
-                {pillLocked ? (
-                  <View style={S.pillGray}><Text style={S.pillGrayTxt}>{pillLocked}</Text></View>
-                ) : (
-                  <View style={S.pillBlue}><Text style={S.pillBlueTxt}>출력 가능</Text></View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* ── PDF 일괄 출력 버튼 ── */}
-        <TouchableOpacity style={S.bulkBtn} onPress={() => setPrintModal(true)} activeOpacity={0.85}>
-          <View style={S.bulkIc}>
-            <Ionicons name="print" size={22} color="#fff" />
-          </View>
-          <View style={S.bulkTx}>
-            <Text style={S.bulkTtl}>PDF 일괄 출력</Text>
-            <Text style={S.bulkSb}>위생·온도·숙성·교육·세무 PDF 생성 및 공유</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
-        </TouchableOpacity>
-
-        {/* ── 플랜 안내 ── */}
-        <View style={S.planNotice}>
-          <Text style={S.planNoticeTxt}>
-            교육일지는 베이직, 세무리포트는 프로 플랜에서 출력 가능합니다.
-          </Text>
-        </View>
-
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {/* ── 출력 로딩 오버레이 ── */}
       {printing && (

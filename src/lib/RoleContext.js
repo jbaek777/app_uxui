@@ -29,8 +29,8 @@ const ROLE_KEY      = '@meatbig_role';          // 앱 재기동 시 role 복원
 const CUR_STAFF_KEY = '@meatbig_current_staff'; // 앱 재기동 시 직원명/ID 복원
 const DEFAULT_PIN   = '0000';
 
-// 직원 모드 허용 탭
-export const STAFF_ALLOWED_TABS = ['HomeTab', 'TraceTab', 'DocsTab'];
+// 직원 모드 허용 탭 (Option D: 조회 탭 제거, 채용 탭 추가)
+export const STAFF_ALLOWED_TABS = ['HomeTab', 'DocsTab', 'JobTab'];
 // 직원 모드 허용 서류 화면
 export const STAFF_ALLOWED_DOCS = ['Hygiene', 'Temp', 'Staff'];
 // 사장 전용 기능 키

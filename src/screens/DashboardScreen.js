@@ -10,6 +10,7 @@ import { lightColors, darkColors, fontSize, spacing, radius } from '../theme';
 import { useTheme } from '../lib/ThemeContext';
 import { meatInventory, hygieneData } from '../data/mockData';
 import { meatStore, hygieneStore } from '../lib/dataStore';
+import { useRole } from '../lib/RoleContext';
 
 const getBuyPrice  = m => m.buyPrice  || m.buy_price  || 0;
 const getSellPrice = m => m.sellPrice || m.sell_price || 0;
@@ -51,6 +52,8 @@ const C = {
 export default function DashboardScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
+  const { role } = useRole();
+  const isStaff = role === 'staff';
   const [bizName, setBizName]     = useState('');
   const [meat, setMeat]           = useState([]);
   const [hygieneLogs, setHygiene] = useState([]);
@@ -97,12 +100,13 @@ export default function DashboardScreen({ navigation }) {
   const checkDoneCount = [!hygieneNeeded, true, true].filter(Boolean).length;
 
   const QUICK_ACTIONS = [
-    { ionicon:'scan-outline', label:'이력\n스캔', tab:'TraceTab', screen:'Scan', main:true },
+    // Option D: 이력조회는 서류 탭 내부 세그먼트로 흡수 → DocsTab으로 이동
+    { ionicon:'scan-outline', label:'이력\n조회', tab:'DocsTab', screen:'Documents', main:true },
     { ionicon:'shield-checkmark-outline', label:'위생\n일지', tab:'DocsTab', screen:'Hygiene', main:false },
     { ionicon:'nutrition-outline', label:'숙성\n관리', tab:'DocsTab', screen:'Aging', main:false },
     { ionicon:'document-text-outline', label:'서류\n출력', tab:'DocsTab', screen:'Documents', main:false },
     { ionicon:'calculator-outline', label:'마감\n정산', tab:'DocsTab', screen:'Closing', main:false },
-    { ionicon:'cube-outline', label:'재고\n확인', tab:'InventoryTab', screen:null, main:false },
+    { ionicon:'briefcase-outline', label:'인재\n찾기', tab:'JobTab', screen:null, main:false },
   ];
 
   const PHOTO_COLORS = ['#6B1515', '#7A2010', '#6B3010', '#4A2800'];
@@ -264,7 +268,7 @@ export default function DashboardScreen({ navigation }) {
             label="이력번호 조회" sub="바코드 스캔으로 확인"
             stripe={C.red} iconBg={C.redS} iconName="pricetag-outline"
             badgeColor={C.red} badgeTxt="2건"
-            onPress={() => navigation.navigate('TraceTab', { screen:'Scan' })}
+            onPress={() => navigation.navigate('DocsTab', { screen:'Documents' })}
           />
           <CheckItem
             label="위생점검" sub="오전 위생일지 작성"
@@ -391,6 +395,33 @@ export default function DashboardScreen({ navigation }) {
           </>
         )}
 
+        {/* 채용 진입 카드 (사장: 인재 찾기 / 직원: 내 구직) */}
+        <TouchableOpacity
+          style={[styles.jobCard, { backgroundColor: isStaff ? '#2563EB' : C.red }]}
+          onPress={() => navigation.navigate('JobTab')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.jobCardIc}>
+            <Ionicons
+              name={isStaff ? 'person-outline' : 'briefcase-outline'}
+              size={22} color="#fff"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.jobCardTtl}>
+              {isStaff ? '내 구직 프로필 관리' : '우리 가게, 인재 찾기'}
+            </Text>
+            <Text style={styles.jobCardSb}>
+              {isStaff
+                ? '자가역량평가 · 헤드헌팅 제안 확인'
+                : '자가역량평가 등급 기반 인재 풀 · 프로모 무료'}
+            </Text>
+          </View>
+          <View style={styles.jobCardBadge}>
+            <Text style={styles.jobCardBadgeTxt}>NEW</Text>
+          </View>
+        </TouchableOpacity>
+
         {/* 빠른 실행 */}
         <SecHeader label="빠른 실행" />
         <View style={styles.quickGrid}>
@@ -404,7 +435,7 @@ export default function DashboardScreen({ navigation }) {
               }}
               activeOpacity={0.8}
             >
-              {urgent.length > 0 && q.screen === 'Scan' && (
+              {urgent.length > 0 && q.main && (
                 <View style={styles.quickBadge}><Text style={{ fontSize:8, color:'#fff', fontWeight:'800' }}>{urgent.length}</Text></View>
               )}
               <View style={[styles.quickIcon, q.main && styles.quickIconMain]}>
@@ -561,6 +592,24 @@ const styles = StyleSheet.create({
   mgBarBg:      { height:5, backgroundColor:C.bg3, borderRadius:10, overflow:'hidden' },
   mgBarFill:    { height:5, borderRadius:10 },
   mgPct:        { fontSize:20, fontWeight:'900', minWidth:42, textAlign:'right', letterSpacing:-0.5 },
+
+  // 채용 진입 카드 (NEW — 구인구직 허브)
+  jobCard: {
+    flexDirection:'row', alignItems:'center', gap:12,
+    marginHorizontal:16, marginBottom:14,
+    borderRadius:16, padding:16,
+  },
+  jobCardIc: {
+    width:44, height:44, borderRadius:12,
+    backgroundColor:'rgba(255,255,255,0.16)',
+    alignItems:'center', justifyContent:'center',
+  },
+  jobCardTtl: { color:'#fff', fontSize:15, fontWeight:'900', marginBottom:3, letterSpacing:-0.3 },
+  jobCardSb:  { color:'rgba(255,255,255,0.85)', fontSize:12, fontWeight:'600' },
+  jobCardBadge: {
+    backgroundColor:'#fff', paddingHorizontal:9, paddingVertical:4, borderRadius:6,
+  },
+  jobCardBadgeTxt: { color:C.red, fontSize:10, fontWeight:'900', letterSpacing:0.5 },
 
   // 빠른 실행
   quickGrid:    { paddingHorizontal:16, paddingBottom:10, flexDirection:'row', flexWrap:'wrap', gap:10 },

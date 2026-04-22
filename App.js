@@ -38,6 +38,8 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import UploadScreen from './src/screens/UploadScreen';
 import { TempScreen, StaffScreen } from './src/screens/OtherScreens';
 import EducationScreen from './src/screens/EducationScreen';
+import JobOwnerHubScreen from './src/screens/JobOwnerHubScreen';
+import JobStaffHubScreen from './src/screens/JobStaffHubScreen';
 import { requestNotificationPermission, scheduleDailyHygieneReminder, scheduleDailyExpiryReminder } from './src/utils/notifications';
 
 const Tab = createBottomTabNavigator();
@@ -68,18 +70,7 @@ function HomeStack() {
   );
 }
 
-// ── Tab 2: 조회/스캔 (이력번호 + 서류 OCR 통합) ──────────
-function TraceStack() {
-  const headerOpts = useHeaderOpts();
-  return (
-    <Stack.Navigator screenOptions={headerOpts}>
-      <Stack.Screen name="Scan" component={ScanScreen} options={{ title: '🔍 조회 · 스캔' }} />
-      <Stack.Screen name="TraceOCR" component={UploadScreen} options={{ title: '📷 서류 스캔·AI OCR' }} />
-    </Stack.Navigator>
-  );
-}
-
-// ── Tab 3: 재고·수율 ─────────────────────────────────────
+// ── Tab 2: 재고·수율 ─────────────────────────────────────
 function InventoryStack() {
   const headerOpts = useHeaderOpts();
   return (
@@ -92,20 +83,41 @@ function InventoryStack() {
   );
 }
 
-// ── Tab 4: 서류·출력 ─────────────────────────────────────
+// ── Tab 3: 서류·조회·OCR (Option D — 조회 탭 흡수) ────────────
+// DocumentScreen이 상단 세그먼트(서류관리/이력조회/서류OCR)로 3개를 통합
 function DocsStack() {
   const headerOpts = useHeaderOpts();
   return (
     <Stack.Navigator screenOptions={headerOpts}>
-      <Stack.Screen name="Documents" component={DocumentScreen} options={{ title: '🖨️ 서류·출력' }} />
+      <Stack.Screen name="Documents" component={DocumentScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Hygiene" component={HygieneScreen} options={{ title: '🧼 위생 일지' }} />
       <Stack.Screen name="Temp" component={TempScreen} options={{ title: '🌡️ 온도·습도 기록' }} />
       <Stack.Screen name="Closing" component={ClosingScreen} options={{ title: '💰 마감 정산' }} />
       <Stack.Screen name="Upload" component={UploadScreen} options={{ title: '📷 서류 스캔·AI OCR' }} />
+      <Stack.Screen name="TraceOCR" component={UploadScreen} options={{ title: '📷 서류 스캔·AI OCR' }} />
       <Stack.Screen name="Staff" component={StaffScreen} options={{ title: '👥 직원 보건증 현황' }} />
       <Stack.Screen name="Aging" component={AgingScreen} options={{ title: '🥩 숙성 관리' }} />
       <Stack.Screen name="Education" component={EducationScreen} options={{ title: '📚 교육일지' }} />
       <Stack.Screen name="TaxReport" component={TaxReportScreen} options={{ title: '📊 세무 리포트' }} />
+    </Stack.Navigator>
+  );
+}
+
+// ── Tab 4: 💼 채용 (사장) / 📤 내 구직 (직원) ────────────────
+function JobOwnerStack() {
+  const headerOpts = useHeaderOpts();
+  return (
+    <Stack.Navigator screenOptions={headerOpts}>
+      <Stack.Screen name="JobOwnerHub" component={JobOwnerHubScreen} options={{ headerShown: false }} />
+    </Stack.Navigator>
+  );
+}
+
+function JobStaffStack() {
+  const headerOpts = useHeaderOpts();
+  return (
+    <Stack.Navigator screenOptions={headerOpts}>
+      <Stack.Screen name="JobStaffHub" component={JobStaffHubScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -242,16 +254,7 @@ function MainTabs({ bizData }) {
             }}
           />
         )}
-        {/* 3. 조회/스캔 */}
-        <Tab.Screen
-          name="TraceTab"
-          component={TraceStack}
-          options={{
-            tabBarIcon: ({ focused }) =>
-              <TabIcon iconOn="scan" iconOff="scan-outline" label="조회" focused={focused} />,
-          }}
-        />
-        {/* 4. 서류 */}
+        {/* 3. 서류 (조회/OCR 흡수 — Option D) */}
         <Tab.Screen
           name="DocsTab"
           component={DocsStack}
@@ -260,6 +263,26 @@ function MainTabs({ bizData }) {
               <TabIcon iconOn="document-text" iconOff="document-text-outline" label="서류" focused={focused} />,
           }}
         />
+        {/* 4. 채용 — 사장: 인재 탐색 / 직원: 내 구직 */}
+        {!isStaff ? (
+          <Tab.Screen
+            name="JobTab"
+            component={JobOwnerStack}
+            options={{
+              tabBarIcon: ({ focused }) =>
+                <TabIcon iconOn="briefcase" iconOff="briefcase-outline" label="채용" focused={focused} />,
+            }}
+          />
+        ) : (
+          <Tab.Screen
+            name="JobTab"
+            component={JobStaffStack}
+            options={{
+              tabBarIcon: ({ focused }) =>
+                <TabIcon iconOn="person" iconOff="person-outline" label="내구직" focused={focused} />,
+            }}
+          />
+        )}
         {/* 5. 설정 — 사장만 */}
         {!isStaff && (
           <Tab.Screen
