@@ -84,7 +84,7 @@ function formatBizNo(raw) {
 }
 
 export default function OnboardingScreen({ onDone }) {
-  // mode: 'select' | 'owner' | 'employee'
+  // mode: 'select' | 'owner' | 'employee' | 'jobseeker'
   const [mode, setMode] = useState('select');
 
   // ── 사장 플로우 ──
@@ -94,6 +94,12 @@ export default function OnboardingScreen({ onDone }) {
   const [bizChecking, setBizChecking] = useState(false); // API 조회 중
   const [species, setSpecies] = useState([]);
   const [staff, setStaff] = useState([{ name: '', role: '사장', pin: '' }]);
+
+  // ── 구직자 플로우 (무소속) ──
+  const [jsName, setJsName] = useState('');
+  const [jsPhone, setJsPhone] = useState('');
+  const [jsYears, setJsYears] = useState('');
+  const [jsSubmitting, setJsSubmitting] = useState(false);
 
   // ── 주소 피커 ──
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -332,6 +338,83 @@ export default function OnboardingScreen({ onDone }) {
     }
   };
 
+  // ─── 구직자(무소속) 가입 ─────────────────────────────────
+  // 사업장 없이 이력만 관리 + 사장에게 헤드헌팅 받기.
+  // 이름 + 연락처 + 경력연차만 받고 job_profiles 에 프로필 선생성.
+  // 나머지 상세(자가역량평가·희망부위·자기소개)는 JobProfileEditor 에서 채움.
+  const joinAsJobseeker = async () => {
+    const name = jsName.trim();
+    const phone = jsPhone.replace(/[^0-9]/g, '');
+    const years = parseInt(jsYears, 10);
+
+    if (!name) { Alert.alert('입력 오류', '이름을 입력해주세요.'); return; }
+    if (phone.length < 10 || phone.length > 11) {
+      Alert.alert('입력 오류', '올바른 휴대전화 번호를 입력해주세요.');
+      return;
+    }
+    if (isNaN(years) || years < 0 || years > 60) {
+      Alert.alert('입력 오류', '경력 연차는 0~60 사이 숫자로 입력해주세요.');
+      return;
+    }
+
+    setJsSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('로그인 필요', '세션이 만료되었습니다. 다시 로그인해주세요.');
+        setJsSubmitting(false);
+        return;
+      }
+
+      // 같은 사용자가 이미 프로필을 만들었으면 그것을 재사용(upsert)
+      const { error: upsertErr } = await supabase
+        .from('job_profiles')
+        .upsert({
+          auth_uid:     user.id,
+          full_name:    name,
+          phone,
+          career_years: years,
+          is_public:    false,       // JobProfileEditor 에서 공개 여부 결정
+          phone_verified: false,     // PASS 연동 후 true
+        }, { onConflict: 'auth_uid' });
+
+      if (upsertErr) {
+        // unique constraint 가 아직 안 걸려있으면 단순 insert 로 폴백
+        const { error: insertErr } = await supabase
+          .from('job_profiles')
+          .insert({
+            auth_uid:     user.id,
+            full_name:    name,
+            phone,
+            career_years: years,
+            is_public:    false,
+            phone_verified: false,
+          });
+        if (insertErr && !(insertErr.code === '23505')) {
+          Alert.alert('가입 실패', insertErr.message || '프로필 저장 중 오류');
+          setJsSubmitting(false);
+          return;
+        }
+      }
+
+      // 로컬 플래그 — 사업장 없음 모드
+      await AsyncStorage.multiSet([
+        ['@meatbig_onboarded', 'true'],
+        ['@meatbig_role', 'jobseeker'],
+        ['@meatbig_jobseeker_name', name],
+      ]);
+      // 사업장 관련 캐시는 모두 비움
+      await AsyncStorage.multiRemove([
+        '@meatbig_biz', '@meatbig_staff', '@meatbig_invite_pin', '@meatbig_store_uuid',
+      ]);
+
+      onDone({ jobseeker: true, profile: { name, phone, years } });
+    } catch (e) {
+      Alert.alert('오류', e?.message || '가입 중 오류가 발생했습니다.');
+    }
+    setJsSubmitting(false);
+  };
+
   const toggleSpecies = (s) => {
     setSpecies(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   };
@@ -348,22 +431,75 @@ export default function OnboardingScreen({ onDone }) {
   if (mode === 'select') {
     return (
       <View style={styles.container}>
-        <View style={styles.selectWrap}>
+        <ScrollView contentContainerStyle={styles.selectWrap}>
           <Text style={styles.selectTitle}>MeatBig에{'\n'}오신 것을 환영합니다 🥩</Text>
-          <Text style={styles.selectSub}>사장님이신가요, 직원이신가요?</Text>
+          <Text style={styles.selectSub}>어떻게 시작하시겠어요?</Text>
 
           <TouchableOpacity style={styles.roleCard} onPress={() => setMode('owner')} activeOpacity={0.85}>
-            <Text style={{ fontSize: 48, marginBottom: spacing.sm }}>👨‍🍳</Text>
+            <Text style={{ fontSize: 44, marginBottom: spacing.xs }}>👨‍🍳</Text>
             <Text style={styles.roleCardTitle}>사장님으로 시작</Text>
             <Text style={styles.roleCardDesc}>사업장 정보를 등록하고{'\n'}처음 시작합니다</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.roleCard, { borderColor: colors.a2, backgroundColor: colors.a2 + '12' }]}
             onPress={() => setMode('employee')} activeOpacity={0.85}>
-            <Text style={{ fontSize: 48, marginBottom: spacing.sm }}>👷</Text>
+            <Text style={{ fontSize: 44, marginBottom: spacing.xs }}>👷</Text>
             <Text style={[styles.roleCardTitle, { color: colors.a2 }]}>직원으로 참여</Text>
             <Text style={styles.roleCardDesc}>사장님에게 받은 초대 코드로{'\n'}참여합니다</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.roleCard, { borderColor: '#22c55e', backgroundColor: '#22c55e' + '12' }]}
+            onPress={() => setMode('jobseeker')} activeOpacity={0.85}>
+            <Text style={{ fontSize: 44, marginBottom: spacing.xs }}>🔍</Text>
+            <Text style={[styles.roleCardTitle, { color: '#22c55e' }]}>구직자로 가입</Text>
+            <Text style={styles.roleCardDesc}>사업장 없이 이력 관리 +{'\n'}사장님의 헤드헌팅 받기</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // 구직자(무소속) 가입 화면
+  // ═══════════════════════════════════════════════════════
+  if (mode === 'jobseeker') {
+    return (
+      <View style={styles.container}>
+        <View style={styles.progressWrap}>
+          <View style={[styles.progressDot, { backgroundColor: '#22c55e', flex: 3 }]} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}>
+          <Text style={styles.stepLabel}>구직자 가입</Text>
+          <Text style={styles.stepTitle}>간단한 정보만{'\n'}입력하면 시작합니다</Text>
+          <Text style={[styles.stepSub, { marginBottom: spacing.xl }]}>
+            자세한 경력·희망 조건은 가입 후 프로필 편집에서 채울 수 있어요.
+          </Text>
+
+          <FieldInput label="이름 *" placeholder="홍길동"
+            value={jsName} onChangeText={setJsName} />
+          <FieldInput label="휴대전화 *" placeholder="01012345678"
+            value={jsPhone} onChangeText={t => setJsPhone(t.replace(/[^0-9]/g, ''))}
+            keyboardType="numeric" />
+          <FieldInput label="경력 연차 *" placeholder="예: 3 (정육업계 경력, 년)"
+            value={jsYears} onChangeText={t => setJsYears(t.replace(/[^0-9]/g, '').slice(0, 2))}
+            keyboardType="numeric" />
+
+          <View style={[styles.infoBox, { backgroundColor: '#22c55e' + '15', borderColor: '#22c55e' + '40' }]}>
+            <Text style={[styles.infoBoxText, { color: '#166534' }]}>
+              🔒 프로필은 처음엔 비공개예요.{'\n'}
+              공개 여부와 자기소개는 JobProfileEditor 에서 직접 설정할 수 있습니다.
+            </Text>
+          </View>
+        </ScrollView>
+        <View style={styles.footer}>
+          <OutlineBtn label="뒤로" onPress={() => setMode('select')} style={{ flex: 1 }} />
+          <PrimaryBtn
+            label={jsSubmitting ? '가입 중...' : '구직 시작하기 🚀'}
+            onPress={joinAsJobseeker}
+            color="#22c55e"
+            disabled={jsSubmitting}
+            style={{ flex: 2 }}
+          />
         </View>
       </View>
     );
@@ -630,13 +766,13 @@ const FieldInput = ({ label, ...props }) => (
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
-  // 역할 선택 화면
-  selectWrap: { flex: 1, padding: spacing.lg, paddingTop: 80, justifyContent: 'center' },
+  // 역할 선택 화면 — 3-way 카드 (ScrollView 용)
+  selectWrap: { flexGrow: 1, padding: spacing.lg, paddingTop: 60, paddingBottom: 40, justifyContent: 'center' },
   selectTitle: { fontSize: fontSize.xxl, fontWeight: '900', color: colors.tx, lineHeight: 44, marginBottom: spacing.sm },
-  selectSub: { fontSize: fontSize.md, color: colors.t2, marginBottom: spacing.xl },
+  selectSub: { fontSize: fontSize.md, color: colors.t2, marginBottom: spacing.lg },
   roleCard: {
     backgroundColor: colors.s1, borderRadius: radius.lg, borderWidth: 2,
-    borderColor: colors.ac, padding: spacing.xl, alignItems: 'center',
+    borderColor: colors.ac, padding: spacing.lg, alignItems: 'center',
     marginBottom: spacing.md, ...shadow.md,
   },
   roleCardTitle: { fontSize: fontSize.xl, fontWeight: '900', color: colors.ac, marginBottom: spacing.sm },

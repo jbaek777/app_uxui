@@ -57,7 +57,23 @@ export default function LoginScreen({ onDone }) {
         await signIn(emailTrim, pw);
         onDone('login');
       } else {
-        await signUp(emailTrim, pw);
+        // 회원가입 — Supabase Confirm email 이 켜져 있으면 session 은 null
+        const { session } = await signUp(emailTrim, pw);
+        if (!session) {
+          // 이메일 인증 필요 → 로그인 탭으로 복귀하고 안내
+          Alert.alert(
+            '📧 이메일 인증 필요',
+            `${emailTrim} 로 인증 메일을 보냈습니다.\n\n메일함에서 인증 링크를 클릭한 후 로그인해주세요.`,
+            [{ text: '확인', onPress: () => {
+              setMode('login');
+              setPw('');
+              setPw2('');
+            }}],
+          );
+          setLoading(false);
+          return;
+        }
+        // Confirm email 비활성 상태 — 바로 로그인 완료
         onDone('signup');
       }
     } catch (e) {
@@ -67,7 +83,7 @@ export default function LoginScreen({ onDone }) {
       else if (msg.includes('User already registered'))
         Alert.alert('이미 가입된 이메일', '해당 이메일로 이미 계정이 있습니다.\n로그인을 시도해주세요.');
       else if (msg.includes('Email not confirmed'))
-        Alert.alert('이메일 인증 필요', '가입 시 발송된 이메일을 확인해주세요.');
+        Alert.alert('이메일 인증 필요', '가입 시 발송된 이메일을 확인해주세요.\n인증 완료 후 다시 로그인해주세요.');
       else
         Alert.alert('오류', msg || '잠시 후 다시 시도해주세요.');
     }
@@ -179,7 +195,9 @@ export default function LoginScreen({ onDone }) {
 
         <View style={[styles.infoBox]}>
           <Text style={styles.infoText}>
-            🔒 계정을 만들면 기기를 바꿔도{'\n'}데이터가 자동으로 복원됩니다.
+            {mode === 'signup'
+              ? '📧 회원가입 후 이메일 인증 링크를\n클릭해야 로그인이 가능합니다.'
+              : '🔒 계정을 만들면 기기를 바꿔도\n데이터가 자동으로 복원됩니다.'}
           </Text>
         </View>
       </ScrollView>

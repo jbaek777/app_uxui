@@ -1,9 +1,10 @@
 /**
- * RoleContext.js — 사장/직원 모드 전역 관리 (강화)
+ * RoleContext.js — 사장/직원/구직자 모드 전역 관리 (강화)
  *
- * role: 'owner' | 'staff'
- * - owner: 모든 탭 + 모든 기능
- * - staff: 홈·스캔·서류 탭만 / 위생·온도 입력만 허용
+ * role: 'owner' | 'staff' | 'jobseeker'
+ * - owner:     모든 탭 + 모든 기능
+ * - staff:     홈·서류·채용 탭 / 위생·온도 입력만 허용
+ * - jobseeker: 채용·설정 탭만 (사업장 없음, 헤드헌팅 받기 + 프로필 편집)
  *
  * 직원 전환 플로우:
  *   1. "직원 모드로 전환" 탭
@@ -15,6 +16,10 @@
  *   1. 탭바 잠금 아이콘 또는 설정 탭
  *   2. 사장 PIN 입력
  *   3. owner 모드 복귀
+ *
+ * 구직자 플로우:
+ *   · 온보딩에서 '구직자로 가입' 선택 → initRole('jobseeker', name)
+ *   · 모드 전환 불가 (사업장이 없음). 로그아웃 후 재가입 시에만 owner/staff 선택 가능.
  */
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
@@ -31,6 +36,8 @@ const DEFAULT_PIN   = '0000';
 
 // 직원 모드 허용 탭 (Option D: 조회 탭 제거, 채용 탭 추가)
 export const STAFF_ALLOWED_TABS = ['HomeTab', 'DocsTab', 'JobTab'];
+// 구직자(무소속) 허용 탭 — 채용 + 설정만
+export const JOBSEEKER_ALLOWED_TABS = ['JobTab', 'SettingsTab'];
 // 직원 모드 허용 서류 화면
 export const STAFF_ALLOWED_DOCS = ['Hygiene', 'Temp', 'Staff'];
 // 사장 전용 기능 키
@@ -83,6 +90,13 @@ export function RoleProvider({ children }) {
             setStaffName(name || '직원');
             setStaffId(id || null);
           }
+        } else if (savedRole === 'jobseeker') {
+          setRole('jobseeker');
+          // 구직자는 본인 이름만 표시용으로 유지 (staffName 재활용)
+          try {
+            const jsName = await AsyncStorage.getItem('@meatbig_jobseeker_name');
+            if (jsName) setStaffName(jsName);
+          } catch {}
         }
       } catch {}
       setRoleReady(true);
@@ -198,6 +212,8 @@ export function RoleProvider({ children }) {
   // ── 기능 접근 권한 체크 ────────────────────────────────
   const canAccess = useCallback((key) => {
     if (role === 'owner') return true;
+    // 구직자는 사장 전용 기능뿐 아니라 재고·위생·서류 작성도 접근 불가
+    if (role === 'jobseeker') return false;
     return !OWNER_ONLY.includes(key);
   }, [role]);
 

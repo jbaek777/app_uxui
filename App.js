@@ -228,10 +228,52 @@ function MainTabs({ bizData }) {
   const pal = isDark ? darkColors : lightColors;
   const { role } = useRole();
   const isStaff = role === 'staff';
+  const isJobseeker = role === 'jobseeker';
   const insets = useSafeAreaInsets();
 
   // Safe Area 반영 탭바 높이 — HTML 프로토타입: padding 10px top + 22px bottom
   const TAB_H = 60 + insets.bottom;
+
+  // 구직자 모드 — 채용·설정 2탭만
+  if (isJobseeker) {
+    return (
+      <View style={{ flex: 1 }}>
+        <Tab.Navigator
+          screenOptions={{
+            headerShown: false,
+            tabBarStyle: {
+              backgroundColor: 'rgba(242,244,248,0.98)',
+              borderTopColor: '#E2E8F0',
+              borderTopWidth: 1,
+              height: TAB_H,
+              paddingBottom: insets.bottom,
+              paddingTop: 0,
+              elevation: 0,
+            },
+            tabBarShowLabel: false,
+          }}
+        >
+          <Tab.Screen
+            name="JobTab"
+            component={JobStaffStack}
+            options={{
+              tabBarIcon: ({ focused }) =>
+                <TabIcon iconOn="person" iconOff="person-outline" label="내구직" focused={focused} />,
+            }}
+          />
+          <Tab.Screen
+            name="SettingsTab"
+            options={{
+              tabBarIcon: ({ focused }) =>
+                <TabIcon iconOn="settings" iconOff="settings-outline" label="설정" focused={focused} />,
+            }}
+          >
+            {() => <SettingsStack bizData={bizData} />}
+          </Tab.Screen>
+        </Tab.Navigator>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -360,7 +402,15 @@ function AppInner() {
     try {
       // 1) 로컬 먼저 확인
       const onboarded = await AsyncStorage.getItem('@meatbig_onboarded');
+      const savedRole = await AsyncStorage.getItem('@meatbig_role');
       const bizRaw    = await AsyncStorage.getItem('@meatbig_biz');
+
+      // 1-a) 구직자(무소속) — 사업장 없음이 정상
+      if (onboarded === 'true' && savedRole === 'jobseeker') {
+        setBizData(null);
+        setPhase('main');
+        return;
+      }
 
       if (onboarded === 'true' && bizRaw) {
         setBizData(JSON.parse(bizRaw));
@@ -395,7 +445,15 @@ function AppInner() {
     try {
       // 로그인 후 가게 데이터 확인
       const onboarded = await AsyncStorage.getItem('@meatbig_onboarded');
+      const savedRole = await AsyncStorage.getItem('@meatbig_role');
       const bizRaw    = await AsyncStorage.getItem('@meatbig_biz');
+
+      // 구직자 — 사업장 없음이 정상
+      if (onboarded === 'true' && savedRole === 'jobseeker') {
+        setBizData(null);
+        setPhase('main');
+        return;
+      }
 
       if (onboarded === 'true' && bizRaw) {
         setBizData(JSON.parse(bizRaw));
@@ -415,8 +473,17 @@ function AppInner() {
     }
   };
 
-  // 온보딩 완료 — currentUser.role 기준으로 자동 모드 설정
-  const handleOnboardingDone = async ({ biz, currentUser }) => {
+  // 온보딩 완료 — 분기: jobseeker / staff / owner
+  const handleOnboardingDone = async (payload) => {
+    // 구직자 무소속 가입
+    if (payload?.jobseeker) {
+      setBizData(null);
+      await initRole('jobseeker', payload.profile?.name || null, null);
+      setPhase('main');
+      return;
+    }
+    // 사장/직원 기존 플로우
+    const { biz, currentUser } = payload || {};
     setBizData(biz);
     if (currentUser && currentUser.role !== '사장') {
       await initRole('staff', currentUser.name, currentUser.id || null);

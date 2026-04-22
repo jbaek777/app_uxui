@@ -31,10 +31,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   // 이메일 회원가입
+  // Supabase 대시보드 Auth → Confirm email 활성화 시:
+  //   · data.user 는 반환되지만 data.session 은 null
+  //   · 사용자가 메일함의 인증 링크 클릭해야 로그인 가능
+  // 활성화 안 돼 있으면 session 즉시 발급 (기존 동작 유지)
   const signUp = useCallback(async (email, password) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
-    return data.user;
+    return { user: data.user, session: data.session };
   }, []);
 
   // 로그아웃
