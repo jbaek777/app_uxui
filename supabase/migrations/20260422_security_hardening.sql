@@ -22,11 +22,41 @@
 BEGIN;
 
 -- =====================================================
+-- SECTION 0. 컬럼 먼저 전부 추가 (정책이 서로 참조하므로 순서 중요)
+-- =====================================================
+ALTER TABLE stores        ADD COLUMN IF NOT EXISTS auth_uid UUID DEFAULT auth.uid();
+ALTER TABLE store_members ADD COLUMN IF NOT EXISTS auth_uid UUID;
+
+CREATE INDEX IF NOT EXISTS idx_stores_auth_uid        ON stores(auth_uid);
+CREATE INDEX IF NOT EXISTS idx_store_members_auth_uid ON store_members(auth_uid);
+CREATE INDEX IF NOT EXISTS idx_store_members_store    ON store_members(store_id);
+
+-- =====================================================
+-- SECTION 0.5. SECURITY DEFINER 헬퍼 — RLS 무한재귀 회피
+--
+-- 문제: store_members 정책이 다시 store_members 를 조회하면
+--       Postgres 가 "infinite recursion detected in policy" 에러 발생
+-- 해결: SECURITY DEFINER 함수 내부에서는 RLS 가 우회되므로
+--       정책이 이 함수만 호출하면 재귀 없음
+-- =====================================================
+CREATE OR REPLACE FUNCTION public.user_store_ids()
+RETURNS SETOF UUID
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT id       FROM stores        WHERE auth_uid = auth.uid()
+  UNION
+  SELECT store_id FROM store_members WHERE auth_uid = auth.uid()
+$$;
+
+-- 익명 롤에게 EXECUTE 권한 부여 (RLS 컨텍스트에서 호출 가능해야 함)
+GRANT EXECUTE ON FUNCTION public.user_store_ids() TO anon, authenticated;
+
+-- =====================================================
 -- SECTION 1. stores 테이블 — 소유자 식별 + RLS
 -- =====================================================
-ALTER TABLE stores ADD COLUMN IF NOT EXISTS auth_uid UUID DEFAULT auth.uid();
-CREATE INDEX IF NOT EXISTS idx_stores_auth_uid ON stores(auth_uid);
-
 ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
 
 -- 기존 전체 허용 정책 제거
@@ -56,39 +86,23 @@ CREATE POLICY stores_member_read ON stores
 -- =====================================================
 -- SECTION 2. store_members — 직원 계정 연결
 -- =====================================================
-ALTER TABLE store_members ADD COLUMN IF NOT EXISTS auth_uid UUID;
-CREATE INDEX IF NOT EXISTS idx_store_members_auth_uid ON store_members(auth_uid);
-CREATE INDEX IF NOT EXISTS idx_store_members_store    ON store_members(store_id);
-
 ALTER TABLE store_members ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "public_all" ON store_members;
 DROP POLICY IF EXISTS "Allow all"  ON store_members;
 
--- 같은 store 소속자만 전체 조회 가능 (사장·직원 모두)
+-- 같은 store 소속자만 전체 조회 가능 (사장·직원 모두) — 재귀 회피용 함수 사용
 DROP POLICY IF EXISTS sm_same_store_read ON store_members;
 CREATE POLICY sm_same_store_read ON store_members
   FOR SELECT
-  USING (
-    store_id IN (
-      -- 내가 사장인 store
-      SELECT id FROM stores WHERE auth_uid = auth.uid()
-      UNION
-      -- 내가 직원으로 속한 store
-      SELECT store_id FROM store_members WHERE auth_uid = auth.uid()
-    )
-  );
+  USING (store_id IN (SELECT public.user_store_ids()));
 
 -- INSERT/UPDATE/DELETE는 store 사장만
 DROP POLICY IF EXISTS sm_owner_write ON store_members;
 CREATE POLICY sm_owner_write ON store_members
   FOR ALL
-  USING (
-    store_id IN (SELECT id FROM stores WHERE auth_uid = auth.uid())
-  )
-  WITH CHECK (
-    store_id IN (SELECT id FROM stores WHERE auth_uid = auth.uid())
-  );
+  USING      (store_id IN (SELECT id FROM stores WHERE auth_uid = auth.uid()))
+  WITH CHECK (store_id IN (SELECT id FROM stores WHERE auth_uid = auth.uid()));
 
 -- =====================================================
 -- SECTION 3. 데이터 테이블 — store_id 컬럼 + multi-tenant RLS
@@ -117,25 +131,13 @@ BEGIN
   EXECUTE format('DROP POLICY IF EXISTS "Allow all"  ON %I', tbl);
   EXECUTE format('DROP POLICY IF EXISTS %L ON %I', 'Allow all for ' || tbl, tbl);
 
-  -- 새 정책: 소속 store 만 접근 (사장 + 직원 모두)
+  -- 새 정책: 소속 store 만 접근 (사장 + 직원 모두) — SECURITY DEFINER 함수로 재귀 회피
   EXECUTE format('DROP POLICY IF EXISTS %s_store_access ON %I', tbl, tbl);
   EXECUTE format($p$
     CREATE POLICY %s_store_access ON %I
       FOR ALL
-      USING (
-        store_id IN (
-          SELECT id FROM stores WHERE auth_uid = auth.uid()
-          UNION
-          SELECT store_id FROM store_members WHERE auth_uid = auth.uid()
-        )
-      )
-      WITH CHECK (
-        store_id IN (
-          SELECT id FROM stores WHERE auth_uid = auth.uid()
-          UNION
-          SELECT store_id FROM store_members WHERE auth_uid = auth.uid()
-        )
-      )
+      USING      (store_id IN (SELECT public.user_store_ids()))
+      WITH CHECK (store_id IN (SELECT public.user_store_ids()))
   $p$, tbl, tbl);
 END;
 $$ LANGUAGE plpgsql;
