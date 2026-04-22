@@ -6,7 +6,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { fontSize, spacing, radius, shadow } from '../theme';
-import { useTheme } from '../lib/ThemeContext';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { staffData } from '../data/mockData';
 import { staffStore } from '../lib/dataStore';
@@ -22,7 +21,7 @@ import { C, F, R, SH } from '../lib/v5';
 const NOTIF_KEY = '@meatbig_notifications';
 
 export default function SettingsScreen({ route, navigation }) {
-  const { isDark, toggleTheme } = useTheme();
+  // 화이트 테마 전용 — 다크 토글 제거
   const { role, staffName, switchToStaff, requestOwnerMode, changePin, ownerPin } = useRole();
   const { sub, plan: currentPlan, isPremium, isTrial, daysLeft, cancelSubscription } = useSubscription();
   const { user, signOut } = useAuth();
@@ -252,27 +251,6 @@ export default function SettingsScreen({ route, navigation }) {
         <InfoRow label="대표자" value={biz.owner} />
         <InfoRow label="사업자번호" value={biz.bizNo} />
         <InfoRow label="취급 축종" value={(biz.species || []).join(', ')} last />
-      </View>
-
-      {/* 화면 설정 */}
-      <SectionTitle icon="🎨" label="화면 설정" />
-      <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
-        <View style={[styles.notifRow, { borderBottomWidth: 0 }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.notifLabel, { color: '#0F172A' }]}>
-              {isDark ? '🌙 다크 모드' : '☀️ 라이트 모드'}
-            </Text>
-            <Text style={[styles.notifSubLabel, { color: '#64748B' }]}>
-              {isDark ? '어두운 배경 사용 중' : '밝은 배경 사용 중'}
-            </Text>
-          </View>
-          <Switch
-            value={isDark}
-            onValueChange={toggleTheme}
-            trackColor={{ false: '#E2E8F0', true: '#B91C1C' + '99' }}
-            thumbColor={isDark ? '#B91C1C' : '#64748B'}
-          />
-        </View>
       </View>
 
       {/* 직원 관리 */}

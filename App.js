@@ -498,7 +498,7 @@ function AppInner() {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <StatusBar style={isDark ? 'light' : 'dark'} />
+          <StatusBar style="dark" />
           <SplashScreen onDone={handleSplashDone} />
         </SafeAreaProvider>
       </GestureHandlerRootView>
@@ -510,7 +510,7 @@ function AppInner() {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <StatusBar style="light" />
+          <StatusBar style="dark" />
           <LoginScreen onDone={handleLoginDone} />
         </SafeAreaProvider>
       </GestureHandlerRootView>
@@ -521,7 +521,7 @@ function AppInner() {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <StatusBar style={isDark ? 'light' : 'dark'} />
+          <StatusBar style="dark" />
           <OnboardingScreen onDone={handleOnboardingDone} />
         </SafeAreaProvider>
       </GestureHandlerRootView>
@@ -532,7 +532,7 @@ function AppInner() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <NavigationContainer>
-          <StatusBar style={isDark ? 'light' : 'dark'} />
+          <StatusBar style="dark" />
           <OfflineBanner />
           <MainTabs bizData={bizData} />
         </NavigationContainer>

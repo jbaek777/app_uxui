@@ -1,29 +1,17 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// 화이트 테마 전용 — 다크 모드 완전 제거.
+// 기존 useTheme()/toggleTheme() 호출부 호환을 위해 Context 는 유지.
+// isDark 는 항상 false, toggleTheme 은 no-op.
+import React, { createContext, useContext } from 'react';
 import { setTheme } from '../theme';
 
-const ThemeContext = createContext(null);
+const ThemeContext = createContext({ isDark: false, toggleTheme: () => {} });
 
 export function ThemeProvider({ children }) {
-  const [isDark, setIsDark] = useState(true);
-
-  useEffect(() => {
-    AsyncStorage.getItem('@meatbig_theme').then(val => {
-      const dark = val !== 'light';
-      setIsDark(dark);
-      setTheme(dark);
-    });
-  }, []);
-
-  const toggleTheme = async () => {
-    const next = !isDark;
-    setIsDark(next);
-    setTheme(next);
-    await AsyncStorage.setItem('@meatbig_theme', next ? 'dark' : 'light');
-  };
+  // 앱 시작 시 1회 라이트 팔레트 주입 (상호 호환용)
+  setTheme(false);
 
   return (
-    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
+    <ThemeContext.Provider value={{ isDark: false, toggleTheme: () => {} }}>
       {children}
     </ThemeContext.Provider>
   );
