@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
 import ScreenHeader from '../components/ScreenHeader';
-import { profileStore, EMPTY_PROFILE } from '../lib/jobStore';
+import { profileStore, headhuntStore, EMPTY_PROFILE } from '../lib/jobStore';
 import { GRADES } from '../data/jobAssessment';
 
 const C = {
@@ -44,13 +44,12 @@ const C = {
   border: '#E2E8F0',
 };
 
-// 임시 인박스 (Phase 2에서 headhuntStore로 대체)
-const INBOX_COUNT = 0;
-
 export default function JobStaffHubScreen({ navigation }) {
   const [profile, setProfile] = useState({ ...EMPTY_PROFILE });
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
+  const [inboxCount, setInboxCount] = useState(0);
+  const [pendingInbox, setPendingInbox] = useState(0);
 
   // ── 포커스마다 새로고침 ─────────────────────────────────
   useFocusEffect(
@@ -58,12 +57,18 @@ export default function JobStaffHubScreen({ navigation }) {
       let cancelled = false;
       (async () => {
         setLoading(true);
-        const remote = await profileStore.fetchRemote();
+        const [remote, inbox] = await Promise.all([
+          profileStore.fetchRemote(),
+          headhuntStore.fetchInbox(),
+        ]);
         let base;
         if (remote.data) base = { ...EMPTY_PROFILE, ...remote.data };
         else             base = await profileStore.getLocal();
         if (!cancelled) {
           setProfile(base || { ...EMPTY_PROFILE });
+          const list = inbox?.data || [];
+          setInboxCount(list.length);
+          setPendingInbox(list.filter(x => x.status === 'pending').length);
           setLoading(false);
         }
       })();
@@ -229,12 +234,7 @@ export default function JobStaffHubScreen({ navigation }) {
         <TouchableOpacity
           style={S.bigCard}
           activeOpacity={0.85}
-          onPress={() =>
-            Alert.alert(
-              '준비 중',
-              '받은 헤드헌팅 요청 기능은 Phase 2에서 제공됩니다.\n현재는 프로필 저장까지 이용 가능합니다.',
-            )
-          }
+          onPress={() => navigation.navigate('JobHeadhuntInbox')}
         >
           <View style={[S.bigIc, { backgroundColor: C.red }]}>
             <Ionicons name="mail-outline" size={22} color="#fff" />
@@ -242,14 +242,16 @@ export default function JobStaffHubScreen({ navigation }) {
           <View style={{ flex: 1 }}>
             <Text style={S.bigTtl}>헤드헌팅 요청함</Text>
             <Text style={S.bigSb}>
-              {INBOX_COUNT > 0
-                ? `사장이 실명·연락처를 요청한 제안 ${INBOX_COUNT}건 대기 중`
-                : '아직 받은 제안이 없습니다. 프로필을 공개하면 제안이 옵니다.'}
+              {pendingInbox > 0
+                ? `사장이 실명·연락처를 요청한 제안 ${pendingInbox}건 대기 중`
+                : inboxCount > 0
+                  ? `받은 제안 총 ${inboxCount}건 (대기 없음)`
+                  : '아직 받은 제안이 없습니다. 프로필을 공개하면 제안이 옵니다.'}
             </Text>
           </View>
-          {INBOX_COUNT > 0 && (
+          {pendingInbox > 0 && (
             <View style={S.badge}>
-              <Text style={S.badgeTxt}>{INBOX_COUNT}</Text>
+              <Text style={S.badgeTxt}>{pendingInbox}</Text>
             </View>
           )}
           <Ionicons name="chevron-forward" size={20} color={C.t3} />

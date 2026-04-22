@@ -43,6 +43,10 @@ import JobStaffHubScreen from './src/screens/JobStaffHubScreen';
 import JobAssessmentScreen from './src/screens/JobAssessmentScreen';
 import JobAssessmentResultScreen from './src/screens/JobAssessmentResultScreen';
 import JobProfileEditorScreen from './src/screens/JobProfileEditorScreen';
+import JobOwnerBrowseScreen from './src/screens/JobOwnerBrowseScreen';
+import JobProfileDetailScreen from './src/screens/JobProfileDetailScreen';
+import JobHeadhuntSentScreen from './src/screens/JobHeadhuntSentScreen';
+import JobHeadhuntInboxScreen from './src/screens/JobHeadhuntInboxScreen';
 import { requestNotificationPermission, scheduleDailyHygieneReminder, scheduleDailyExpiryReminder } from './src/utils/notifications';
 
 const Tab = createBottomTabNavigator();
@@ -112,6 +116,10 @@ function JobOwnerStack() {
   return (
     <Stack.Navigator screenOptions={headerOpts}>
       <Stack.Screen name="JobOwnerHub" component={JobOwnerHubScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="JobOwnerBrowse" component={JobOwnerBrowseScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="JobProfileDetail" component={JobProfileDetailScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="JobHeadhuntSent" component={JobHeadhuntSentScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Paywall" component={PaywallScreen} options={{ title: '💎 구독 관리' }} />
     </Stack.Navigator>
   );
 }
@@ -124,6 +132,7 @@ function JobStaffStack() {
       <Stack.Screen name="JobAssessment" component={JobAssessmentScreen} options={{ headerShown: false }} />
       <Stack.Screen name="JobAssessmentResult" component={JobAssessmentResultScreen} options={{ headerShown: false }} />
       <Stack.Screen name="JobProfileEditor" component={JobProfileEditorScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="JobHeadhuntInbox" component={JobHeadhuntInboxScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

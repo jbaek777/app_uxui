@@ -3,19 +3,21 @@
  *
  * Option D 하단 탭 "💼채용" → 이 화면
  *
- * MVP 범위(스텁):
- *  - 인재 풀 탐색 진입 카드
- *  - 헤드헌팅 요청함 진입 카드
- *  - 쿼터 사용 현황 배지 (프로모 기간 20건/월)
+ * Phase 2 구현:
+ *  - 인재 풀 탐색 진입 → JobOwnerBrowse
+ *  - 보낸 헤드헌팅 요청 → JobHeadhuntSent
+ *  - 실시간 쿼터 사용량 (quotaStore.getCurrentMonth)
+ *  - 실시간 보낸 요청 카운트 (headhuntStore.fetchSent)
  *  - 사업장 코드 + 본인인증 배지
- *  - 실제 기능은 Phase 2~4에서 구현
  *
  * 디자인: ScreenHeader + 공통 팔레트 → 다른 랜딩 화면과 일체감
  */
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import ScreenHeader from '../components/ScreenHeader';
+import { quotaStore, headhuntStore } from '../lib/jobStore';
 
 const C = {
   bg:     '#F2F4F8',
@@ -41,19 +43,42 @@ const C = {
   border: '#E2E8F0',
 };
 
-// 임시 데이터 (실제는 Supabase job_profiles 테이블에서 가져옴)
-const PROMO_QUOTA_TOTAL = 20;
-const PROMO_QUOTA_USED  = 0;
-
 function NotifyStub(feature) {
   Alert.alert(
     '준비 중',
-    `${feature} 기능은 다음 업데이트(Phase 2)에서 제공됩니다.\n\n현재는 허브 화면만 배포된 상태입니다.`,
+    `${feature} 기능은 다음 업데이트에서 제공됩니다.`,
   );
 }
 
 export default function JobOwnerHubScreen({ navigation }) {
-  const quotaLeft = Math.max(0, PROMO_QUOTA_TOTAL - PROMO_QUOTA_USED);
+  const [quota, setQuota] = useState({ used: 0, limit: 20 });
+  const [sentCount, setSentCount] = useState(0);
+  const [pendingSent, setPendingSent] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [q, sent] = await Promise.all([
+        quotaStore.getCurrentMonth(),
+        headhuntStore.fetchSent(),
+      ]);
+      setQuota({ used: q.used || 0, limit: q.limit || 20 });
+      const list = sent?.data || [];
+      setSentCount(list.length);
+      setPendingSent(list.filter(x => x.status === 'pending').length);
+    } catch (_) {}
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
+  const quotaLeft = Math.max(0, quota.limit - quota.used);
+  const pct = quota.limit > 0 ? Math.min(100, (quota.used / quota.limit) * 100) : 0;
 
   return (
     <View style={S.container}>
@@ -66,7 +91,10 @@ export default function JobOwnerHubScreen({ navigation }) {
         }}
       />
 
-      <ScrollView contentContainerStyle={S.scroll}>
+      <ScrollView
+        contentContainerStyle={S.scroll}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
 
         {/* 프로모 배너 */}
         <View style={S.promoBanner}>
@@ -75,7 +103,7 @@ export default function JobOwnerHubScreen({ navigation }) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={S.promoTtl}>프로모 기간 — 전 유저 무료</Text>
-            <Text style={S.promoSb}>이번 달 헤드헌팅 쿼터 {quotaLeft}/{PROMO_QUOTA_TOTAL}건 남음</Text>
+            <Text style={S.promoSb}>이번 달 헤드헌팅 쿼터 {quotaLeft}/{quota.limit}건 남음</Text>
           </View>
         </View>
 
@@ -87,18 +115,22 @@ export default function JobOwnerHubScreen({ navigation }) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={S.quotaTtl}>이번 달 헤드헌팅</Text>
-              <Text style={S.quotaSb}>실명 공개 요청 {PROMO_QUOTA_USED}건 / {PROMO_QUOTA_TOTAL}건</Text>
+              <Text style={S.quotaSb}>실명 공개 요청 {quota.used}건 / {quota.limit}건</Text>
             </View>
           </View>
           <View style={S.quotaBar}>
-            <View style={[S.quotaBarFill, { width: `${(PROMO_QUOTA_USED / PROMO_QUOTA_TOTAL) * 100}%` }]} />
+            <View style={[S.quotaBarFill, { width: `${pct}%` }]} />
           </View>
         </View>
 
         {/* 메인 액션 카드 */}
         <Text style={S.sectionLabel}>인재 찾기</Text>
 
-        <TouchableOpacity style={S.bigCard} activeOpacity={0.85} onPress={() => NotifyStub('인재 풀 탐색')}>
+        <TouchableOpacity
+          style={S.bigCard}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('JobOwnerBrowse')}
+        >
           <View style={[S.bigIc, { backgroundColor: C.blue2 }]}>
             <Ionicons name="search-outline" size={22} color="#fff" />
           </View>
@@ -109,13 +141,28 @@ export default function JobOwnerHubScreen({ navigation }) {
           <Ionicons name="chevron-forward" size={20} color={C.t3} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={S.bigCard} activeOpacity={0.85} onPress={() => NotifyStub('헤드헌팅 요청함')}>
+        <TouchableOpacity
+          style={S.bigCard}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('JobHeadhuntSent')}
+        >
           <View style={[S.bigIc, { backgroundColor: C.red }]}>
             <Ionicons name="paper-plane-outline" size={22} color="#fff" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={S.bigTtl}>내가 보낸 헤드헌팅 요청</Text>
-            <Text style={S.bigSb}>실명·연락처 공개 요청 상태 확인 (수락·거절·대기)</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={S.bigTtl}>내가 보낸 헤드헌팅 요청</Text>
+              {pendingSent > 0 && (
+                <View style={S.countBadge}>
+                  <Text style={S.countBadgeTxt}>{pendingSent}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={S.bigSb}>
+              {sentCount > 0
+                ? `총 ${sentCount}건 · 대기 ${pendingSent}건`
+                : '실명·연락처 공개 요청 상태 확인'}
+            </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={C.t3} />
         </TouchableOpacity>
@@ -220,6 +267,12 @@ const S = StyleSheet.create({
   },
   bigTtl: { fontSize: 15, fontWeight: '800', color: C.t1, marginBottom: 2 },
   bigSb:  { fontSize: 12, color: C.t3, lineHeight: 17 },
+
+  countBadge: {
+    backgroundColor: C.red, minWidth: 20, height: 20, borderRadius: 10,
+    paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center',
+  },
+  countBadgeTxt: { color: '#fff', fontSize: 11, fontWeight: '900' },
 
   infoCard: {
     backgroundColor: C.white, borderRadius: 12,
