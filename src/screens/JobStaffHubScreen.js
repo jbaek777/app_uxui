@@ -3,18 +3,24 @@
  *
  * Option D 직원 하단 탭 "📤내구직" → 이 화면
  *
- * MVP 범위(스텁):
- *  - 내 구직 프로필 상태 카드 (공개/비공개)
- *  - 자가역량평가 진입 카드
- *  - 받은 헤드헌팅 요청함 카드
- *  - 실제 기능은 Phase 2~4에서 구현
+ * 실시간 상태 표시:
+ *  - jobStore에서 프로필 + 등급 로드
+ *  - useFocusEffect로 포커스마다 갱신 (다른 화면에서 편집 후 돌아올 때)
  *
- * 직원 전용 — 유료화 없음
+ * 주요 액션:
+ *  - 자가역량평가 → JobAssessment
+ *  - 프로필 편집   → JobProfileEditor
+ *  - 공개 토글     → 즉시 저장
+ *  - 헤드헌팅 인박스 (Phase 2 스텁)
  */
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+
 import ScreenHeader from '../components/ScreenHeader';
+import { profileStore, EMPTY_PROFILE } from '../lib/jobStore';
+import { GRADES } from '../data/jobAssessment';
 
 const C = {
   bg:     '#F2F4F8',
@@ -38,28 +44,80 @@ const C = {
   border: '#E2E8F0',
 };
 
-// 임시 상태 (실제는 Supabase job_profiles에서 가져옴)
-const PROFILE_STATE = 'none'; // 'none' | 'private' | 'public'
-const ASSESSMENT_GRADE = null; // 'D'|'C'|'B'|'A'|'S'
+// 임시 인박스 (Phase 2에서 headhuntStore로 대체)
 const INBOX_COUNT = 0;
 
-function NotifyStub(feature) {
-  Alert.alert(
-    '준비 중',
-    `${feature} 기능은 다음 업데이트(Phase 2)에서 제공됩니다.\n\n현재는 허브 화면만 배포된 상태입니다.`,
-  );
-}
-
 export default function JobStaffHubScreen({ navigation }) {
-  const statusLabel =
-    PROFILE_STATE === 'public' ? '공개 중 — 사장들이 검색 가능'
-    : PROFILE_STATE === 'private' ? '비공개 — 프로필 저장만 됨'
-    : '프로필 미등록 — 자가역량평가부터 시작';
+  const [profile, setProfile] = useState({ ...EMPTY_PROFILE });
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
 
-  const statusColor =
-    PROFILE_STATE === 'public' ? C.ok2
-    : PROFILE_STATE === 'private' ? C.warn2
-    : C.t3;
+  // ── 포커스마다 새로고침 ─────────────────────────────────
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        setLoading(true);
+        const remote = await profileStore.fetchRemote();
+        let base;
+        if (remote.data) base = { ...EMPTY_PROFILE, ...remote.data };
+        else             base = await profileStore.getLocal();
+        if (!cancelled) {
+          setProfile(base || { ...EMPTY_PROFILE });
+          setLoading(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, []),
+  );
+
+  // ── 상태 라벨 계산 ──────────────────────────────────────
+  const hasGrade = !!profile.grade;
+  const isPublic = !!profile.is_public;
+
+  const statusLabel = !hasGrade
+    ? '프로필 미등록 — 자가역량평가부터 시작'
+    : isPublic
+      ? '공개 중 — 사장들이 검색 가능'
+      : '비공개 — 프로필 저장만 됨';
+
+  const statusColor = !hasGrade ? C.t3 : isPublic ? C.ok2 : C.warn2;
+  const gradeInfo = hasGrade ? GRADES.find(g => g.letter === profile.grade) : null;
+
+  // ── 공개 토글 ───────────────────────────────────────────
+  const handleTogglePublic = async () => {
+    if (!hasGrade) {
+      Alert.alert(
+        '평가 먼저',
+        '공개하려면 자가역량평가를 먼저 완료해 등급이 있어야 합니다.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '평가 시작', onPress: () => navigation.navigate('JobAssessment') },
+        ],
+      );
+      return;
+    }
+    if (!profile.region || !profile.preferred_work) {
+      Alert.alert(
+        '프로필 미완성',
+        '공개하려면 지역과 근무 형태를 먼저 입력해야 합니다.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '프로필 편집', onPress: () => navigation.navigate('JobProfileEditor') },
+        ],
+      );
+      return;
+    }
+
+    setToggling(true);
+    const { data, error } = await profileStore.setPublic(!isPublic);
+    setToggling(false);
+    if (error && error !== 'no-session') {
+      Alert.alert('변경 실패', error);
+      return;
+    }
+    if (data) setProfile(data);
+  };
 
   return (
     <View style={S.container}>
@@ -79,65 +137,105 @@ export default function JobStaffHubScreen({ navigation }) {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 }}>
             <View style={[S.statusDot, { backgroundColor: statusColor }]} />
             <Text style={S.statusLbl}>구직 프로필 상태</Text>
+            {loading && <ActivityIndicator size="small" color={C.t4} style={{ marginLeft: 6 }} />}
           </View>
           <Text style={S.statusTtl}>{statusLabel}</Text>
-          {ASSESSMENT_GRADE ? (
-            <View style={S.gradeBadge}>
+
+          {gradeInfo ? (
+            <View style={[S.gradeBadge, { backgroundColor: gradeInfo.color }]}>
               <Ionicons name="trophy-outline" size={12} color="#fff" />
-              <Text style={S.gradeTxt}>{ASSESSMENT_GRADE} 등급</Text>
+              <Text style={S.gradeTxt}>
+                {gradeInfo.letter}급 · {profile.percent}점
+              </Text>
             </View>
           ) : (
-            <Text style={S.statusHint}>자가역량평가를 완료하면 D/C/B/A/S 등급이 부여됩니다.</Text>
+            <Text style={S.statusHint}>
+              자가역량평가를 완료하면 D/C/B/A/S 등급이 부여됩니다.
+            </Text>
           )}
         </View>
 
         {/* 주요 액션 */}
         <Text style={S.sectionLabel}>프로필 관리</Text>
 
-        <TouchableOpacity style={S.bigCard} activeOpacity={0.85} onPress={() => NotifyStub('자가역량평가')}>
+        <TouchableOpacity
+          style={S.bigCard}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('JobAssessment')}
+        >
           <View style={[S.bigIc, { backgroundColor: C.pur }]}>
             <Ionicons name="clipboard-outline" size={22} color="#fff" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={S.bigTtl}>자가역량평가</Text>
-            <Text style={S.bigSb}>51문항 · 7개 영역 · 예상 소요 10분 — 내 등급 산출</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={C.t3} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={S.bigCard} activeOpacity={0.85} onPress={() => NotifyStub('프로필 편집')}>
-          <View style={[S.bigIc, { backgroundColor: C.blue2 }]}>
-            <Ionicons name="create-outline" size={22} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={S.bigTtl}>프로필 편집</Text>
-            <Text style={S.bigSb}>경력·자격증·희망 근무조건 입력 (실명은 수락 시에만 공개)</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={C.t3} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={S.bigCard} activeOpacity={0.85} onPress={() => NotifyStub('공개 설정')}>
-          <View style={[S.bigIc, { backgroundColor: PROFILE_STATE === 'public' ? C.ok2 : C.t3 }]}>
-            <Ionicons
-              name={PROFILE_STATE === 'public' ? 'eye-outline' : 'eye-off-outline'}
-              size={22} color="#fff"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={S.bigTtl}>공개 여부 설정</Text>
+            <Text style={S.bigTtl}>
+              자가역량평가 {hasGrade ? '· 재평가' : ''}
+            </Text>
             <Text style={S.bigSb}>
-              {PROFILE_STATE === 'public'
-                ? '현재 공개 중 · 사장들이 익명으로 프로필 검색 가능'
-                : '비공개 상태 · 공개하면 사장들이 검색할 수 있습니다'}
+              51문항 · 7개 영역 · 예상 소요 10분 — 내 등급 산출
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={C.t3} />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={S.bigCard}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('JobProfileEditor')}
+        >
+          <View style={[S.bigIc, { backgroundColor: C.blue2 }]}>
+            <Ionicons name="create-outline" size={22} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={S.bigTtl}>프로필 편집</Text>
+            <Text style={S.bigSb}>
+              {profile.region
+                ? `지역: ${profile.region}${profile.preferred_work ? ' · ' + profile.preferred_work : ''}`
+                : '경력·자격증·희망 근무조건 입력 (실명은 수락 시에만 공개)'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={C.t3} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={S.bigCard}
+          activeOpacity={0.85}
+          onPress={handleTogglePublic}
+          disabled={toggling}
+        >
+          <View style={[S.bigIc, { backgroundColor: isPublic ? C.ok2 : C.t3 }]}>
+            <Ionicons
+              name={isPublic ? 'eye-outline' : 'eye-off-outline'}
+              size={22} color="#fff"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={S.bigTtl}>
+              {isPublic ? '공개 → 비공개로 전환' : '비공개 → 공개로 전환'}
+            </Text>
+            <Text style={S.bigSb}>
+              {isPublic
+                ? '현재 공개 중 · 사장들이 익명으로 프로필 검색 가능'
+                : '비공개 상태 · 공개하면 사장들이 검색할 수 있습니다'}
+            </Text>
+          </View>
+          {toggling
+            ? <ActivityIndicator size="small" color={C.t3} />
+            : <Ionicons name="swap-horizontal-outline" size={18} color={C.t3} />}
+        </TouchableOpacity>
+
         {/* 헤드헌팅 인박스 */}
         <Text style={[S.sectionLabel, { marginTop: 18 }]}>받은 요청</Text>
 
-        <TouchableOpacity style={S.bigCard} activeOpacity={0.85} onPress={() => NotifyStub('받은 헤드헌팅 요청함')}>
+        <TouchableOpacity
+          style={S.bigCard}
+          activeOpacity={0.85}
+          onPress={() =>
+            Alert.alert(
+              '준비 중',
+              '받은 헤드헌팅 요청 기능은 Phase 2에서 제공됩니다.\n현재는 프로필 저장까지 이용 가능합니다.',
+            )
+          }
+        >
           <View style={[S.bigIc, { backgroundColor: C.red }]}>
             <Ionicons name="mail-outline" size={22} color="#fff" />
           </View>
@@ -187,7 +285,7 @@ const S = StyleSheet.create({
   gradeBadge: {
     alignSelf: 'flex-start', marginTop: 8,
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: C.warn2, paddingHorizontal: 10, paddingVertical: 5,
+    paddingHorizontal: 10, paddingVertical: 5,
     borderRadius: 20,
   },
   gradeTxt: { color: '#fff', fontSize: 12, fontWeight: '800' },

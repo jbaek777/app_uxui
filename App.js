@@ -40,6 +40,9 @@ import { TempScreen, StaffScreen } from './src/screens/OtherScreens';
 import EducationScreen from './src/screens/EducationScreen';
 import JobOwnerHubScreen from './src/screens/JobOwnerHubScreen';
 import JobStaffHubScreen from './src/screens/JobStaffHubScreen';
+import JobAssessmentScreen from './src/screens/JobAssessmentScreen';
+import JobAssessmentResultScreen from './src/screens/JobAssessmentResultScreen';
+import JobProfileEditorScreen from './src/screens/JobProfileEditorScreen';
 import { requestNotificationPermission, scheduleDailyHygieneReminder, scheduleDailyExpiryReminder } from './src/utils/notifications';
 
 const Tab = createBottomTabNavigator();
@@ -118,6 +121,9 @@ function JobStaffStack() {
   return (
     <Stack.Navigator screenOptions={headerOpts}>
       <Stack.Screen name="JobStaffHub" component={JobStaffHubScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="JobAssessment" component={JobAssessmentScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="JobAssessmentResult" component={JobAssessmentResultScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="JobProfileEditor" component={JobProfileEditorScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
