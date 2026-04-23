@@ -52,6 +52,16 @@ export function AuthProvider({ children }) {
     ]);
   }, []);
 
+  // 비밀번호 재설정 이메일 발송
+  //   · Supabase 는 {Site URL}/reset-password 형태로 redirect_to 만들어 보냄
+  //   · 사용자는 메일함의 재설정 링크 클릭 → 임시 세션 발급 → 새 비밀번호 입력 플로우
+  //   · RN 앱에서 새 비밀번호 입력 UI 는 추후 Deep Link 연결 시 구현 (현재는 Supabase 웹 UI 활용)
+  const resetPassword = useCallback(async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) throw error;
+    return true;
+  }, []);
+
   // Supabase stores 테이블에서 가게 정보 불러오기 (기기 변경 시 복원)
   //
   // 안전한 복원 경로:
@@ -135,7 +145,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, authReady,
-      signIn, signUp, signOut,
+      signIn, signUp, signOut, resetPassword,
       loadStoreFromCloud, loadMembersFromCloud,
     }}>
       {children}

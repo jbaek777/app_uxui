@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeatBig — 이메일 인증 완료</title>
+  <meta name="description" content="MeatBig 계정 이메일 인증이 완료되었습니다." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥩</text></svg>" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR",
+                   "Malgun Gothic", sans-serif;
+      background: linear-gradient(160deg, #F5F6FA 0%, #FFFFFF 100%);
+      color: #1A1F36;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: #FFFFFF;
+      border: 1px solid #DDE1EF;
+      border-radius: 20px;
+      padding: 40px 32px;
+      box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
+      text-align: center;
+    }
+    .emoji {
+      font-size: 72px;
+      margin-bottom: 8px;
+      line-height: 1;
+    }
+    .brand {
+      font-size: 14px;
+      font-weight: 800;
+      color: #C0392B;
+      letter-spacing: 2px;
+      margin-bottom: 24px;
+    }
+    .check {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #27AE60;
+      color: #FFFFFF;
+      font-size: 44px;
+      font-weight: 900;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 20px rgba(39, 174, 96, 0.25);
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 900;
+      color: #1A1F36;
+      margin-bottom: 12px;
+    }
+    .msg {
+      font-size: 15px;
+      line-height: 1.6;
+      color: #4A5568;
+      margin-bottom: 28px;
+    }
+    .steps {
+      text-align: left;
+      background: #F5F6FA;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 14px;
+      color: #4A5568;
+      line-height: 1.5;
+    }
+    .step + .step { margin-top: 12px; }
+    .step-num {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #C0392B;
+      color: #FFFFFF;
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .foot {
+      font-size: 12px;
+      color: #94A3B8;
+      line-height: 1.6;
+    }
+    .foot strong { color: #4A5568; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="emoji">🥩</div>
+    <div class="brand">MeatBig</div>
+
+    <div class="check">✓</div>
+    <h1>이메일 인증 완료!</h1>
+    <p class="msg">
+      MeatBig 계정 이메일 인증이<br />
+      정상적으로 완료되었습니다.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span>이 페이지는 닫아도 됩니다.</span>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span>MeatBig 앱으로 돌아가세요.</span>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span>가입하신 이메일과 비밀번호로<br />로그인하시면 됩니다.</span>
+      </div>
+    </div>
+
+    <p class="foot">
+      문제가 있으신가요?<br />
+      <strong>skystory1031@gmail.com</strong> 으로 문의주세요.
+    </p>
+  </main>
+</body>
+</html>

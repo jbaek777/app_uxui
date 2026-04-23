@@ -8,12 +8,44 @@ import { useAuth } from '../lib/AuthContext';
 import { colors, fontSize, spacing, radius } from '../theme';
 
 export default function LoginScreen({ onDone }) {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
   const [mode, setMode]       = useState('login'); // 'login' | 'signup'
   const [email, setEmail]     = useState('');
   const [pw, setPw]           = useState('');
   const [pw2, setPw2]         = useState('');
   const [loading, setLoading] = useState(false);
+
+  // 비밀번호 찾기 — 현재 입력된 이메일로 재설정 메일 발송
+  const handleForgotPassword = () => {
+    const emailTrim = email.trim().toLowerCase();
+    if (!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) {
+      Alert.alert(
+        '이메일 입력 필요',
+        '가입하신 이메일을 먼저 입력한 후\n"비밀번호 찾기"를 눌러주세요.',
+      );
+      return;
+    }
+    Alert.alert(
+      '비밀번호 재설정',
+      `${emailTrim} 로\n재설정 링크를 보낼까요?`,
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '보내기', style: 'default', onPress: async () => {
+          setLoading(true);
+          try {
+            await resetPassword(emailTrim);
+            Alert.alert(
+              '📧 전송 완료',
+              '메일함에서 재설정 링크를 클릭한 후\n새 비밀번호로 로그인해주세요.',
+            );
+          } catch (e) {
+            Alert.alert('오류', e.message || '잠시 후 다시 시도해주세요.');
+          }
+          setLoading(false);
+        }},
+      ],
+    );
+  };
 
   const handleSubmit = async () => {
     const emailTrim = email.trim().toLowerCase();
@@ -172,6 +204,17 @@ export default function LoginScreen({ onDone }) {
                 </Text>
             }
           </TouchableOpacity>
+
+          {mode === 'login' && (
+            <TouchableOpacity
+              style={styles.forgotBtn}
+              onPress={handleForgotPassword}
+              disabled={loading}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.forgotText}>비밀번호를 잊으셨나요?</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* 하단 안내 */}
@@ -197,7 +240,7 @@ export default function LoginScreen({ onDone }) {
           <Text style={styles.infoText}>
             {mode === 'signup'
               ? '📧 회원가입 후 이메일 인증 링크를\n클릭해야 로그인이 가능합니다.'
-              : '🔒 계정을 만들면 기기를 바꿔도\n데이터가 자동으로 복원됩니다.'}
+              : '🔒 계정을 만들면 기기를 바꿔도\n데이터가 자동으로 복원됩니다.\n\n💡 아이디는 가입 시 사용한 이메일입니다.'}
           </Text>
         </View>
       </ScrollView>
@@ -241,6 +284,14 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, alignItems: 'center', marginTop: spacing.lg,
   },
   submitText: { color: '#fff', fontSize: fontSize.md, fontWeight: '900', letterSpacing: 0.3 },
+
+  forgotBtn: {
+    alignItems: 'center', paddingVertical: 14, marginTop: 4,
+  },
+  forgotText: {
+    fontSize: fontSize.sm, color: colors.t2, fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
 
   footer: { alignItems: 'center', marginBottom: spacing.lg },
   footerText: { fontSize: fontSize.sm, color: colors.t2 },
