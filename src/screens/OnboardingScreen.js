@@ -816,7 +816,10 @@ const styles = StyleSheet.create({
   speciesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   speciesBtn: {
     width: '30%', aspectRatio: 1, backgroundColor: colors.s1, borderRadius: radius.md,
-    borderWidth: 2, borderColor: colors.bd, alignItems: 'center', justifyContent: 'center', ...shadow.sm,
+    borderWidth: 2, borderColor: colors.bd, alignItems: 'center', justifyContent: 'center',
+    // 아이콘+텍스트 묶음을 살짝 위로 올려 상/하 여백 균형 맞춤 (top 10 / bottom 20)
+    paddingTop: 10, paddingBottom: 20,
+    ...shadow.sm,
   },
   speciesBtnActive: { borderColor: colors.ac, backgroundColor: colors.ac + '20' },
   speciesEmoji: { fontSize: 32, marginBottom: 6 },

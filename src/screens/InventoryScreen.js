@@ -1147,7 +1147,8 @@ const styles = StyleSheet.create({
 
   tabBarScroll: { borderBottomWidth: 1, flexGrow: 0 },
   tabBarContent: { flexDirection: 'row' },
-  tab: { paddingVertical: 15, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent', minWidth: 80 },
+  // paddingTop 을 3px 키워 borderBottomWidth(3) 만큼 보정 → 텍스트가 탭 영역에 수직 중앙 정렬
+  tab: { paddingTop: 18, paddingBottom: 15, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent', minWidth: 80 },
   tabText: { fontSize: F.body, fontWeight: '600' },
   tabTextActive: { fontWeight: '900' },
 

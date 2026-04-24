@@ -35,9 +35,22 @@ export function toIsoDate(val) {
 }
 
 // 저장된 API 키 불러오기
+//   1순위) AsyncStorage @meatbig_mtrace_api_key — ScanScreen에서 사용자가 직접 입력한 값
+//   2순위) .env.local 의 EXPO_PUBLIC_MTRACE_API_KEY — 개발·빌드 단계에서 기본 주입
+//   → 사용자 입력이 있으면 우선, 없으면 env 폴백 (env도 없으면 Mock)
 export async function getMtraceKey() {
-  try { return (await AsyncStorage.getItem(MTRACE_KEY_STORAGE)) || ''; }
-  catch { return ''; }
+  try {
+    const stored = await AsyncStorage.getItem(MTRACE_KEY_STORAGE);
+    if (stored && stored.trim()) return stored.trim();
+  } catch {}
+  const envKey = process.env.EXPO_PUBLIC_MTRACE_API_KEY;
+  return envKey && envKey.trim() ? envKey.trim() : '';
+}
+
+// 키 존재 여부 (UI에서 "API 키 미설정" 경고를 띄울지 판단)
+export async function hasMtraceKey() {
+  const k = await getMtraceKey();
+  return !!k;
 }
 
 // ─── 실제 API 호출 ──────────────────────────────────────

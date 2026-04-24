@@ -16,7 +16,7 @@ export const LEGAL_URLS = {
   privacy: 'https://meatbig.co.kr/privacy-policy/',
   terms:   'https://meatbig.co.kr/terms-of-service/',
   landing: 'https://meatbig.co.kr/',
-  supportEmail: 'skystory1031@gmail.com',
+  supportEmail: 'meatbigadmin@gmail.com',
 };
 
 /**

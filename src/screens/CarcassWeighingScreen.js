@@ -1235,13 +1235,38 @@ function Step5({
 
       {losses.length > 0 && (
         <View style={styles.warnBox}>
-          <Ionicons name="warning-outline" size={20} color={C.warn2} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.warnTitle}>손실 예상 부위 {losses.length}개</Text>
-            <Text style={styles.warnDesc}>
-              {losses.map(x => `${x.p.name}(${fmt(x.s.profit)})`).join(', ')}
+          <View style={styles.warnHeader}>
+            <Ionicons name="warning-outline" size={20} color={C.warn2} />
+            <Text style={styles.warnTitle}>손실 예상 부위 · {losses.length}개</Text>
+          </View>
+
+          {/* 부위 리스트 — 이름 + 손실액을 2열 배치, 손실액 내림차순 정렬 */}
+          <View style={styles.warnList}>
+            {[...losses]
+              .sort((a, b) => a.s.profit - b.s.profit) // 손실 큰 순 (음수라서 오름차순이 큰 손실 먼저)
+              .map((x, i) => (
+                <View
+                  key={`${x.p.name}-${i}`}
+                  style={[
+                    styles.warnRow,
+                    i !== losses.length - 1 && styles.warnRowBorder,
+                  ]}
+                >
+                  <Text style={styles.warnPartName} numberOfLines={1}>
+                    {x.p.name}
+                  </Text>
+                  <Text style={styles.warnPartVal}>
+                    {fmt(x.s.profit)}원
+                  </Text>
+                </View>
+              ))}
+          </View>
+
+          <View style={styles.warnTipBox}>
+            <Ionicons name="bulb-outline" size={14} color={C.warn2} />
+            <Text style={styles.warnHint}>
+              판매단가 재검토 또는 번들 판매를 고려해 보세요
             </Text>
-            <Text style={styles.warnHint}>→ 이 부위들은 판매단가 재검토 또는 번들 판매 고려</Text>
           </View>
         </View>
       )}
@@ -1400,13 +1425,38 @@ const styles = StyleSheet.create({
   miniBadgeTxt: { fontSize: F.xxs, fontWeight: '800' },
 
   warnBox: {
-    flexDirection: 'row', gap: 10,
-    backgroundColor: C.warnS, borderRadius: R.md, borderLeftWidth: 4, borderLeftColor: C.warn2,
-    padding: 12, marginTop: 12,
+    backgroundColor: C.warnS, borderRadius: R.md,
+    borderLeftWidth: 4, borderLeftColor: C.warn2,
+    padding: 14, marginTop: 12,
   },
-  warnTitle: { fontSize: F.sm, fontWeight: '900', color: C.warn },
-  warnDesc:  { fontSize: F.xs, color: C.t2, marginTop: 3 },
-  warnHint:  { fontSize: F.xxs, color: C.t3, marginTop: 4, fontStyle: 'italic' },
+  warnHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10,
+  },
+  warnTitle: { fontSize: F.md, fontWeight: '900', color: C.warn },
+  warnList: {
+    backgroundColor: C.white, borderRadius: R.sm,
+    borderWidth: 1, borderColor: 'rgba(180,83,9,0.15)',
+    overflow: 'hidden',
+  },
+  warnRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingVertical: 9,
+  },
+  warnRowBorder: {
+    borderBottomWidth: 1, borderBottomColor: 'rgba(180,83,9,0.08)',
+  },
+  warnPartName: {
+    fontSize: F.sm, fontWeight: '700', color: C.t1, flex: 1, marginRight: 8,
+  },
+  warnPartVal: {
+    fontSize: F.sm, fontWeight: '900', color: C.red,
+    fontVariant: ['tabular-nums'],
+  },
+  warnTipBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: 10, paddingHorizontal: 2,
+  },
+  warnHint:  { flex: 1, fontSize: F.xs, color: C.warn, fontWeight: '600', lineHeight: 17 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   modalBox:     { backgroundColor: C.white, borderRadius: R.md, padding: 20, width: '100%' },

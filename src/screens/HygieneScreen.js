@@ -133,6 +133,15 @@ export default function HygieneScreen() {
     setChecks(p => ({ ...p, [`${catId}_${idx}`]: val }));
   };
 
+  // 카테고리 내 모든 항목을 O로 일괄 설정
+  const setCatAll = (cat, val) => {
+    setChecks(p => {
+      const next = { ...p };
+      cat.items.forEach((_, i) => { next[`${cat.id}_${i}`] = val; });
+      return next;
+    });
+  };
+
   const catChecks = (cat) => cat.items.map((_, i) => checks[`${cat.id}_${i}`]);
 
   const isCatDone = (cat) => catChecks(cat).every(v => v !== undefined && v !== null);
@@ -357,12 +366,29 @@ export default function HygieneScreen() {
           {page >= 1 && page <= CATEGORIES.length && (() => {
             const cat = CATEGORIES[page - 1];
             const done = isCatDone(cat);
+            const allO = cat.items.every((_, i) => checks[`${cat.id}_${i}`] === 'O');
             return (
               <>
                 <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
-                    <Ionicons name={cat.icon} size={18} color={C.t3} />
-                    <Text style={styles.catDesc}>{cat.label} — {cat.items.length}개 항목</Text>
+                  <View style={styles.catHeaderRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                      <Ionicons name={cat.icon} size={18} color={C.t3} />
+                      <Text style={styles.catDesc}>{cat.label} — {cat.items.length}개 항목</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.allOBtn, allO && styles.allOBtnActive]}
+                      onPress={() => setCatAll(cat, 'O')}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={allO ? 'checkmark-circle' : 'checkmark-done-outline'}
+                        size={16}
+                        color={allO ? '#fff' : '#16a34a'}
+                      />
+                      <Text style={[styles.allOBtnTxt, allO && { color: '#fff' }]}>
+                        {allO ? '전체선택됨' : '전체선택 (O)'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                   {cat.items.map((item, i) => {
                     const val = checks[`${cat.id}_${i}`];
@@ -585,6 +611,24 @@ const styles = StyleSheet.create({
   stepPreviewCount: { fontSize: F.xs, color: C.t3 },
 
   catDesc: { fontSize: F.sm, fontWeight: '700', color: C.t3 },
+  catHeaderRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginBottom: 16,
+  },
+  allOBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderWidth: 1.5, borderColor: '#16a34a',
+    backgroundColor: '#16a34a15',
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: R.md,
+  },
+  allOBtnActive: {
+    backgroundColor: '#16a34a',
+    borderColor: '#16a34a',
+  },
+  allOBtnTxt: {
+    fontSize: F.xs, fontWeight: '900', color: '#16a34a',
+  },
   checkItem: { borderRadius: R.sm, borderWidth: 1, borderColor: C.border, backgroundColor: C.white, padding: 8, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
   checkNum: { fontSize: F.xxs, fontWeight: '800', width: 18, textAlign: 'center', color: C.t3 },
   checkLabel: { fontSize: F.sm, lineHeight: 18, color: C.t1 },
