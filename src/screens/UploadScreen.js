@@ -42,7 +42,6 @@ const DEMO_DATA = {
 // - 인식 실패 또는 필드 추출 실패 시 DEMO_DATA 로 자동 폴백
 //
 // 네이티브 모듈이므로 반드시 EAS Dev Client 또는 Production 빌드로 실행해야 함 (Expo Go 불가).
-const HAS_API_KEY = true; // UI 호환용 (기존 조건식 유지)
 
 // ─── 날짜 정규화 헬퍼: "2026년 3월 24일" / "2026-03-24" / "2026.3.24" → "2026.03.24" ──
 function extractDate(text) {
@@ -411,17 +410,6 @@ export default function UploadScreen({ navigation }) {
       style={{ flex: 1, backgroundColor: C.bg }}
       contentContainerStyle={{ padding: 18, paddingBottom: 48 }}>
 
-      {/* OCR 엔진 안내 배너 — 기본 숨김, 인식 실패 시 결과 영역의 demoNotice 로 대체 */}
-      {!HAS_API_KEY && (
-        <View style={styles.demoBanner}>
-          <Ionicons name="warning" size={22} color={C.warn} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.demoBannerTitle}>데모 모드</Text>
-            <Text style={styles.demoBannerSub}>ML Kit 인식이 불가한 환경입니다. Dev Client 또는 프로덕션 빌드에서 실제 OCR 이 동작합니다.</Text>
-          </View>
-        </View>
-      )}
-
       {/* 문서 종류 */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
         <Ionicons name="folder-open" size={18} color={C.t2} />
@@ -502,8 +490,8 @@ export default function UploadScreen({ navigation }) {
           </View>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Ionicons name={HAS_API_KEY ? 'sparkles' : 'search'} size={18} color="#fff" />
-            <Text style={styles.ocrBtnText}>{HAS_API_KEY ? 'AI 자동 분석' : '데모로 확인'}</Text>
+            <Ionicons name="sparkles" size={18} color="#fff" />
+            <Text style={styles.ocrBtnText}>AI 자동 분석</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -646,14 +634,6 @@ export default function UploadScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  demoBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: C.warnS, borderWidth: 1, borderColor: C.warn2 + '40',
-    borderRadius: R.md, padding: 16, marginBottom: 16,
-  },
-  demoBannerTitle: { fontSize: F.sm, fontWeight: '800', color: '#92400e', marginBottom: 2 },
-  demoBannerSub: { fontSize: F.xs, color: C.warn, lineHeight: 18 },
-
   sectionTitle: { fontSize: F.body, fontWeight: '800', color: C.t1 },
 
   typeBtn: {
