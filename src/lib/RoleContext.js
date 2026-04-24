@@ -1,10 +1,11 @@
 /**
- * RoleContext.js — 사장/직원/구직자 모드 전역 관리 (강화)
+ * RoleContext.js — 사장/직원/구직자/관리자 모드 전역 관리 (강화)
  *
- * role: 'owner' | 'staff' | 'jobseeker'
+ * role: 'owner' | 'staff' | 'jobseeker' | 'admin'
  * - owner:     모든 탭 + 모든 기능
  * - staff:     홈·서류·채용 탭 / 위생·온도 입력만 허용
  * - jobseeker: 채용·설정 탭만 (사업장 없음, 헤드헌팅 받기 + 프로필 편집)
+ * - admin:     관리자 대시보드·설정 탭만 (사업장 없음, user_profiles.role='admin')
  *
  * 직원 전환 플로우:
  *   1. "직원 모드로 전환" 탭
@@ -97,6 +98,13 @@ export function RoleProvider({ children }) {
             const jsName = await AsyncStorage.getItem('@meatbig_jobseeker_name');
             if (jsName) setStaffName(jsName);
           } catch {}
+        } else if (savedRole === 'admin') {
+          setRole('admin');
+          // 관리자는 display_name 을 staffName 에 임시 저장 (UI 표시용)
+          try {
+            const adminName = await AsyncStorage.getItem('@meatbig_admin_name');
+            if (adminName) setStaffName(adminName);
+          } catch {}
         }
       } catch {}
       setRoleReady(true);
@@ -113,6 +121,12 @@ export function RoleProvider({ children }) {
       await AsyncStorage.setItem(CUR_STAFF_KEY, JSON.stringify({ name, id })).catch(() => {});
     } else {
       await AsyncStorage.removeItem(CUR_STAFF_KEY).catch(() => {});
+    }
+    // 관리자 표시명 저장 (앱 재기동 시 복원용)
+    if (newRole === 'admin' && name) {
+      await AsyncStorage.setItem('@meatbig_admin_name', name).catch(() => {});
+    } else {
+      await AsyncStorage.removeItem('@meatbig_admin_name').catch(() => {});
     }
   }, []);
 
@@ -212,6 +226,8 @@ export function RoleProvider({ children }) {
   // ── 기능 접근 권한 체크 ────────────────────────────────
   const canAccess = useCallback((key) => {
     if (role === 'owner') return true;
+    // 관리자는 AdminScreen 에서만 데이터 조회 — 일반 기능은 모두 차단
+    if (role === 'admin') return false;
     // 구직자는 사장 전용 기능뿐 아니라 재고·위생·서류 작성도 접근 불가
     if (role === 'jobseeker') return false;
     return !OWNER_ONLY.includes(key);

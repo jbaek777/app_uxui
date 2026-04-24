@@ -1,18 +1,21 @@
 /**
  * 법적 문서 공개 URL
  *
- * 호스팅: GitHub Pages (jbaek777/app_uxui)
+ * 호스팅: GitHub Pages (jbaek777/app_uxui) + 커스텀 도메인 meatbig.co.kr (2026-04-25~)
  * 호스팅 가이드: legal/hosting-guide.md
  * 원본 마크다운: legal/privacy-policy.md, legal/terms-of-service.md
  *
  * 한 곳에서만 관리하므로, 도메인 이전 시 본 파일만 수정하면 됩니다.
+ *
+ * ⚠️ 이전 GitHub Pages 주소 (fallback):
+ *   https://jbaek777.github.io/app_uxui/ — 커스텀 도메인 장애 시 복구용
  */
 import { Linking, Alert } from 'react-native';
 
 export const LEGAL_URLS = {
-  privacy: 'https://jbaek777.github.io/app_uxui/privacy-policy/',
-  terms:   'https://jbaek777.github.io/app_uxui/terms-of-service/',
-  landing: 'https://jbaek777.github.io/app_uxui/',
+  privacy: 'https://meatbig.co.kr/privacy-policy/',
+  terms:   'https://meatbig.co.kr/terms-of-service/',
+  landing: 'https://meatbig.co.kr/',
   supportEmail: 'skystory1031@gmail.com',
 };
 

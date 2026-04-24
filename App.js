@@ -152,6 +152,16 @@ function SettingsStack({ bizData }) {
   );
 }
 
+// ── 관리자 전용 탭: AdminScreen 스택 ──────────────────────
+function AdminOnlyStack() {
+  const headerOpts = useHeaderOpts();
+  return (
+    <Stack.Navigator screenOptions={headerOpts}>
+      <Stack.Screen name="Admin" component={AdminScreen} options={{ title: '🛡️ 관리자 대시보드' }} />
+    </Stack.Navigator>
+  );
+}
+
 // ── 탭 아이콘 + 레이블 (HTML 프로토타입 V5 스타일) ──────────
 function TabIcon({ iconOn, iconOff, label, focused }) {
   const RED = '#B91C1C';
@@ -182,45 +192,10 @@ function TabIcon({ iconOn, iconOff, label, focused }) {
   );
 }
 
-// ── 사장 전환 탭 화면 (직원 모드 탭바 우측) ──────────────
-function OwnerReturnScreen() {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
-  const { requestOwnerMode, staffName } = useRole();
-  React.useEffect(() => { requestOwnerMode(); }, []);
-  return (
-    <View style={{ flex: 1, backgroundColor: pal.bg, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontSize: 48, marginBottom: 16 }}>🔐</Text>
-      <Text style={{ color: pal.tx, fontSize: 16, fontWeight: '700' }}>사장 모드로 전환</Text>
-    </View>
-  );
-}
-
-// ── 직원 모드 배너 ────────────────────────────────────────
-function StaffModeBanner() {
-  const { isDark } = useTheme();
-  const pal = isDark ? darkColors : lightColors;
-  const { role, staffName, requestOwnerMode } = useRole();
-  if (role !== 'staff') return null;
-  return (
-    <TouchableOpacity
-      style={{
-        backgroundColor: '#E8950A',
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingVertical: 8,
-      }}
-      onPress={requestOwnerMode}
-      activeOpacity={0.85}
-    >
-      <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-        👤 직원 모드 — {staffName || '직원'}
-      </Text>
-      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' }}>
-        🔐 사장 전환 탭
-      </Text>
-    </TouchableOpacity>
-  );
-}
+// (2026-04-23) 직원 모드 상단 주황 배너 + OwnerReturnScreen 제거
+// 이유: 상태바와 시각적 충돌 + 이질적인 UI
+// 대체: 하단 탭 5번째 자리를 "설정"으로 통합 — 설정 화면 안에 "직원 모드" 카드 +
+//        "사장 모드 복귀" 버튼 + "로그아웃" 버튼을 통합 제공 (SettingsScreen.js)
 
 // ── 메인 탭 네비게이터 ───────────────────────────────────
 function MainTabs({ bizData }) {
@@ -229,10 +204,55 @@ function MainTabs({ bizData }) {
   const { role } = useRole();
   const isStaff = role === 'staff';
   const isJobseeker = role === 'jobseeker';
+  const isAdmin = role === 'admin';
   const insets = useSafeAreaInsets();
 
   // Safe Area 반영 탭바 높이 — HTML 프로토타입: padding 10px top + 22px bottom
   const TAB_H = 60 + insets.bottom;
+
+  // 관리자 모드 — 관리자 대시보드 + 설정 2탭만
+  // · user_profiles.role='admin' 전용
+  // · 사업장 없음 → 사장/직원 기능 차단
+  // · AdminScreen 이 주 작업 공간, 설정은 로그아웃용
+  if (isAdmin) {
+    return (
+      <View style={{ flex: 1 }}>
+        <Tab.Navigator
+          screenOptions={{
+            headerShown: false,
+            tabBarStyle: {
+              backgroundColor: 'rgba(242,244,248,0.98)',
+              borderTopColor: '#E2E8F0',
+              borderTopWidth: 1,
+              height: TAB_H,
+              paddingBottom: insets.bottom,
+              paddingTop: 0,
+              elevation: 0,
+            },
+            tabBarShowLabel: false,
+          }}
+        >
+          <Tab.Screen
+            name="AdminTab"
+            component={AdminOnlyStack}
+            options={{
+              tabBarIcon: ({ focused }) =>
+                <TabIcon iconOn="shield-checkmark" iconOff="shield-checkmark-outline" label="관리자" focused={focused} />,
+            }}
+          />
+          <Tab.Screen
+            name="SettingsTab"
+            options={{
+              tabBarIcon: ({ focused }) =>
+                <TabIcon iconOn="settings" iconOff="settings-outline" label="설정" focused={focused} />,
+            }}
+          >
+            {() => <SettingsStack bizData={bizData} />}
+          </Tab.Screen>
+        </Tab.Navigator>
+      </View>
+    );
+  }
 
   // 구직자 모드 — 채용·설정 2탭만
   if (isJobseeker) {
@@ -277,7 +297,6 @@ function MainTabs({ bizData }) {
 
   return (
     <View style={{ flex: 1 }}>
-      <StaffModeBanner />
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
@@ -342,32 +361,18 @@ function MainTabs({ bizData }) {
             }}
           />
         )}
-        {/* 5. 설정 — 사장만 */}
-        {!isStaff && (
-          <Tab.Screen
-            name="SettingsTab"
-            options={{
-              tabBarIcon: ({ focused }) =>
-                <TabIcon iconOn="settings" iconOff="settings-outline" label="설정" focused={focused} />,
-            }}
-          >
-            {() => <SettingsStack bizData={bizData} />}
-          </Tab.Screen>
-        )}
-        {/* 직원 모드 — 설정 탭 대신 사장복귀 탭 */}
-        {isStaff && (
-          <Tab.Screen
-            name="OwnerTab"
-            component={OwnerReturnScreen}
-            options={{
-              tabBarIcon: ({ focused }) =>
-                <TabIcon iconOn="lock-closed" iconOff="lock-closed-outline" label="사장전환" focused={focused} />,
-            }}
-            listeners={({ navigation }) => ({
-              tabPress: (e) => { e.preventDefault(); },
-            })}
-          />
-        )}
+        {/* 5. 설정 — 사장·직원 모두 (2026-04-23 변경) */}
+        {/* 직원 모드에서는 SettingsScreen 내부에서 민감 섹션(직원관리·구독관리) 자동 숨김 */}
+        {/* "사장 모드 복귀"·"로그아웃"은 설정 화면에서 제공 */}
+        <Tab.Screen
+          name="SettingsTab"
+          options={{
+            tabBarIcon: ({ focused }) =>
+              <TabIcon iconOn="settings" iconOff="settings-outline" label="설정" focused={focused} />,
+          }}
+        >
+          {() => <SettingsStack bizData={bizData} />}
+        </Tab.Screen>
       </Tab.Navigator>
     </View>
   );
@@ -377,7 +382,7 @@ function MainTabs({ bizData }) {
 function AppInner() {
   const { isDark } = useTheme();
   const { initRole, roleReady } = useRole();
-  const { user, authReady, loadStoreFromCloud } = useAuth();
+  const { user, authReady, loadStoreFromCloud, checkIsAdmin } = useAuth();
   const [phase, setPhase] = useState('splash');
   const [bizData, setBizData] = useState(null);
 
@@ -400,6 +405,18 @@ function AppInner() {
 
     // 로그인 됐으면 가게 데이터 확인
     try {
+      // ⭐ 관리자 체크 — user_profiles.role='admin' 이면 온보딩 스킵
+      //   · 사업장 없음 / AdminScreen 이 주 작업 공간
+      //   · 앱 재기동 시마다 재확인 (role 강등 대응)
+      const { isAdmin, displayName } = await checkIsAdmin();
+      if (isAdmin) {
+        setBizData(null);
+        await initRole('admin', displayName || 'MeatBig 관리자', null);
+        await AsyncStorage.setItem('@meatbig_onboarded', 'true');
+        setPhase('main');
+        return;
+      }
+
       // 1) 로컬 먼저 확인
       const onboarded = await AsyncStorage.getItem('@meatbig_onboarded');
       const savedRole = await AsyncStorage.getItem('@meatbig_role');
@@ -440,9 +457,32 @@ function AppInner() {
     }
   }, [authReady]);
 
+  // 로그아웃 감지 — user 가 null 로 바뀌면 로그인 화면으로 복귀
+  //   · SettingsScreen → signOut() → AuthContext.user = null → 이 effect 발동
+  //   · bizData 도 함께 초기화해야 다음 로그인 시 캐시된 가게 데이터가 섞이지 않음
+  useEffect(() => {
+    if (!authReady) return;
+    if (!user && phase !== 'login' && phase !== 'splash') {
+      setBizData(null);
+      setPhase('login');
+    }
+  }, [user, authReady]);
+
   // 로그인 완료 콜백
   const handleLoginDone = async (type) => {
     try {
+      // ⭐ 관리자 체크 — user_profiles.role='admin' 이면 온보딩 스킵
+      console.log('[LOGIN-DONE] Calling checkIsAdmin...');
+      const { isAdmin, displayName } = await checkIsAdmin();
+      console.log('[LOGIN-DONE] isAdmin=', isAdmin, 'displayName=', displayName);
+      if (isAdmin) {
+        setBizData(null);
+        await initRole('admin', displayName || 'MeatBig 관리자', null);
+        await AsyncStorage.setItem('@meatbig_onboarded', 'true');
+        setPhase('main');
+        return;
+      }
+
       // 로그인 후 가게 데이터 확인
       const onboarded = await AsyncStorage.getItem('@meatbig_onboarded');
       const savedRole = await AsyncStorage.getItem('@meatbig_role');

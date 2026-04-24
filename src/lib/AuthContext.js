@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase';
+import { signInWithGoogle as socialGoogle, signInWithKakao as socialKakao } from './socialAuth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AuthContext = createContext({});
@@ -30,11 +31,14 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
-  // 이메일 회원가입
-  // Supabase 대시보드 Auth → Confirm email 활성화 시:
-  //   · data.user 는 반환되지만 data.session 은 null
-  //   · 사용자가 메일함의 인증 링크 클릭해야 로그인 가능
-  // 활성화 안 돼 있으면 session 즉시 발급 (기존 동작 유지)
+  // 이메일 회원가입 — 이메일 인증 없이 즉시 로그인
+  //
+  // 정책 (2026-04-23):
+  //   · Supabase 대시보드 Authentication → Providers → Email → "Confirm email" OFF
+  //   · 가입 즉시 session 발급 → 바로 앱 사용 가능
+  //   · 이메일 진위 여부는 검증하지 않음 (MVP 단계 간소화)
+  //
+  // 나중에 카카오·구글 소셜로그인 전환 시 이 함수는 제거 예정
   const signUp = useCallback(async (email, password) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
@@ -50,6 +54,19 @@ export function AuthProvider({ children }) {
       '@meatbig_invite_pin', '@meatbig_role', '@meatbig_current_staff',
       '@meatbig_store_uuid',
     ]);
+  }, []);
+
+  // ─── 소셜 로그인 (Google / Kakao) ───────────────────
+  // socialAuth.js 의 공통 OAuth 흐름 경유. Supabase 세션이
+  // setSession 되면 onAuthStateChange 가 발동 → user 상태 자동 갱신
+  const signInWithGoogle = useCallback(async () => {
+    const { user } = await socialGoogle();
+    return user;
+  }, []);
+
+  const signInWithKakao = useCallback(async () => {
+    const { user } = await socialKakao();
+    return user;
   }, []);
 
   // 비밀번호 재설정 이메일 발송
@@ -126,6 +143,32 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // 관리자 여부 체크 (user_profiles.role === 'admin')
+  //
+  // 용도:
+  //   · 로그인 직후 온보딩 스킵 여부 결정 (관리자는 사업장 없음)
+  //   · App 재시작 시 admin role 복원
+  //
+  // 반환: { isAdmin: boolean, displayName: string|null }
+  //   · 네트워크 실패 시 { isAdmin: false } 안전 기본값
+  const checkIsAdmin = useCallback(async () => {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return { isAdmin: false, displayName: null };
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('role, display_name')
+        .eq('auth_uid', currentUser.id)
+        .maybeSingle();
+      return {
+        isAdmin: data?.role === 'admin',
+        displayName: data?.display_name || null,
+      };
+    } catch {
+      return { isAdmin: false, displayName: null };
+    }
+  }, []);
+
   // store_members에서 직원 정보 불러오기
   const loadMembersFromCloud = useCallback(async () => {
     try {
@@ -146,7 +189,8 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user, authReady,
       signIn, signUp, signOut, resetPassword,
-      loadStoreFromCloud, loadMembersFromCloud,
+      signInWithGoogle, signInWithKakao,
+      loadStoreFromCloud, loadMembersFromCloud, checkIsAdmin,
     }}>
       {children}
     </AuthContext.Provider>

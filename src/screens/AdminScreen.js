@@ -66,6 +66,9 @@ export default function AdminScreen({ navigation }) {
         if (data?.role === 'admin') {
           setAdminProfile(data);
           setAuthed(true); // 관리자 자동 통과
+          // Edge Function 은 여전히 master_pin 검증이 필요 — 서버 기본값 '777777' 주입
+          // (Supabase Secrets 에서 ADMIN_MASTER_PIN 변경 시 이 값도 함께 맞춰야 함)
+          setVerifiedPin('777777');
         }
       } catch (e) {
         // user_profiles 테이블 미배포 상태에서도 PIN 방식으로 동작하도록 무시
