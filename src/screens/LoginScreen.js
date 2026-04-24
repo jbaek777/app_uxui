@@ -8,7 +8,7 @@ import { useAuth } from '../lib/AuthContext';
 import { colors, fontSize, spacing, radius } from '../theme';
 
 export default function LoginScreen({ onDone }) {
-  const { signIn, signUp, resetPassword } = useAuth();
+  const { signIn, signUp, resetPassword, signInWithGoogle, signInWithKakao } = useAuth();
   const [mode, setMode]       = useState('login'); // 'login' | 'signup'
   const [email, setEmail]     = useState('');
   const [pw, setPw]           = useState('');
@@ -89,23 +89,9 @@ export default function LoginScreen({ onDone }) {
         await signIn(emailTrim, pw);
         onDone('login');
       } else {
-        // 회원가입 — Supabase Confirm email 이 켜져 있으면 session 은 null
-        const { session } = await signUp(emailTrim, pw);
-        if (!session) {
-          // 이메일 인증 필요 → 로그인 탭으로 복귀하고 안내
-          Alert.alert(
-            '📧 이메일 인증 필요',
-            `${emailTrim} 로 인증 메일을 보냈습니다.\n\n메일함에서 인증 링크를 클릭한 후 로그인해주세요.`,
-            [{ text: '확인', onPress: () => {
-              setMode('login');
-              setPw('');
-              setPw2('');
-            }}],
-          );
-          setLoading(false);
-          return;
-        }
-        // Confirm email 비활성 상태 — 바로 로그인 완료
+        // 회원가입 — 이메일 인증 없이 즉시 로그인
+        // (Supabase 대시보드 Auth → Confirm email = OFF 전제)
+        await signUp(emailTrim, pw);
         onDone('signup');
       }
     } catch (e) {
@@ -114,10 +100,27 @@ export default function LoginScreen({ onDone }) {
         Alert.alert('로그인 실패', '이메일 또는 비밀번호가 올바르지 않습니다.');
       else if (msg.includes('User already registered'))
         Alert.alert('이미 가입된 이메일', '해당 이메일로 이미 계정이 있습니다.\n로그인을 시도해주세요.');
-      else if (msg.includes('Email not confirmed'))
-        Alert.alert('이메일 인증 필요', '가입 시 발송된 이메일을 확인해주세요.\n인증 완료 후 다시 로그인해주세요.');
       else
         Alert.alert('오류', msg || '잠시 후 다시 시도해주세요.');
+    }
+    setLoading(false);
+  };
+
+  // ─── 소셜 로그인 공통 핸들러 ──────────────────
+  const handleSocial = async (provider) => {
+    setLoading(true);
+    try {
+      if (provider === 'google') await signInWithGoogle();
+      else if (provider === 'kakao') await signInWithKakao();
+      onDone('login');
+    } catch (e) {
+      const msg = e.message || '';
+      if (!msg.includes('취소')) {
+        Alert.alert(
+          provider === 'google' ? '구글 로그인 오류' : '카카오 로그인 오류',
+          msg || '잠시 후 다시 시도해주세요.',
+        );
+      }
     }
     setLoading(false);
   };
@@ -215,6 +218,33 @@ export default function LoginScreen({ onDone }) {
               <Text style={styles.forgotText}>비밀번호를 잊으셨나요?</Text>
             </TouchableOpacity>
           )}
+
+          {/* ─── 소셜 로그인 구분선 ─── */}
+          <View style={styles.dividerWrap}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>간편 로그인</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* 카카오 — 노란색, 카카오 브랜드 컬러 */}
+          <TouchableOpacity
+            style={[styles.socialBtn, styles.kakaoBtn, loading && { opacity: 0.6 }]}
+            onPress={() => handleSocial('kakao')}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.kakaoText}>💬  카카오로 시작하기</Text>
+          </TouchableOpacity>
+
+          {/* 구글 — 흰 배경 + 테두리 */}
+          <TouchableOpacity
+            style={[styles.socialBtn, styles.googleBtn, loading && { opacity: 0.6 }]}
+            onPress={() => handleSocial('google')}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.googleText}>G  Google 로 시작하기</Text>
+          </TouchableOpacity>
         </View>
 
         {/* 하단 안내 */}
@@ -239,7 +269,7 @@ export default function LoginScreen({ onDone }) {
         <View style={[styles.infoBox]}>
           <Text style={styles.infoText}>
             {mode === 'signup'
-              ? '📧 회원가입 후 이메일 인증 링크를\n클릭해야 로그인이 가능합니다.'
+              ? '🎉 회원가입 후 바로 로그인됩니다.\n기기를 바꿔도 데이터가 자동 복원됩니다.\n\n💡 비밀번호는 안전하게 보관해 주세요.'
               : '🔒 계정을 만들면 기기를 바꿔도\n데이터가 자동으로 복원됩니다.\n\n💡 아이디는 가입 시 사용한 이메일입니다.'}
           </Text>
         </View>
@@ -305,5 +335,34 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: fontSize.xs, color: colors.a2, fontWeight: '600',
     lineHeight: 20, textAlign: 'center',
+  },
+
+  // ─── 소셜 로그인 ─────────────────────────────
+  dividerWrap: {
+    flexDirection: 'row', alignItems: 'center',
+    marginTop: spacing.lg, marginBottom: spacing.md,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.bd },
+  dividerText: {
+    marginHorizontal: spacing.md, fontSize: fontSize.xs,
+    color: colors.t3, fontWeight: '700',
+  },
+  socialBtn: {
+    paddingVertical: 16, borderRadius: radius.lg,
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: spacing.sm, minHeight: 54,
+  },
+  kakaoBtn: { backgroundColor: '#FEE500' },
+  kakaoText: {
+    color: '#181600', fontSize: fontSize.md, fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  googleBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5, borderColor: colors.bd,
+  },
+  googleText: {
+    color: '#1F2937', fontSize: fontSize.md, fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });
