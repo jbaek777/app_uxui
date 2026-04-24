@@ -6,3 +6,25 @@ web-build/
 .env.local
 .env*.local
 *.orig.*
+
+# Native builds
+/android
+/ios
+
+# Local asset/doc generation scripts (not shipped)
+apply_canva_icon.py
+create_app_icon.py
+create_business_plan.py
+preview_icon.py
+
+# Asset preview files (underscore prefix = local draft)
+assets/_*.png
+assets/_*.jpg
+
+# Business / legal documents (local only, sensitive)
+*.docx
+*.hwp
+*.pdf
+
+# Supabase CLI temp
+supabase/.temp/
