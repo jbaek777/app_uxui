@@ -39,10 +39,11 @@
   .login-input {
     width: 100%; padding: 14px 18px; background: var(--s2);
     border: 1.5px solid var(--bd); border-radius: 10px;
-    color: var(--tx); font-size: 16px; letter-spacing: 4px;
-    outline: none; text-align: center;
+    color: var(--tx); font-size: 15px;
+    outline: none;
     transition: border-color .2s;
   }
+  .login-input[type="password"] { letter-spacing: 4px; text-align: center; }
   .login-input:focus { border-color: var(--ac); }
   .login-btn {
     width: 100%; padding: 14px; background: var(--ac); color: #fff;
@@ -185,15 +186,26 @@
   <div class="login-box">
     <div class="login-logo">🥩</div>
     <div class="login-title">MeatBig 관리자</div>
-    <div class="login-sub">관리자 비밀번호를 입력하세요</div>
+    <div class="login-sub">관리자 이메일·비밀번호로 로그인</div>
+    <input
+      id="emailInput" type="email" class="login-input"
+      placeholder="meatbigadmin@gmail.com"
+      autocomplete="username"
+      onkeydown="if(event.key==='Enter') document.getElementById('pwInput').focus()"
+      autofocus
+    />
     <input
       id="pwInput" type="password" class="login-input"
       placeholder="••••••••"
+      autocomplete="current-password"
       onkeydown="if(event.key==='Enter') tryLogin()"
-      autofocus
     />
-    <div id="loginError" class="login-error">⚠ 비밀번호가 올바르지 않습니다</div>
-    <button class="login-btn" onclick="tryLogin()">로그인 →</button>
+    <div id="loginError" class="login-error">⚠ 로그인에 실패했습니다</div>
+    <button class="login-btn" id="loginBtn" onclick="tryLogin()">로그인 →</button>
+    <div class="login-sub" style="text-align:center; line-height:1.5;">
+      일반 사용자 계정은 접근할 수 없습니다.<br/>
+      관리자 권한이 부여된 계정만 사용 가능합니다.
+    </div>
   </div>
 </div>
 
@@ -204,7 +216,9 @@
   <h1>🥩 <span>MeatBig</span> 관리자 대시보드</h1>
   <div class="header-right">
     <span class="last-sync" id="lastSync">-</span>
+    <span class="last-sync" id="adminEmail" style="color: var(--gn); font-weight: 700;"></span>
     <button class="refresh-btn" onclick="loadAll()">🔄 새로고침</button>
+    <button class="refresh-btn" onclick="doLogout()" style="background: var(--rd);">로그아웃</button>
   </div>
 </div>
 
@@ -897,35 +911,118 @@ function renderClosing() {
 }
 
 // ─── 로그인 ─────────────────────────────────────────────
-const ADMIN_PW = '3607859wls';
+// ═══════════════════════════════════════════════════════════
+// 🔐 Supabase Auth 기반 관리자 로그인
+//   - 이메일/비밀번호로 Supabase Auth 로그인
+//   - 로그인 성공 후 user_profiles.role === 'admin' 검증
+//   - 세션은 Supabase SDK 가 localStorage 에 자동 저장
+//   - 일반 유저 계정으로 로그인 시 즉시 거부 + signOut
+// ═══════════════════════════════════════════════════════════
 
-function tryLogin() {
-  const input = document.getElementById('pwInput').value;
+let CURRENT_ADMIN = null;
+
+function showLoginError(msg) {
   const errEl = document.getElementById('loginError');
-  if (input === ADMIN_PW) {
-    sessionStorage.setItem('mb_admin_auth', '1');
-    document.getElementById('loginOverlay').style.display = 'none';
-    document.getElementById('dashContent').style.display = 'block';
-    loadAll();
-  } else {
-    errEl.style.display = 'block';
+  errEl.textContent = msg ? '⚠ ' + msg : '⚠ 로그인에 실패했습니다';
+  errEl.style.display = 'block';
+  setTimeout(() => { errEl.style.display = 'none'; }, 4000);
+}
+
+function setLoginLoading(loading) {
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = loading;
+  btn.textContent = loading ? '확인 중...' : '로그인 →';
+  btn.style.opacity = loading ? '0.6' : '1';
+}
+
+// 관리자 권한 검증 — profiles.role 확인
+async function verifyAdmin(userId) {
+  const { data, error } = await sb
+    .from('user_profiles')
+    .select('role, display_name')
+    .eq('auth_uid', userId)
+    .maybeSingle();
+  if (error) {
+    console.error('role 조회 실패:', error);
+    return null;
+  }
+  if (!data || data.role !== 'admin') return null;
+  return data;
+}
+
+async function showDashboard(email) {
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('dashContent').style.display = 'block';
+  document.getElementById('adminEmail').textContent = '👤 ' + email;
+  await loadAll();
+}
+
+async function tryLogin() {
+  const email = document.getElementById('emailInput').value.trim();
+  const password = document.getElementById('pwInput').value;
+  if (!email || !password) {
+    showLoginError('이메일과 비밀번호를 입력하세요');
+    return;
+  }
+  setLoginLoading(true);
+  try {
+    // 1) Supabase Auth 로그인
+    const { data: authData, error: authErr } =
+      await sb.auth.signInWithPassword({ email, password });
+    if (authErr || !authData?.user) {
+      showLoginError('이메일 또는 비밀번호가 올바르지 않습니다');
+      return;
+    }
+    // 2) 관리자 권한 검증
+    const profile = await verifyAdmin(authData.user.id);
+    if (!profile) {
+      await sb.auth.signOut();
+      showLoginError('이 계정은 관리자 권한이 없습니다');
+      return;
+    }
+    // 3) 대시보드 진입
+    CURRENT_ADMIN = { email: authData.user.email, ...profile };
     document.getElementById('pwInput').value = '';
-    document.getElementById('pwInput').focus();
-    setTimeout(() => { errEl.style.display = 'none'; }, 3000);
+    await showDashboard(authData.user.email);
+  } catch (e) {
+    console.error(e);
+    showLoginError(e.message || '로그인 중 오류 발생');
+  } finally {
+    setLoginLoading(false);
   }
 }
 
-// ─── 초기 로드 ──────────────────────────────────────────
-// 세션 인증 유지 (새로고침 시 재로그인 불필요)
-if (sessionStorage.getItem('mb_admin_auth') === '1') {
-  document.getElementById('loginOverlay').style.display = 'none';
-  document.getElementById('dashContent').style.display = 'block';
-  loadAll();
+async function doLogout() {
+  if (!confirm('로그아웃하시겠습니까?')) return;
+  await sb.auth.signOut();
+  CURRENT_ADMIN = null;
+  document.getElementById('dashContent').style.display = 'none';
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('emailInput').value = '';
+  document.getElementById('pwInput').value = '';
+  document.getElementById('adminEmail').textContent = '';
+  document.getElementById('emailInput').focus();
 }
 
-// 60초마다 자동 새로고침 (로그인 후에만)
+// ─── 초기 로드 ──────────────────────────────────────────
+// Supabase 세션 복원 → 관리자 여부 재검증
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    const profile = await verifyAdmin(session.user.id);
+    if (profile) {
+      CURRENT_ADMIN = { email: session.user.email, ...profile };
+      await showDashboard(session.user.email);
+      return;
+    }
+    // 세션은 있는데 관리자 아님 → 강제 로그아웃
+    await sb.auth.signOut();
+  }
+})();
+
+// 60초마다 자동 새로고침 (관리자 로그인 상태에서만)
 setInterval(() => {
-  if (sessionStorage.getItem('mb_admin_auth') === '1') loadAll();
+  if (CURRENT_ADMIN) loadAll();
 }, 60000);
 </script>
 

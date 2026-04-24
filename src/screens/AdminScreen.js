@@ -9,7 +9,7 @@
  * 진입:
  *   · 기본 PIN '777777' — Supabase Secrets 에서 ADMIN_MASTER_PIN 으로 변경 가능
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Alert, Switch, ActivityIndicator,
@@ -18,6 +18,7 @@ import { darkColors, lightColors, fontSize, spacing, radius, shadow } from '../t
 import { useTheme } from '../lib/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { useFeatureFlags } from '../lib/FeatureFlagsContext';
+import { useAuth } from '../lib/AuthContext';
 
 // PIN 은 더 이상 클라이언트에 저장하지 않음 — 서버 Secret(ADMIN_MASTER_PIN) 과 비교
 // Secret 미설정 시 서버가 '777777' 을 폴백 기본값으로 사용 (backward compat)
@@ -38,11 +39,43 @@ export default function AdminScreen({ navigation }) {
   const { isDark } = useTheme();
   const pal = isDark ? darkColors : lightColors;
   const { flags, reload } = useFeatureFlags();
+  const { user } = useAuth();
 
   const [authed, setAuthed] = useState(false);
   const [pin, setPin] = useState('');
   const [verifiedPin, setVerifiedPin] = useState(''); // 서버 요청에 실어보낼 PIN
   const [saving, setSaving] = useState(null);         // 저장 중인 feature_key
+  const [checkingRole, setCheckingRole] = useState(true);
+  const [adminProfile, setAdminProfile] = useState(null); // { role, display_name } — 관리자 계정인 경우
+
+  // 로그인된 계정의 role 확인 — admin 이면 PIN 스킵, 일반 계정이면 PIN 방식 유지
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!user?.id) {
+        if (!cancelled) setCheckingRole(false);
+        return;
+      }
+      try {
+        const { data } = await supabase
+          .from('user_profiles')
+          .select('role, display_name')
+          .eq('auth_uid', user.id)
+          .maybeSingle();
+        if (cancelled) return;
+        if (data?.role === 'admin') {
+          setAdminProfile(data);
+          setAuthed(true); // 관리자 자동 통과
+        }
+      } catch (e) {
+        // user_profiles 테이블 미배포 상태에서도 PIN 방식으로 동작하도록 무시
+        console.log('user_profiles 조회 실패(무시):', e?.message);
+      } finally {
+        if (!cancelled) setCheckingRole(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   // PIN 검증 — 더미 toggle 요청으로 서버와 대조 (잘못된 PIN 이면 403)
   const handlePinSubmit = async () => {
@@ -124,13 +157,27 @@ export default function AdminScreen({ navigation }) {
     setSaving(null);
   };
 
-  // PIN 입력 화면
+  // role 조회 중 로딩 화면
+  if (checkingRole) {
+    return (
+      <View style={[styles.pinWrap, { backgroundColor: pal.bg }]}>
+        <ActivityIndicator size="large" color={pal.ac} />
+        <Text style={[styles.pinSub, { color: pal.t3, marginTop: spacing.md }]}>
+          권한 확인 중...
+        </Text>
+      </View>
+    );
+  }
+
+  // PIN 입력 화면 — 관리자 계정이 아닌 경우 PIN 방식으로 폴백
   if (!authed) {
     return (
       <View style={[styles.pinWrap, { backgroundColor: pal.bg }]}>
         <Text style={{ fontSize: 52, marginBottom: spacing.lg }}>🔐</Text>
         <Text style={[styles.pinTitle, { color: pal.tx }]}>관리자 PIN 입력</Text>
-        <Text style={[styles.pinSub, { color: pal.t3 }]}>기능 잠금/해제 관리자 전용</Text>
+        <Text style={[styles.pinSub, { color: pal.t3 }]}>
+          {user ? '관리자 계정으로 로그인하면 PIN 없이 진입 가능합니다.' : '기능 잠금/해제 관리자 전용'}
+        </Text>
         <TextInput
           style={[styles.pinInput, { backgroundColor: pal.s1, borderColor: pal.bd, color: pal.tx }]}
           value={pin}
@@ -159,6 +206,15 @@ export default function AdminScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: pal.bg }]}>
+      {/* 관리자 계정 배지 — admin role 로 진입한 경우만 표시 */}
+      {adminProfile && (
+        <View style={[styles.adminBadge, { backgroundColor: pal.gn + '15', borderColor: pal.gn }]}>
+          <Text style={[styles.adminBadgeText, { color: pal.gn }]}>
+            👤 {adminProfile.display_name || user?.email} · 관리자 계정 로그인
+          </Text>
+        </View>
+      )}
+
       {/* 상단 요약 */}
       <View style={[styles.summary, { backgroundColor: pal.s1, borderBottomColor: pal.bd }]}>
         <View style={styles.summaryItem}>
@@ -229,6 +285,13 @@ export default function AdminScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
+  // 관리자 계정 로그인 배지 (상단)
+  adminBadge: {
+    paddingHorizontal: spacing.md, paddingVertical: 10,
+    borderBottomWidth: 1.5, alignItems: 'center',
+  },
+  adminBadgeText: { fontSize: fontSize.xs, fontWeight: '800' },
 
   pinWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   pinTitle: { fontSize: fontSize.xl, fontWeight: '900', marginBottom: 8 },
