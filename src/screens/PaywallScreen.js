@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { C, F, R, SH } from '../lib/v5';
 import { useSubscription, PLANS } from '../lib/SubscriptionContext';
+import { openPrivacyPolicy, openTermsOfService } from '../constants/legalUrls';
 
 const PLAN_ICONS = {
   free: 'gift-outline',
@@ -21,6 +22,7 @@ const PLAN_ICONS = {
 export default function PaywallScreen({ navigation, route }) {
   const {
     sub, isPremium, isTrial, daysLeft,
+    promoActive, promoDaysLeft,
     startTrial, upgradePlan, restorePurchase, cancelSubscription,
   } = useSubscription();
 
@@ -205,6 +207,23 @@ export default function PaywallScreen({ navigation, route }) {
       contentContainerStyle={{ padding: 24, paddingBottom: 60 }}
     >
 
+      {/* ── 🎉 출시 기념 프로모션 배너 (180일간 전 플랜 무료) ── */}
+      {promoActive && (
+        <View style={s.promoBanner}>
+          <View style={s.promoIc}>
+            <Ionicons name="gift" size={22} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.promoTtl}>🎉 출시 기념 · 전 플랜 무료</Text>
+            <Text style={s.promoSub}>
+              {promoDaysLeft != null
+                ? `${promoDaysLeft}일 남음 · 결제 없이 모든 프리미엄 기능 이용`
+                : '결제 없이 모든 프리미엄 기능을 사용할 수 있습니다'}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* ── 현재 구독 상태 배너 (구독 중인 경우) ── */}
       {isPremium && (
         <View style={[s.statusBanner, {
@@ -388,7 +407,11 @@ export default function PaywallScreen({ navigation, route }) {
       {/* 약관 */}
       <Text style={s.termsText}>
         구독은 언제든지 취소 가능합니다. 무료 체험 후 자동 결제되지 않습니다.{'\n'}
-        구독 시 이용약관 및 개인정보처리방침에 동의하는 것으로 간주됩니다.
+        구독 시{' '}
+        <Text style={s.termsLink} onPress={openTermsOfService}>이용약관</Text>
+        {' 및 '}
+        <Text style={s.termsLink} onPress={openPrivacyPolicy}>개인정보처리방침</Text>
+        에 동의하는 것으로 간주됩니다.
       </Text>
     </ScrollView>
   );
@@ -406,6 +429,28 @@ const s = StyleSheet.create({
   },
   statusTitle: { fontSize: F.sm, fontWeight: '800' },
   statusSub: { fontSize: F.xs, color: C.t3 },
+
+  // 출시 기념 프로모 배너
+  promoBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#B91C1C',
+    borderRadius: R.lg,
+    padding: 16, marginBottom: 20,
+    ...SH.sm,
+  },
+  promoIc: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  promoTtl: {
+    fontSize: F.body, fontWeight: '900', color: '#fff',
+    marginBottom: 2,
+  },
+  promoSub: {
+    fontSize: F.xs, color: 'rgba(255,255,255,0.9)',
+    lineHeight: 17,
+  },
 
   cycleToggle: {
     flexDirection: 'row', borderRadius: R.md, borderWidth: 1, borderColor: C.border,
@@ -437,4 +482,5 @@ const s = StyleSheet.create({
   cancelBtn: { paddingVertical: 14, borderRadius: R.md, alignItems: 'center', borderWidth: 1, borderColor: C.red3 + '50' },
   cancelBtnText: { fontSize: F.sm, fontWeight: '700', color: C.red3 },
   termsText: { fontSize: F.xxs, textAlign: 'center', lineHeight: 16, marginTop: 24, color: C.t3 },
+  termsLink: { color: C.t2, fontWeight: '700', textDecorationLine: 'underline' },
 });

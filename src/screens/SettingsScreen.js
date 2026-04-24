@@ -17,6 +17,7 @@ import { useRole } from '../lib/RoleContext';
 import { useSubscription, PLANS } from '../lib/SubscriptionContext';
 import { useAuth } from '../lib/AuthContext';
 import { C, F, R, SH } from '../lib/v5';
+import { openPrivacyPolicy, openTermsOfService, openSupportEmail, LEGAL_URLS } from '../constants/legalUrls';
 
 const NOTIF_KEY = '@meatbig_notifications';
 
@@ -190,16 +191,24 @@ export default function SettingsScreen({ route, navigation }) {
         }}>
           <View style={{
             width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: role === 'owner' ? '#B91C1C' + '25' : '#DC2626' + '25',
+            backgroundColor: role === 'owner' ? '#B91C1C' + '25' : role === 'jobseeker' ? '#2563EB' + '25' : '#DC2626' + '25',
           }}>
-            <Text style={{ fontSize: 22 }}>{role === 'owner' ? '👑' : '👤'}</Text>
+            <Text style={{ fontSize: 22 }}>{role === 'owner' ? '👑' : role === 'jobseeker' ? '🔎' : '👤'}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: role === 'owner' ? '#B91C1C' : '#DC2626' }}>
-              {role === 'owner' ? '사장 모드' : `직원 모드${staffName ? ` — ${staffName}` : ''}`}
+            <Text style={{ fontSize: fontSize.sm, fontWeight: '900', color: role === 'owner' ? '#B91C1C' : role === 'jobseeker' ? '#2563EB' : '#DC2626' }}>
+              {role === 'owner'
+                ? '사장 모드'
+                : role === 'jobseeker'
+                  ? '구직 모드'
+                  : `직원 모드${staffName ? ` — ${staffName}` : ''}`}
             </Text>
             <Text style={{ fontSize: fontSize.xs, color: '#64748B', marginTop: 2 }}>
-              {role === 'owner' ? '모든 기능에 접근 가능합니다' : '위생·온도·이력 조회만 허용됩니다'}
+              {role === 'owner'
+                ? '모든 기능에 접근 가능합니다'
+                : role === 'jobseeker'
+                  ? '구직 기능과 이력서 관리를 이용할 수 있습니다'
+                  : '위생·온도·이력 조회만 허용됩니다'}
             </Text>
           </View>
         </View>
@@ -253,7 +262,8 @@ export default function SettingsScreen({ route, navigation }) {
         <InfoRow label="취급 축종" value={(biz.species || []).join(', ')} last />
       </View>
 
-      {/* 직원 관리 */}
+      {/* 직원 관리 — 사장 모드에서만 (민감 정보 보호) */}
+      {role === 'owner' && (<>
       <SectionTitle icon="👥" label="직원 관리" />
       <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
         {staff.map((s, idx) => (
@@ -289,6 +299,7 @@ export default function SettingsScreen({ route, navigation }) {
           <Text style={[styles.addStaffText, { color: '#DC2626' }]}>+ 직원 추가</Text>
         </TouchableOpacity>
       </View>
+      </>)}
 
       {/* 알림 설정 */}
       <SectionTitle icon="🔔" label="알림 설정" />
@@ -298,7 +309,8 @@ export default function SettingsScreen({ route, navigation }) {
         <NotifRow label="온도 이상 알림" value={notifications.temp} onChange={() => toggleNotif('temp')} last />
       </View>
 
-      {/* 구독 관리 */}
+      {/* 구독 관리 — 사장 모드에서만 (결제·요금제 변경 방지) */}
+      {role === 'owner' && (<>
       <SectionTitle icon="💎" label="구독 관리" />
       <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: isPremium ? '#16A34A' + '60' : '#E2E8F0', overflow: 'hidden' }]}>
         <View style={styles.planRow}>
@@ -337,6 +349,7 @@ export default function SettingsScreen({ route, navigation }) {
           />
         )}
       </View>
+      </>)}
 
       {/* 라벨 프린터 */}
       <SectionTitle icon="🖨️" label="라벨 프린터" />
@@ -366,6 +379,25 @@ export default function SettingsScreen({ route, navigation }) {
         <InfoRow label="버전" value="v1.0.0" />
         <InfoRow label="계정" value={user?.email || '—'} last />
       </TouchableOpacity>
+
+      {/* 법적 문서 · 고객지원 */}
+      <SectionTitle icon="📄" label="약관 · 고객지원" />
+      <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
+        <TouchableOpacity style={styles.legalRow} onPress={openTermsOfService} activeOpacity={0.7}>
+          <Text style={styles.legalRowLabel}>이용약관</Text>
+          <Text style={styles.legalRowChevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.legalRowDivider} />
+        <TouchableOpacity style={styles.legalRow} onPress={openPrivacyPolicy} activeOpacity={0.7}>
+          <Text style={styles.legalRowLabel}>개인정보처리방침</Text>
+          <Text style={styles.legalRowChevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.legalRowDivider} />
+        <TouchableOpacity style={styles.legalRow} onPress={openSupportEmail} activeOpacity={0.7}>
+          <Text style={styles.legalRowLabel}>문의하기</Text>
+          <Text style={styles.legalRowValue}>{LEGAL_URLS.supportEmail}</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* 로그아웃 */}
       <TouchableOpacity
@@ -605,6 +637,19 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: fontSize.sm, fontWeight: '600' },
   infoValue: { fontSize: fontSize.sm, fontWeight: '700', flex: 1, textAlign: 'right' },
+
+  // 법적 문서 · 고객지원 행
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 16,
+  },
+  legalRowLabel: { fontSize: fontSize.sm, fontWeight: '700', color: '#1E293B' },
+  legalRowValue: { fontSize: fontSize.xs, color: '#64748B', flexShrink: 1, marginLeft: spacing.sm, textAlign: 'right' },
+  legalRowChevron: { fontSize: fontSize.lg, color: '#64748B' },
+  legalRowDivider: { height: 1, backgroundColor: '#E2E8F0', marginHorizontal: spacing.md },
 
   staffRow: {
     flexDirection: 'row',
