@@ -4,12 +4,50 @@
  * - 유저(개인)는 구독 개념 없음 — 사업장 구독을 공유
  * - 사장만 구독 변경 가능, 직원은 읽기만
  * - AsyncStorage 로컬 캐시 + Supabase 서버 동기화
+ *
+ * ⭐ 출시 기념 프로모션 (LAUNCH_PROMO)
+ * - 앱스토어 최초 출시일로부터 180일간 전 플랜 무료 제공
+ * - LAUNCH_DATE를 실제 앱스토어 출시일로 설정 필요 (ISO 문자열)
+ * - LAUNCH_DATE가 null 이거나 180일 경과 시 자동 종료 → 정상 과금 전환
+ * - 프로모 기간 중에는 모든 프리미엄 기능(`checkFeature`)이 true를 반환
  */
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 
 const SUB_KEY = '@meatbig_subscription';
+
+// ─── 출시 기념 프로모션 설정 ───────────────────────────────
+// 앱스토어 최초 출시일 (YYYY-MM-DD, KST 기준). 출시 확정 시 교체.
+// null 이면 프로모션 미활성화.
+export const LAUNCH_DATE   = null;   // 예: '2026-05-15'
+export const PROMO_DAYS    = 180;    // 출시 후 전 플랜 무료 기간 (일)
+
+// 프로모 종료 시각 (Date) — LAUNCH_DATE 기반 자동 계산
+export function getPromoEndsAt() {
+  if (!LAUNCH_DATE) return null;
+  const start = new Date(LAUNCH_DATE);
+  if (isNaN(start)) return null;
+  const end = new Date(start);
+  end.setDate(end.getDate() + PROMO_DAYS);
+  return end;
+}
+
+// 현재가 180일 프로모 기간 내부인지
+export function isLaunchPromoActive(now = new Date()) {
+  const end = getPromoEndsAt();
+  if (!end) return false;
+  const start = new Date(LAUNCH_DATE);
+  return now >= start && now < end;
+}
+
+// 프로모 종료까지 남은 일수
+export function getPromoDaysLeft(now = new Date()) {
+  const end = getPromoEndsAt();
+  if (!end) return null;
+  const diff = end - now;
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
 
 // 요금제 정의
 export const PLANS = {
@@ -83,6 +121,8 @@ const SubscriptionContext = createContext({
   isPremium: false,
   isTrial: false,
   daysLeft: null,
+  promoActive: false,
+  promoDaysLeft: null,
   startTrial: async () => {},
   upgradePlan: async () => {},
   restorePurchase: async () => {},
@@ -284,6 +324,9 @@ export function SubscriptionProvider({ children }) {
 
   // ─── 기능 접근 가능 여부 ────────────────────────────────
   const checkFeature = useCallback((featureKey) => {
+    // 🎉 출시 기념 180일 프로모 기간 — 모든 기능 무료 오픈
+    if (isLaunchPromoActive()) return true;
+
     const { planId, isActive, isTrial } = sub;
     const hasPremium = isActive || isTrial;
     const premiumFeatures = ['ocr', 'aging', 'closing', 'margin', 'supplier', 'education'];
@@ -292,7 +335,9 @@ export function SubscriptionProvider({ children }) {
   }, [sub]);
 
   const plan = PLANS[sub.planId] || PLANS.free;
-  const isPremium = sub.isActive || sub.isTrial;
+  const promoActive = isLaunchPromoActive();
+  const promoDaysLeft = getPromoDaysLeft();
+  const isPremium = promoActive || sub.isActive || sub.isTrial;
 
   const daysLeft = (() => {
     const target = sub.isTrial ? sub.trialEndsAt : sub.periodEndsAt;
@@ -304,6 +349,7 @@ export function SubscriptionProvider({ children }) {
   return (
     <SubscriptionContext.Provider value={{
       sub, plan, isPremium, isTrial: sub.isTrial, daysLeft,
+      promoActive, promoDaysLeft,
       startTrial, upgradePlan, restorePurchase, cancelSubscription, checkFeature,
     }}>
       {children}

@@ -14,6 +14,7 @@ import ScreenHeader from '../components/ScreenHeader';
 import SegmentTabs from '../components/SegmentTabs';
 import ScanScreen from './ScanScreen';
 import UploadScreen from './UploadScreen';
+import { useSubscription } from '../lib/SubscriptionContext';
 
 // ── V5 색상 상수 ──────────────────────────────────────────────
 const C = {
@@ -106,6 +107,16 @@ const DOCS = [
     getHTML: (biz) => genAgingHTML(agingData, biz),
   },
   {
+    id: 'staff',
+    title: '직원 위생증',
+    icon: 'medkit',
+    iconColor: C.ok2,
+    iconBg: C.okS,
+    desc: '보건증·건강검진 만료일 관리',
+    screen: 'Staff',
+    getHTML: (biz) => genStaffHTML(staffData, biz),
+  },
+  {
     id: 'education',
     title: '교육 일지',
     icon: 'book',
@@ -149,13 +160,16 @@ async function printDoc(doc) {
 }
 
 // ── 바로가기 버튼 컴포넌트 ────────────────────────────────────
-const ScBtn = ({ icon, label, iconColor, iconBg, onPress, plan }) => (
+const ScBtn = ({ icon, label, iconColor, iconBg, onPress, plan, promoActive }) => (
   <TouchableOpacity style={S.scBtn} onPress={onPress} activeOpacity={0.8}>
-    {plan === 'basic' && (
+    {!promoActive && plan === 'basic' && (
       <View style={S.planBdgBasic}><Text style={S.planBdgBasicTxt}>베이직</Text></View>
     )}
-    {plan === 'pro' && (
+    {!promoActive && plan === 'pro' && (
       <View style={S.planBdgPro}><Text style={S.planBdgProTxt}>프로</Text></View>
+    )}
+    {promoActive && plan && (
+      <View style={S.planBdgPromo}><Text style={S.planBdgPromoTxt}>무료</Text></View>
     )}
     <View style={[S.scIc, { backgroundColor: iconBg }]}>
       <Ionicons name={icon} size={20} color={iconColor} />
@@ -173,6 +187,7 @@ const SEGMENTS = [
 
 export default function DocumentScreen({ navigation }) {
   const { role, canAccess } = useRole();
+  const { promoActive } = useSubscription();
   const isStaff = role === 'staff';
 
   const [segment, setSegment] = useState('docs'); // 'docs' | 'scan' | 'ocr'
@@ -239,8 +254,9 @@ export default function DocumentScreen({ navigation }) {
             <ScBtn icon="thermometer"      label="온도 기록"  iconColor={C.blue2} iconBg={C.blueS} onPress={() => navigateSafe('Temp')} />
             <ScBtn icon="calculator"       label="마감 정산"  iconColor={C.red}   iconBg={C.redS}  onPress={() => navigateSafe('Closing')} />
             <ScBtn icon="nutrition"        label="숙성 관리"  iconColor={C.warn2} iconBg={C.warnS} onPress={() => navigateSafe('Aging')} />
-            <ScBtn icon="book"             label="교육 일지"  iconColor={C.ok2}   iconBg={C.okS}   onPress={() => navigateSafe('Education')} plan="basic" />
-            <ScBtn icon="bar-chart"        label="세무 리포트" iconColor={C.pur}  iconBg={C.purS}  onPress={() => navigateSafe('TaxReport')} plan="pro" />
+            <ScBtn icon="medkit"           label="직원 위생증" iconColor={C.ok2}  iconBg={C.okS}   onPress={() => navigateSafe('Staff')} />
+            <ScBtn icon="book"             label="교육 일지"  iconColor={C.ok2}   iconBg={C.okS}   onPress={() => navigateSafe('Education')} plan="basic" promoActive={promoActive} />
+            <ScBtn icon="bar-chart"        label="세무 리포트" iconColor={C.pur}  iconBg={C.purS}  onPress={() => navigateSafe('TaxReport')} plan="pro" promoActive={promoActive} />
           </View>
 
           {/* ── 서류 출력 섹션 ── */}
@@ -249,6 +265,7 @@ export default function DocumentScreen({ navigation }) {
             {DOCS.map(doc => {
               const locked = isStaff && OWNER_ONLY.includes(doc.screen);
               const pillLocked = doc.plan === 'basic' ? '베이직↑' : doc.plan === 'pro' ? '프로↑' : null;
+              const showPromoPill = promoActive && !!doc.plan;
               return (
                 <TouchableOpacity
                   key={doc.id}
@@ -263,7 +280,9 @@ export default function DocumentScreen({ navigation }) {
                     <Text style={S.docNm}>{doc.title}</Text>
                     <Text style={S.docSb}>{doc.desc}</Text>
                   </View>
-                  {pillLocked ? (
+                  {showPromoPill ? (
+                    <View style={S.pillPromo}><Text style={S.pillPromoTxt}>무료</Text></View>
+                  ) : pillLocked ? (
                     <View style={S.pillGray}><Text style={S.pillGrayTxt}>{pillLocked}</Text></View>
                   ) : (
                     <View style={S.pillBlue}><Text style={S.pillBlueTxt}>출력 가능</Text></View>
@@ -286,9 +305,11 @@ export default function DocumentScreen({ navigation }) {
           </TouchableOpacity>
 
           {/* ── 플랜 안내 ── */}
-          <View style={S.planNotice}>
-            <Text style={S.planNoticeTxt}>
-              교육일지는 베이직, 세무리포트는 프로 플랜에서 출력 가능합니다.
+          <View style={[S.planNotice, promoActive && S.planNoticePromo]}>
+            <Text style={[S.planNoticeTxt, promoActive && S.planNoticePromoTxt]}>
+              {promoActive
+                ? '🎉 출시 기념 · 전 플랜 무료 이용 중 — 모든 서류 출력 가능'
+                : '교육일지는 베이직, 세무리포트는 프로 플랜에서 출력 가능합니다.'}
             </Text>
           </View>
 
@@ -367,6 +388,8 @@ const S = StyleSheet.create({
   planBdgBasicTxt: { fontSize: 10, fontWeight: '800', color: '#065F46' },
   planBdgPro:   { position: 'absolute', top: -7, right: -4, backgroundColor: '#FEE2E2', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   planBdgProTxt: { fontSize: 10, fontWeight: '800', color: '#991B1B' },
+  planBdgPromo: { position: 'absolute', top: -7, right: -4, backgroundColor: C.red, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  planBdgPromoTxt: { fontSize: 10, fontWeight: '900', color: '#FFFFFF' },
 
   // 섹션 라벨
   sec:  { marginTop: 4, marginBottom: 10 },
@@ -383,6 +406,8 @@ const S = StyleSheet.create({
   pillBlueTxt: { fontSize: 12, fontWeight: '700', color: C.blue },
   pillGray: { backgroundColor: C.bg3, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
   pillGrayTxt: { fontSize: 12, fontWeight: '700', color: C.t3 },
+  pillPromo: { backgroundColor: C.red, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
+  pillPromoTxt: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
 
   // 일괄 출력 버튼
   bulkBtn:  { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.t1, borderRadius: 16, padding: 20, marginBottom: 14 },
