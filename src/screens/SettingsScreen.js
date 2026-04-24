@@ -9,6 +9,7 @@ import { fontSize, spacing, radius, shadow } from '../theme';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { staffData } from '../data/mockData';
 import { staffStore } from '../lib/dataStore';
+import { calcDaysUntil, computeStaffStatus } from '../lib/staffUtils';
 import {
   scheduleDailyHygieneReminder, cancelHygieneReminder,
   scheduleDailyExpiryReminder, cancelExpiryReminder,
@@ -51,7 +52,7 @@ export default function SettingsScreen({ route, navigation }) {
   const [newStaff, setNewStaff] = useState({ name: '', role: '직원', pin: '', health: '', edu: '' });
   const [editModal, setEditModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [editForm, setEditForm] = useState({ health: '', edu: '' });
+  const [editForm, setEditForm] = useState({ name: '', role: '직원', pin: '', color: '#3d7ef5', health: '', edu: '' });
 
   // ── 데이터 로드 ──
   useEffect(() => {
@@ -76,21 +77,59 @@ export default function SettingsScreen({ route, navigation }) {
 
   const openEditStaff = (s) => {
     setEditTarget(s);
-    setEditForm({ health: s.health || '', edu: s.edu || '' });
+    setEditForm({
+      name:   s.name || '',
+      role:   s.role || '직원',
+      pin:    s.pin || '',
+      color:  s.color || '#3d7ef5',
+      health: s.health || '',
+      edu:    s.edu || '',
+    });
     setEditModal(true);
   };
 
   const handleEditStaff = () => {
     if (!editTarget) return;
-    setStaff(prev => prev.map(s =>
-      s.id !== editTarget.id ? s : {
+    if (!editForm.name?.trim()) {
+      Alert.alert('입력 오류', '이름을 입력해주세요.');
+      return;
+    }
+    setStaff(prev => prev.map(s => {
+      if (s.id !== editTarget.id) return s;
+      const health = editForm.health || s.health;
+      const edu    = editForm.edu || s.edu;
+      return {
         ...s,
-        health: editForm.health || s.health,
-        edu: editForm.edu || s.edu,
-        status: editForm.health && new Date(editForm.health.replace(/\./g, '-')) < new Date() ? 'expired' : 'ok',
-      }
-    ));
+        name:   editForm.name.trim(),
+        role:   editForm.role || s.role,
+        pin:    editForm.pin || s.pin,
+        color:  editForm.color || s.color,
+        health,
+        edu,
+        status: computeStaffStatus(health, edu),
+      };
+    }));
     setEditModal(false);
+  };
+
+  const handleDeleteStaff = () => {
+    if (!editTarget) return;
+    Alert.alert(
+      '직원 삭제',
+      `"${editTarget.name}" 직원을 삭제하시겠습니까?\n보건증·위생교육 이수 정보도 함께 삭제됩니다.`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: () => {
+            setStaff(prev => prev.filter(s => s.id !== editTarget.id));
+            setEditModal(false);
+            setEditTarget(null);
+          },
+        },
+      ]
+    );
   };
 
   const handleAddStaff = () => {
@@ -99,13 +138,16 @@ export default function SettingsScreen({ route, navigation }) {
       return;
     }
     const id = Date.now().toString();
+    const health = newStaff.health || '미등록';
+    const edu    = newStaff.edu || '미등록';
     setStaff([...staff, {
       id, name: newStaff.name.trim(), role: newStaff.role,
       pin: newStaff.pin || '0000',
       hire: new Date().toLocaleDateString('ko-KR').replace(/\. /g, '.').replace(/\.$/, ''),
-      health: newStaff.health || '미등록',
-      edu: newStaff.edu || '미등록',
-      status: 'ok', color: selectedColor,
+      health,
+      edu,
+      status: computeStaffStatus(health, edu),
+      color: selectedColor,
     }]);
     setNewStaff({ name: '', role: '직원', pin: '', health: '', edu: '' });
     setSelectedColor('#3d7ef5');
@@ -266,35 +308,54 @@ export default function SettingsScreen({ route, navigation }) {
       {role === 'owner' && (<>
       <SectionTitle icon="👥" label="직원 관리" />
       <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
-        {staff.map((s, idx) => (
-          <TouchableOpacity
-            key={s.id}
-            activeOpacity={0.7}
-            onPress={() => openEditStaff(s)}
-            style={[
-              styles.staffRow,
-              { borderBottomColor: '#E2E8F0' + '50' },
-              idx === staff.length - 1 && { borderBottomWidth: 0 },
-            ]}
-          >
-            <View style={[styles.avatar, { backgroundColor: s.color + '30' }]}>
-              <Text style={[styles.avatarText, { color: s.color }]}>{s.name[0]}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={[styles.staffName, { color: '#0F172A' }]}>{s.name}</Text>
-                <View style={[styles.roleBadge, { backgroundColor: s.role === '사장' ? '#B91C1C' + '25' : '#DC2626' + '20' }]}>
-                  <Text style={[styles.roleBadgeText, { color: s.role === '사장' ? '#B91C1C' : '#DC2626' }]}>{s.role}</Text>
-                </View>
+        {staff.map((s, idx) => {
+          const healthDays = calcDaysUntil(s.health);
+          const eduDays    = calcDaysUntil(s.edu);
+          const minDays    = [healthDays, eduDays].filter(v => v !== null).reduce((a, b) => Math.min(a, b), Infinity);
+          const status     = s.status || computeStaffStatus(s.health, s.edu);
+          const dotColor   = status === 'expired' ? '#B91C1C' : status === 'warn' ? '#F59E0B' : '#16A34A';
+          return (
+            <TouchableOpacity
+              key={s.id}
+              activeOpacity={0.7}
+              onPress={() => openEditStaff(s)}
+              style={[
+                styles.staffRow,
+                { borderBottomColor: '#E2E8F0' + '50' },
+                idx === staff.length - 1 && { borderBottomWidth: 0 },
+              ]}
+            >
+              <View style={[styles.avatar, { backgroundColor: s.color + '30' }]}>
+                <Text style={[styles.avatarText, { color: s.color }]}>{s.name[0]}</Text>
               </View>
-              <Text style={[styles.staffMeta, { color: '#64748B' }]}>보건증: {s.health}  ·  위생교육: {s.edu}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <View style={[styles.statusDot, { backgroundColor: s.status === 'ok' ? '#16A34A' : '#B91C1C' }]} />
-              <Text style={{ fontSize: fontSize.xxs, color: '#64748B', marginTop: 4 }}>수정 ›</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <Text style={[styles.staffName, { color: '#0F172A' }]}>{s.name}</Text>
+                  <View style={[styles.roleBadge, { backgroundColor: s.role === '사장' ? '#B91C1C' + '25' : '#DC2626' + '20' }]}>
+                    <Text style={[styles.roleBadgeText, { color: s.role === '사장' ? '#B91C1C' : '#DC2626' }]}>{s.role}</Text>
+                  </View>
+                  {status === 'expired' && (
+                    <View style={{ backgroundColor: '#B91C1C' + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                      <Text style={{ fontSize: fontSize.xxs, color: '#B91C1C', fontWeight: '800' }}>만료</Text>
+                    </View>
+                  )}
+                  {status === 'warn' && (
+                    <View style={{ backgroundColor: '#F59E0B' + '25', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                      <Text style={{ fontSize: fontSize.xxs, color: '#B45309', fontWeight: '800' }}>D-{minDays}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.staffMeta, { color: '#64748B' }]}>
+                  보건증: {s.health}{healthDays !== null && healthDays < 0 ? ' (지남)' : ''}  ·  위생교육: {s.edu}{eduDays !== null && eduDays < 0 ? ' (지남)' : ''}
+                </Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
+                <Text style={{ fontSize: fontSize.xxs, color: '#64748B', marginTop: 4 }}>수정 ›</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
         <TouchableOpacity style={styles.addStaffRow} onPress={() => setStaffModal(true)}>
           <Text style={[styles.addStaffText, { color: '#DC2626' }]}>+ 직원 추가</Text>
         </TouchableOpacity>
@@ -517,37 +578,103 @@ export default function SettingsScreen({ route, navigation }) {
         </View>
       </Modal>
 
-      {/* 직원 수정 모달 */}
-      <Modal visible={editModal} animationType="fade" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing.lg }}>
-          <View style={[styles.card, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', padding: spacing.lg }]}>
-            <Text style={[styles.modalTitle, { color: '#0F172A', marginBottom: spacing.md }]}>
-              ✏️ {editTarget?.name} 정보 수정
-            </Text>
+      {/* 직원 수정 모달 — 전체 필드 편집 + 삭제 */}
+      <Modal visible={editModal} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: '#F2F4F8' }}>
+          <View style={[styles.modalHeader, { backgroundColor: '#FFFFFF', borderBottomColor: '#E2E8F0' }]}>
+            <Text style={[styles.modalTitle, { color: '#0F172A' }]}>✏️ {editTarget?.name || '직원'} 수정</Text>
+            <TouchableOpacity onPress={() => setEditModal(false)}>
+              <Text style={[styles.closeBtn, { color: '#334155' }]}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+            {/* 이름 */}
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>이름 *</Text>
+            <TextInput
+              style={[styles.fieldInput, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', color: '#0F172A' }]}
+              placeholder="예: 홍길동"
+              placeholderTextColor={'#64748B'}
+              value={editForm.name}
+              onChangeText={t => setEditForm({ ...editForm, name: t })}
+            />
 
+            {/* 역할 */}
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>역할</Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+              {['직원', '사장', '파트타임'].map(r => (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.roleChip, { borderColor: editForm.role === r ? '#B91C1C' : '#E2E8F0', backgroundColor: editForm.role === r ? '#B91C1C' + '20' : '#FFFFFF' }]}
+                  onPress={() => setEditForm({ ...editForm, role: r })}
+                >
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: editForm.role === r ? '#B91C1C' : '#334155' }}>{r}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* 아바타 색상 */}
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>아바타 색상</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: spacing.md }}>
+              {COLORS.map(c => (
+                <TouchableOpacity key={c} onPress={() => setEditForm({ ...editForm, color: c })}
+                  style={[styles.colorDot, { backgroundColor: c, borderColor: editForm.color === c ? '#0F172A' : 'transparent' }]} />
+              ))}
+            </View>
+
+            {/* PIN */}
+            <Text style={[styles.fieldLabel, { color: '#334155' }]}>PIN (4자리)</Text>
+            <TextInput
+              style={[styles.fieldInput, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', color: '#0F172A' }]}
+              placeholder="예: 5678"
+              placeholderTextColor={'#64748B'}
+              keyboardType="numeric"
+              maxLength={4}
+              secureTextEntry
+              value={editForm.pin}
+              onChangeText={t => setEditForm({ ...editForm, pin: t })}
+            />
+
+            {/* 보건증 만료일 */}
             <Text style={[styles.fieldLabel, { color: '#334155' }]}>🏥 보건증 만료일</Text>
             <TextInput
-              style={[styles.fieldInput, { backgroundColor: '#F2F4F8', borderColor: '#E2E8F0', color: '#0F172A' }]}
-              value={editForm.health}
-              onChangeText={t => setEditForm({ ...editForm, health: t })}
+              style={[styles.fieldInput, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', color: '#0F172A' }]}
               placeholder="예: 2027.06.01"
               placeholderTextColor={'#64748B'}
+              value={editForm.health}
+              onChangeText={t => setEditForm({ ...editForm, health: t })}
             />
 
+            {/* 위생교육 만료일 */}
             <Text style={[styles.fieldLabel, { color: '#334155' }]}>📚 위생교육 만료일</Text>
             <TextInput
-              style={[styles.fieldInput, { backgroundColor: '#F2F4F8', borderColor: '#E2E8F0', color: '#0F172A' }]}
-              value={editForm.edu}
-              onChangeText={t => setEditForm({ ...editForm, edu: t })}
+              style={[styles.fieldInput, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', color: '#0F172A' }]}
               placeholder="예: 2027.09.01"
               placeholderTextColor={'#64748B'}
+              value={editForm.edu}
+              onChangeText={t => setEditForm({ ...editForm, edu: t })}
             />
 
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
-              <OutlineBtn label="취소" onPress={() => setEditModal(false)} style={{ flex: 1 }} />
-              <PrimaryBtn label="저장" onPress={handleEditStaff} style={{ flex: 1 }} />
-            </View>
-          </View>
+            {/* 저장 / 취소 */}
+            <PrimaryBtn label="✓ 변경 저장" onPress={handleEditStaff} style={{ marginTop: spacing.md }} />
+            <OutlineBtn label="취소" onPress={() => setEditModal(false)} style={{ marginTop: spacing.sm }} />
+
+            {/* 삭제 (destructive) */}
+            <TouchableOpacity
+              style={{
+                marginTop: spacing.lg,
+                paddingVertical: 14,
+                borderRadius: radius.md,
+                borderWidth: 1.5,
+                borderColor: '#B91C1C' + '60',
+                backgroundColor: '#B91C1C' + '08',
+                alignItems: 'center',
+              }}
+              onPress={handleDeleteStaff}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: fontSize.sm, fontWeight: '800', color: '#B91C1C' }}>🗑️ 이 직원 삭제</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </Modal>
     </ScrollView>

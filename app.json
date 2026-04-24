@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "meatbig",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -19,7 +20,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.kmeatmaster.meatmanager",
       "versionCode": 1,
@@ -36,12 +37,14 @@
         }
       ],
       [
-        "expo-camera",
+        "react-native-vision-camera",
         {
-          "cameraPermission": "축산물 이력번호 바코드 스캔을 위해 카메라 접근 권한이 필요합니다."
+          "cameraPermissionText": "축산물 이력번호 바코드 스캔을 위해 카메라 접근 권한이 필요합니다.",
+          "enableCodeScanner": true
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

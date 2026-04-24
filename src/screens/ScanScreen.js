@@ -6,7 +6,12 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  useCodeScanner,
+} from 'react-native-vision-camera';
 import { radius, shadow, fontSize, spacing } from '../theme';
 import { C } from '../lib/v5';
 import { PrimaryBtn, OutlineBtn, StatusBadge } from '../components/UI';
@@ -32,7 +37,10 @@ async function checkOnline() {
 export default function ScanScreen({ navigation, embedded = false, initialMode = 'trace' }) {
   // embedded=true: DocumentScreen(서류 허브) 내부에서 세그먼트로 렌더링 — 자체 헤더/모드탭 숨김
   const [mode, setMode] = useState(initialMode); // 'trace' | 'ocr'
-  const [permission, requestPermission] = useCameraPermissions();
+  // VisionCamera: 권한 + 기기 + torch 상태
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const device = useCameraDevice('back');
+  const [torchOn, setTorchOn] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -179,13 +187,19 @@ export default function ScanScreen({ navigation, embedded = false, initialMode =
     }
   };
 
-  if (!permission) return (
-    <View style={[styles.center, { backgroundColor: C.bg }]}>
-      <ActivityIndicator color={C.red} />
-    </View>
-  );
+  // VisionCamera 코드 스캐너 — 모달 열릴 때만 활성화
+  const codeScanner = useCodeScanner({
+    codeTypes: ['qr', 'ean-13', 'ean-8', 'code-128', 'code-39', 'code-93', 'itf', 'data-matrix', 'pdf-417', 'upc-a', 'upc-e'],
+    onCodeScanned: (codes) => {
+      if (scanned || !codes?.length) return;
+      const data = codes[0].value;
+      if (!data) return;
+      handleBarcode({ data });
+    },
+  });
 
-  if (!permission.granted) {
+  // 권한 미허용 시 가드 (모달이 안 열려 있어도 카메라 탭을 대비)
+  if (!hasPermission) {
     return (
       <View style={[styles.center, { backgroundColor: C.bg }]}>
         <Text style={styles.permIcon}>📷</Text>
@@ -370,33 +384,52 @@ export default function ScanScreen({ navigation, embedded = false, initialMode =
         </ScrollView>
       )}
 
-      {/* 카메라 모달 */}
-      <Modal visible={scanning} animationType="slide">
+      {/* 카메라 모달 — VisionCamera (ML Kit on-device) */}
+      <Modal visible={scanning} animationType="slide" onRequestClose={() => setScanning(false)}>
         <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <CameraView
-            style={{ flex: 1 }}
-            facing="back"
-            autofocus="on"
-            onBarcodeScanned={scanned ? undefined : handleBarcode}
-            barcodeScannerSettings={{ barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'code93', 'itf14', 'datamatrix', 'pdf417', 'upc_a', 'upc_e'] }}
-          >
-            <View style={styles.camOverlay}>
-              <View style={styles.camTopBar}>
-                <TouchableOpacity onPress={() => setScanning(false)} style={styles.camCloseBtn}>
-                  <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>✕ 닫기</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.camCenter}>
-                <View style={styles.scanFrame}>
-                  <View style={[styles.corner, styles.cornerTL]} />
-                  <View style={[styles.corner, styles.cornerTR]} />
-                  <View style={[styles.corner, styles.cornerBL]} />
-                  <View style={[styles.corner, styles.cornerBR]} />
-                </View>
-                <Text style={styles.camHint}>바코드를 가이드 안에 수평으로 맞춰주세요</Text>
-              </View>
+          {device == null ? (
+            // 기기 초기화 지연 또는 후면 카메라 없음
+            <View style={[styles.center, { backgroundColor: '#000' }]}>
+              <ActivityIndicator color="#fff" />
+              <Text style={{ color: '#fff', marginTop: 12 }}>카메라 준비 중...</Text>
             </View>
-          </CameraView>
+          ) : (
+            <Camera
+              style={StyleSheet.absoluteFill}
+              device={device}
+              isActive={scanning}
+              codeScanner={codeScanner}
+              torch={torchOn ? 'on' : 'off'}
+              enableZoomGesture
+            />
+          )}
+          {/* 오버레이 UI */}
+          <View style={styles.camOverlay} pointerEvents="box-none">
+            <View style={styles.camTopBar}>
+              <TouchableOpacity onPress={() => { setScanning(false); setTorchOn(false); }} style={styles.camCloseBtn}>
+                <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>✕ 닫기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setTorchOn(v => !v)}
+                style={[styles.camCloseBtn, { backgroundColor: torchOn ? '#FBBF24' + 'cc' : 'rgba(0,0,0,0.5)' }]}
+                accessibilityLabel="손전등 토글"
+              >
+                <Ionicons name={torchOn ? 'flashlight' : 'flashlight-outline'} size={18} color={torchOn ? '#000' : '#fff'} />
+                <Text style={{ color: torchOn ? '#000' : '#fff', fontSize: 14, fontWeight: '700', marginLeft: 4 }}>
+                  {torchOn ? '손전등 켜짐' : '손전등'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.camCenter}>
+              <View style={styles.scanFrame}>
+                <View style={[styles.corner, styles.cornerTL]} />
+                <View style={[styles.corner, styles.cornerTR]} />
+                <View style={[styles.corner, styles.cornerBL]} />
+                <View style={[styles.corner, styles.cornerBR]} />
+              </View>
+              <Text style={styles.camHint}>바코드를 가이드 안에 수평으로 맞춰주세요{'\n'}핀치로 확대 · 어두우면 손전등 켜기</Text>
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -688,8 +721,8 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: fontSize.md, textAlign: 'center', lineHeight: 26 },
 
   camOverlay: { flex: 1 },
-  camTopBar: { padding: spacing.md, paddingTop: 56 },
-  camCloseBtn: { alignSelf: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', padding: 10, borderRadius: radius.sm },
+  camTopBar: { padding: spacing.md, paddingTop: 56, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  camCloseBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.sm },
   camCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scanFrame: { width: 300, height: 130, position: 'relative', marginBottom: 24 },
   corner: { position: 'absolute', width: 30, height: 30, borderColor: '#e8950a', borderWidth: 3 },

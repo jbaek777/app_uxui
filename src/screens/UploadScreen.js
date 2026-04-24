@@ -5,9 +5,10 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import TextRecognition, { TextRecognitionScript } from '@react-native-ml-kit/text-recognition';
 import { C, F, R, SH } from '../lib/v5';
 import { meatStore, staffStore } from '../lib/dataStore';
-import { supabase } from '../lib/supabase';
+import { computeStaffStatus } from '../lib/staffUtils';
 import { meatInventory as initMeat, staffData } from '../data/mockData';
 
 const DOC_TYPES = [
@@ -35,9 +36,144 @@ const DEMO_DATA = {
   '위생교육 이수증': { '성명': '홍길동', '교육명': '식육위생교육', '이수일': '2026.03.24', '유효기한': '2027.03.24', '발급기관': '한국식품안전관리인증원', '이수시간': '8시간' },
 };
 
-// ※ Anthropic API 키는 클라이언트 번들에 넣지 않는다.
-// Supabase Edge Function `ocr-proxy` 가 서버사이드에서 대신 호출한다.
-// 프록시가 401/5xx 를 돌려주면 아래 runOCR 이 자동으로 데모 폴백한다.
+// ※ OCR 엔진: Google ML Kit Text Recognition (온디바이스, 한국어 지원)
+// - 오프라인 · 무료 · 키 관리 불필요
+// - 한국어 스크립트(TextRecognitionScript.KOREAN)로 정확도 향상
+// - 인식 실패 또는 필드 추출 실패 시 DEMO_DATA 로 자동 폴백
+//
+// 네이티브 모듈이므로 반드시 EAS Dev Client 또는 Production 빌드로 실행해야 함 (Expo Go 불가).
+const HAS_API_KEY = true; // UI 호환용 (기존 조건식 유지)
+
+// ─── 날짜 정규화 헬퍼: "2026년 3월 24일" / "2026-03-24" / "2026.3.24" → "2026.03.24" ──
+function extractDate(text) {
+  if (!text) return '';
+  // YYYY[.-/년] MM[.-/월] DD[.-/일]? 형태
+  const m = text.match(/(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/);
+  if (!m) return '';
+  const y = m[1];
+  const mm = String(m[2]).padStart(2, '0');
+  const dd = String(m[3]).padStart(2, '0');
+  return `${y}.${mm}.${dd}`;
+}
+
+// ─── 라벨 기반 값 추출 (라벨 뒤 공백/콜론 후의 값) ──
+// labelRegex: 라벨 패턴 (e.g. /이력번호|개체식별번호/)
+// valuePattern: 값의 정규식 (기본: 다음 줄까지의 문자열)
+function pickByLabel(text, labels, valueRegex = /([^\n:：\s][^\n]*)/) {
+  const labelAlt = labels.map(l => l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const re = new RegExp(`(?:${labelAlt})\\s*[:：]?\\s*${valueRegex.source}`, 'i');
+  const m = text.match(re);
+  return m ? m[1].trim() : '';
+}
+
+// ─── 문서 유형별 파서 ──────────────────────────────────────
+// ML Kit 이 반환한 raw text 에서 라벨·정규식으로 필드를 뽑아낸다.
+// 라벨을 찾지 못한 필드는 빈 문자열로 둔다. (빈 필드 0 에 도달하면 caller 가 데모 폴백)
+function parseDocument(rawText, docType) {
+  if (!rawText) return {};
+  const text = rawText.replace(/\r/g, '');
+  const out = {};
+
+  // 공통 추출: 이력번호 — 10자리 이상 숫자/영문 조합
+  const traceMatch = text.match(/(?:이력(?:번호)?|개체식별번호)\s*[:：]?\s*([0-9A-Z\-]{8,20})/i);
+  const trace = traceMatch ? traceMatch[1].replace(/[^\dA-Z\-]/gi, '') : '';
+
+  // 중량: "10.5 kg" / "10kg" / "10 KG"
+  const weightMatch = text.match(/(?:중량|무게|수량)\s*[:：]?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:kg|KG|킬로)/i)
+    || text.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:kg|KG)/);
+  const weight = weightMatch ? weightMatch[1] : '';
+
+  // 금액: 숫자 + "원" or 콤마 포함 금액
+  const priceMatch = text.match(/(?:금액|합계|총액|공급가액)\s*[:：]?\s*([0-9,]+)\s*원?/)
+    || text.match(/([0-9]{1,3}(?:,[0-9]{3}){1,})\s*원/);
+  const price = priceMatch ? priceMatch[1].replace(/,/g, '') : '';
+
+  // 성명 (한글 2~5자)
+  const nameMatch = text.match(/(?:성\s*명|이\s*름|수검자)\s*[:：]?\s*([가-힣]{2,5})/);
+  const name = nameMatch ? nameMatch[1] : '';
+
+  // 등급: 1++, 1+, 1, 2, 3, A, B, C
+  const gradeMatch = text.match(/등\s*급\s*[:：]?\s*(1\+\+|1\+|1|2|3|[ABCDabcd])/);
+  const grade = gradeMatch ? gradeMatch[1].toUpperCase() : '';
+
+  // 부위 (한글 2~6자, 흔한 부위명)
+  const cutMatch = text.match(/(?:부\s*위|품\s*목)\s*[:：]?\s*([가-힣]{2,8})/);
+  const cut = cutMatch ? cutMatch[1] : '';
+
+  // 원산지
+  const originMatch = text.match(/원산지\s*[:：]?\s*([가-힣()\s]{3,20})/);
+  const origin = originMatch ? originMatch[1].trim() : '';
+
+  // 발급기관
+  const issuerMatch = text.match(/(?:발급기관|발행처|실시기관|교육기관)\s*[:：]?\s*([가-힣()\s]{3,25})/);
+  const issuer = issuerMatch ? issuerMatch[1].trim() : '';
+
+  // 날짜들 (라벨별로 가까운 날짜 추출)
+  const findDateNear = (labelRe) => {
+    const m = text.match(new RegExp(`${labelRe.source}[^\\n]{0,20}?(\\d{4}\\s*[.\\-/년]\\s*\\d{1,2}\\s*[.\\-/월]\\s*\\d{1,2})`));
+    return m ? extractDate(m[1]) : '';
+  };
+
+  switch (docType) {
+    case '도축 검사증명서': {
+      out['이력번호'] = trace;
+      out['도축일']   = findDateNear(/도축일/);
+      out['등급']     = grade;
+      out['부위']     = cut;
+      out['원산지']   = origin;
+      out['중량(kg)'] = weight;
+      out['도축장명'] = pickByLabel(text, ['도축장', '도축장명', '작업장']);
+      out['검사관']   = pickByLabel(text, ['검사관', '검사원']);
+      break;
+    }
+    case '거래명세서': {
+      out['공급업체'] = pickByLabel(text, ['공급자', '공급업체', '판매자', '상호']);
+      out['거래일']   = findDateNear(/거래일|작성일|발행일/);
+      out['이력번호'] = trace;
+      out['부위']     = cut;
+      out['원산지']   = origin;
+      out['중량(kg)'] = weight;
+      out['금액']     = price;
+      out['매입처']   = pickByLabel(text, ['매입처', '공급받는자', '구매자']);
+      break;
+    }
+    case '보건증': {
+      out['성명']       = name;
+      out['생년월일']   = findDateNear(/생년월일/);
+      out['발급일']     = findDateNear(/발급일|발행일/);
+      out['만료일']     = findDateNear(/만료일|유효기간|유효기한|다음검진일/);
+      out['발급기관']   = issuer;
+      out['검사결과']   = pickByLabel(text, ['검사결과', '판정']) || (/이상\s*없음|정상|합격/.test(text) ? '이상없음' : '');
+      break;
+    }
+    case '위생교육 이수증': {
+      out['성명']       = name;
+      out['교육명']     = pickByLabel(text, ['교육명', '과정명', '교육과정']);
+      out['이수일']     = findDateNear(/이수일|교육일|수료일/);
+      out['유효기한']   = findDateNear(/유효기한|유효기간|만료일/);
+      out['발급기관']   = issuer;
+      out['이수시간']   = pickByLabel(text, ['이수시간', '교육시간'], /(\d{1,3}\s*시간)/);
+      break;
+    }
+    case '이력확인서': {
+      out['이력번호'] = trace;
+      out['개체번호'] = pickByLabel(text, ['개체번호', '개체식별번호'], /([0-9\-]{8,20})/);
+      out['출생일']   = findDateNear(/출생일/);
+      out['품종']     = pickByLabel(text, ['품종', '축종']);
+      out['도축일']   = findDateNear(/도축일/);
+      out['등급']     = grade;
+      break;
+    }
+    default: {
+      out['서류명']    = docType;
+      out['날짜']      = extractDate(text);
+      out['발급기관']  = issuer;
+      out['비고']      = '';
+      break;
+    }
+  }
+  return out;
+}
 
 // OCR 결과에서 소비기한 계산 (도축일 기준 14일)
 function calcExpire(slaughterDate) {
@@ -81,14 +217,14 @@ export default function UploadScreen({ navigation }) {
       Alert.alert('권한 필요', '카메라/갤러리 접근 권한이 필요합니다.');
       return;
     }
-    // quality 0.7: base64 메모리 절약, HEIC → JPEG 자동 변환
-    const opts = { base64: true, quality: 0.7, exif: false };
+    // ML Kit 은 파일 URI 로 인식 — base64 불필요. HEIC → JPEG 자동 변환.
+    const opts = { quality: 0.8, exif: false };
     const res = useCamera
       ? await ImagePicker.launchCameraAsync(opts)
       : await ImagePicker.launchImageLibraryAsync(opts);
     if (!res.canceled && res.assets[0]) {
       const asset = res.assets[0];
-      if (!asset.base64) {
+      if (!asset.uri) {
         Alert.alert('이미지 오류', '이미지를 불러오지 못했습니다. 다시 시도해주세요.');
         return;
       }
@@ -98,9 +234,9 @@ export default function UploadScreen({ navigation }) {
     }
   };
 
-  // ─── OCR 실행 — Supabase Edge Function `ocr-proxy` 호출 ──────
-  // 키 노출 방지: Anthropic API 키는 서버(Edge Function)에만 존재.
-  // 프록시 미배포/미인증/서버 오류 시 DEMO_DATA 로 자동 폴백.
+  // ─── OCR 실행 — Google ML Kit Text Recognition (온디바이스) ──────
+  // 네이티브 모듈이 한국어 스크립트로 raw text 를 반환 → 정규식 파서로 필드 추출.
+  // 인식 실패 또는 유의미한 필드가 2개 미만이면 DEMO_DATA 로 폴백.
   const runOCR = async () => {
     if (!image) return;
     setLoading(true);
@@ -113,61 +249,37 @@ export default function UploadScreen({ navigation }) {
       if (reason) console.warn('[OCR] demo fallback:', reason);
     };
 
-    if (!image.base64) {
+    if (!image.uri) {
       Alert.alert('이미지 오류', '이미지 데이터가 없습니다. 다시 촬영해주세요.');
       setLoading(false);
       return;
     }
 
-    // Anthropic 지원 MIME: jpeg/png/gif/webp만 허용
-    const SUPPORTED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    const mimeType = SUPPORTED.includes(image.mimeType) ? image.mimeType : 'image/jpeg';
-
-    const schema = SCHEMAS[docType] || SCHEMAS['기타'];
-    const prompt = `당신은 한국 축산물 관련 문서 분석 전문가입니다.\n이미지는 "${docType}" 문서입니다.\n다음 항목들을 추출하여 JSON으로만 반환하세요 (다른 텍스트 없이):\n${schema.map(k => `- ${k}`).join('\n')}\n없는 값은 "" 으로, 날짜는 YYYY.MM.DD 형식으로.`;
-
     try {
-      // Supabase Edge Function 호출 (60초 타임아웃은 supabase-js 기본값)
-      const { data, error } = await supabase.functions.invoke('ocr-proxy', {
-        body: {
-          docType,
-          prompt,
-          imageBase64: image.base64,
-          mimeType,
-        },
-      });
+      // 1) ML Kit 으로 텍스트 인식 (한국어 스크립트)
+      const ocr = await TextRecognition.recognize(image.uri, TextRecognitionScript.KOREAN);
+      const rawText = ocr?.text || '';
 
-      // 401(미로그인) · 404(함수 미배포) · 500/504(서버 오류) → 데모 폴백
-      if (error) {
-        if (error.context?.status === 504) {
-          Alert.alert('시간 초과', '요청 시간이 초과됐습니다 (30초). 인터넷 연결을 확인 후 다시 시도해주세요.');
-          setLoading(false);
-          return;
-        }
-        return fallbackToDemo(`invoke error: ${error.message}`);
-      }
-      if (data?.error) {
-        return fallbackToDemo(`proxy error: ${data.error}`);
-      }
-
-      // Anthropic 응답 파싱 (프록시는 { content, usage } 포맷으로 전달)
-      const raw = data?.content?.[0]?.text || '';
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (!match) {
-        Alert.alert('OCR 오류', 'AI가 결과를 반환하지 못했습니다. 서류를 더 선명하게 촬영 후 다시 시도해주세요.');
+      if (!rawText.trim()) {
+        Alert.alert('인식 실패', '글자를 인식하지 못했습니다.\n서류가 잘 보이도록 다시 촬영해주세요.');
         setLoading(false);
         return;
       }
-      const parsed = JSON.parse(match[0]);
-      if (Object.keys(parsed).length === 0) {
-        Alert.alert('OCR 오류', '인식된 내용이 없습니다. 서류가 잘 보이도록 다시 촬영해주세요.');
-        setLoading(false);
-        return;
+
+      // 2) 문서 유형별 파서로 필드 추출
+      const parsed = parseDocument(rawText, docType);
+
+      // 3) 추출 성공률 검사 — 값이 들어간 필드가 2개 미만이면 데모 폴백
+      const filledCount = Object.values(parsed).filter(v => v && String(v).trim()).length;
+      if (filledCount < 2) {
+        return fallbackToDemo(`low extraction rate: ${filledCount} fields`);
       }
+
       setResult(parsed);
       setIsDemo(false);
     } catch (e) {
-      fallbackToDemo(e?.message || 'unknown');
+      // 네이티브 모듈 미로드 (Expo Go 실행) 또는 이미지 처리 실패
+      fallbackToDemo(e?.message || 'ML Kit unavailable');
     }
     setLoading(false);
   };
@@ -227,9 +339,15 @@ export default function UploadScreen({ navigation }) {
 
       const updated = staff.map((s, i) => {
         if (i !== idx) return s;
-        return isHealth
-          ? { ...s, health: expDate, status: new Date(expDate.replace(/\./g, '-')) < new Date() ? 'expired' : 'ok' }
-          : { ...s, edu: expDate };
+        const nextHealth = isHealth ? expDate : s.health;
+        const nextEdu    = isHealth ? s.edu : expDate;
+        // 두 만료일 중 더 급한 쪽 기준으로 status 일괄 재계산 (ok/warn/expired)
+        return {
+          ...s,
+          health: nextHealth,
+          edu:    nextEdu,
+          status: computeStaffStatus(nextHealth, nextEdu),
+        };
       });
 
       await staffStore.save(updated);
@@ -293,13 +411,13 @@ export default function UploadScreen({ navigation }) {
       style={{ flex: 1, backgroundColor: C.bg }}
       contentContainerStyle={{ padding: 18, paddingBottom: 48 }}>
 
-      {/* API 키 상태 배너 */}
+      {/* OCR 엔진 안내 배너 — 기본 숨김, 인식 실패 시 결과 영역의 demoNotice 로 대체 */}
       {!HAS_API_KEY && (
         <View style={styles.demoBanner}>
           <Ionicons name="warning" size={22} color={C.warn} />
           <View style={{ flex: 1 }}>
             <Text style={styles.demoBannerTitle}>데모 모드</Text>
-            <Text style={styles.demoBannerSub}>.env.local에 EXPO_PUBLIC_ANTHROPIC_API_KEY 설정 시 실제 AI 분석 가능</Text>
+            <Text style={styles.demoBannerSub}>ML Kit 인식이 불가한 환경입니다. Dev Client 또는 프로덕션 빌드에서 실제 OCR 이 동작합니다.</Text>
           </View>
         </View>
       )}
