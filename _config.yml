@@ -1,0 +1,53 @@
+title: 미트빅(MeatBig) 법적 문서
+description: 미트빅 앱 개인정보처리방침 및 이용약관
+theme: jekyll-theme-cayman
+markdown: kramdown
+lang: ko-KR
+
+# legal 폴더의 문서만 공개하고 나머지 소스·빌드 산출물은 제외
+include:
+  - legal
+
+exclude:
+  - node_modules
+  - android
+  - ios
+  - src
+  - supabase
+  - assets
+  - scripts
+  - dist
+  - web-build
+  - .expo
+  - .github
+  - "*.lock"
+  - "*.log"
+  - "*.sql"
+  - "*.py"
+  - "*.html"
+  - "*.js"
+  - "*.json"
+  - "*.ts"
+  - "*.tsx"
+  - "*.docx"
+  - App.js
+  - README.md
+  - eas.json
+  - app.json
+  - babel.config.js
+  - tsconfig.json
+  - package.json
+  - package-lock.json
+  - beta-guide.txt
+  - supabase_migration.sql
+  - supabase_setup.sql
+  - admin-dashboard.html
+  - pdf_preview.html
+
+# 루트 URL 로 접속하면 index.md 를 표시
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
