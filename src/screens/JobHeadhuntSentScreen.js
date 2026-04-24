@@ -131,7 +131,7 @@ export default function JobHeadhuntSentScreen({ navigation }) {
         iconBg={C.red}
       />
 
-      {/* 필터 바 */}
+      {/* 필터 바 — 5단계 상태 칩 (40-50대 가독성) */}
       <View style={S.filterBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.filterRow}>
           {STATUS_FILTERS.map(f => {
@@ -144,6 +144,7 @@ export default function JobHeadhuntSentScreen({ navigation }) {
                   active && { backgroundColor: f.color || C.t1, borderColor: f.color || C.t1 },
                 ]}
                 onPress={() => setFilter(f.k)}
+                activeOpacity={0.85}
               >
                 <Text style={[S.filterChipTxt, active && { color: '#fff' }]}>{f.lbl}</Text>
               </TouchableOpacity>
@@ -339,15 +340,18 @@ const S = StyleSheet.create({
   filterBar: {
     backgroundColor: C.white,
     borderBottomWidth: 1, borderBottomColor: C.border,
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
-  filterRow: { paddingHorizontal: 12, gap: 6, alignItems: 'center', flexDirection: 'row' },
+  filterRow: { paddingHorizontal: 14, gap: 8, alignItems: 'center', flexDirection: 'row' },
   filterChip: {
-    backgroundColor: C.white,
-    borderWidth: 1, borderColor: C.border,
-    borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5,
+    backgroundColor: C.bg2,
+    borderWidth: 1.5, borderColor: C.border,
+    borderRadius: 22,
+    paddingHorizontal: 18, paddingVertical: 10,
+    minHeight: 44, minWidth: 64,
+    alignItems: 'center', justifyContent: 'center',
   },
-  filterChipTxt: { fontSize: 12, fontWeight: '700', color: C.t2 },
+  filterChipTxt: { fontSize: 15, fontWeight: '800', color: C.t2 },
 
   summary: { fontSize: 13, color: C.t2, fontWeight: '700', marginBottom: 10 },
 

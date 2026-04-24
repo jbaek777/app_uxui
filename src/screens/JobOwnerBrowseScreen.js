@@ -15,7 +15,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -60,6 +60,8 @@ export default function JobOwnerBrowseScreen({ navigation }) {
 
   const [gradeFilter, setGradeFilter]   = useState(null);
   const [regionFilter, setRegionFilter] = useState(null);
+  const [gradeOpen, setGradeOpen]       = useState(false);
+  const [regionOpen, setRegionOpen]     = useState(false);
 
   const load = useCallback(async (opts = {}) => {
     const { silent = false } = opts;
@@ -97,50 +99,112 @@ export default function JobOwnerBrowseScreen({ navigation }) {
         iconBg={C.blue2}
       />
 
-      {/* 필터 바 */}
+      {/* 필터 바 — 드롭다운 2개 (40-50대 가독성) */}
       <View style={S.filterBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.filterRow}>
-          <Text style={S.filterLbl}>등급</Text>
-          {GRADE_FILTERS.map(g => {
-            const active = gradeFilter === g;
-            const info   = g ? GRADES.find(x => x.letter === g) : null;
-            return (
-              <TouchableOpacity
-                key={g || 'all'}
-                style={[
-                  S.filterChip,
-                  active && { backgroundColor: info?.color || C.t1, borderColor: info?.color || C.t1 },
-                ]}
-                onPress={() => setGradeFilter(g)}
-                activeOpacity={0.8}
-              >
-                <Text style={[S.filterChipTxt, active && { color: '#fff' }]}>
-                  {g ? `${g}급` : '전체'}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-        <View style={S.filterDivider} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.filterRow}>
-          <Text style={S.filterLbl}>지역</Text>
-          {REGION_FILTERS.map(r => {
-            const active = regionFilter === r;
-            return (
-              <TouchableOpacity
-                key={r || 'all'}
-                style={[S.filterChip, active && { backgroundColor: C.blue2, borderColor: C.blue2 }]}
-                onPress={() => setRegionFilter(r)}
-                activeOpacity={0.8}
-              >
-                <Text style={[S.filterChipTxt, active && { color: '#fff' }]}>
-                  {r || '전체'}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <TouchableOpacity
+          style={[S.dropBtn, gradeFilter && S.dropBtnActive]}
+          onPress={() => setGradeOpen(true)}
+          activeOpacity={0.85}
+        >
+          <Text style={S.dropLbl}>등급</Text>
+          <Text style={[S.dropVal, gradeFilter && { color: C.blue2 }]} numberOfLines={1}>
+            {gradeFilter ? `${gradeFilter}급` : '전체'}
+          </Text>
+          <Ionicons name="chevron-down" size={18} color={C.t2} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[S.dropBtn, regionFilter && S.dropBtnActive]}
+          onPress={() => setRegionOpen(true)}
+          activeOpacity={0.85}
+        >
+          <Text style={S.dropLbl}>지역</Text>
+          <Text style={[S.dropVal, regionFilter && { color: C.blue2 }]} numberOfLines={1}>
+            {regionFilter || '전체'}
+          </Text>
+          <Ionicons name="chevron-down" size={18} color={C.t2} />
+        </TouchableOpacity>
       </View>
+
+      {/* 등급 선택 모달 (bottom-sheet) */}
+      <Modal visible={gradeOpen} transparent animationType="fade" onRequestClose={() => setGradeOpen(false)}>
+        <TouchableOpacity style={S.sheetBackdrop} activeOpacity={1} onPress={() => setGradeOpen(false)}>
+          <View style={S.sheetBox}>
+            <View style={S.sheetHead}>
+              <Text style={S.sheetTtl}>등급 선택</Text>
+              <TouchableOpacity onPress={() => setGradeOpen(false)} style={S.sheetClose}>
+                <Ionicons name="close" size={24} color={C.t2} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
+              {GRADE_FILTERS.map(g => {
+                const active = gradeFilter === g;
+                const info   = g ? GRADES.find(x => x.letter === g) : null;
+                return (
+                  <TouchableOpacity
+                    key={g || 'all'}
+                    style={[S.sheetItem, active && S.sheetItemActive]}
+                    onPress={() => { setGradeFilter(g); setGradeOpen(false); }}
+                    activeOpacity={0.8}
+                  >
+                    {info ? (
+                      <View style={[S.sheetDot, { backgroundColor: info.color }]}>
+                        <Text style={S.sheetDotTxt}>{info.letter}</Text>
+                      </View>
+                    ) : (
+                      <View style={[S.sheetDot, { backgroundColor: C.t4 }]}>
+                        <Ionicons name="apps-outline" size={16} color="#fff" />
+                      </View>
+                    )}
+                    <Text style={[S.sheetItemTxt, active && { color: C.blue2, fontWeight: '900' }]}>
+                      {g ? `${g}급` : '전체'}
+                    </Text>
+                    {active && <Ionicons name="checkmark" size={22} color={C.blue2} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 지역 선택 모달 (bottom-sheet) */}
+      <Modal visible={regionOpen} transparent animationType="fade" onRequestClose={() => setRegionOpen(false)}>
+        <TouchableOpacity style={S.sheetBackdrop} activeOpacity={1} onPress={() => setRegionOpen(false)}>
+          <View style={S.sheetBox}>
+            <View style={S.sheetHead}>
+              <Text style={S.sheetTtl}>지역 선택</Text>
+              <TouchableOpacity onPress={() => setRegionOpen(false)} style={S.sheetClose}>
+                <Ionicons name="close" size={24} color={C.t2} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
+              {REGION_FILTERS.map(r => {
+                const active = regionFilter === r;
+                return (
+                  <TouchableOpacity
+                    key={r || 'all'}
+                    style={[S.sheetItem, active && S.sheetItemActive]}
+                    onPress={() => { setRegionFilter(r); setRegionOpen(false); }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name={r ? 'location-outline' : 'apps-outline'}
+                      size={20}
+                      color={active ? C.blue2 : C.t3}
+                      style={{ width: 34, textAlign: 'center' }}
+                    />
+                    <Text style={[S.sheetItemTxt, active && { color: C.blue2, fontWeight: '900' }]}>
+                      {r || '전체'}
+                    </Text>
+                    {active && <Ionicons name="checkmark" size={22} color={C.blue2} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <ScrollView
         contentContainerStyle={S.scroll}
@@ -296,27 +360,62 @@ const S = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   scroll:    { padding: 16, paddingBottom: 120 },
 
-  // 필터
+  // 필터 — 드롭다운 2개 (40-50대 가독성)
   filterBar: {
     backgroundColor: C.white,
     borderBottomWidth: 1, borderBottomColor: C.border,
-    paddingVertical: 6,
+    paddingHorizontal: 14, paddingVertical: 12,
+    flexDirection: 'row', gap: 10,
   },
-  filterRow: {
-    paddingHorizontal: 12, gap: 6,
-    alignItems: 'center', flexDirection: 'row',
+  dropBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: C.bg2,
+    borderWidth: 1.5, borderColor: C.border,
+    borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+    minHeight: 52,
   },
-  filterDivider: { height: 1, backgroundColor: C.bg2, marginVertical: 4 },
-  filterLbl: {
-    fontSize: 11, fontWeight: '800', color: C.t3,
-    marginRight: 6,
+  dropBtnActive: {
+    backgroundColor: C.blueS,
+    borderColor: C.blue2,
   },
-  filterChip: {
+  dropLbl: {
+    fontSize: 13, fontWeight: '800', color: C.t3,
+    marginRight: 2,
+  },
+  dropVal: {
+    flex: 1, fontSize: 16, fontWeight: '900', color: C.t1,
+  },
+
+  // Bottom-sheet 선택 모달
+  sheetBackdrop: {
+    flex: 1, backgroundColor: 'rgba(15,23,42,0.45)',
+    justifyContent: 'flex-end',
+  },
+  sheetBox: {
     backgroundColor: C.white,
-    borderWidth: 1, borderColor: C.border,
-    borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingBottom: 24, maxHeight: '75%',
   },
-  filterChipTxt: { fontSize: 11, fontWeight: '700', color: C.t2 },
+  sheetHead: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 18, paddingBottom: 14,
+    borderBottomWidth: 1, borderBottomColor: C.bg2,
+  },
+  sheetTtl: { fontSize: 17, fontWeight: '900', color: C.t1 },
+  sheetClose: { padding: 4 },
+  sheetItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 20, paddingVertical: 16,
+    borderBottomWidth: 1, borderBottomColor: C.bg2,
+  },
+  sheetItemActive: { backgroundColor: C.blueS },
+  sheetItemTxt: { flex: 1, fontSize: 16, fontWeight: '700', color: C.t1 },
+  sheetDot: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  sheetDotTxt: { color: '#fff', fontSize: 14, fontWeight: '900' },
 
   summaryRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
