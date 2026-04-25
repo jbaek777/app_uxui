@@ -42,6 +42,14 @@ export default function ScanScreen({ navigation, embedded = false, initialMode =
   const device = useCameraDevice('back');
   const [torchOn, setTorchOn] = useState(false);
   const [scanning, setScanning] = useState(false);
+  // 카메라 모달 진입 후 5초 이상 device == null 이면 "카메라 미지원" 안내로 전환
+  const [cameraTimedOut, setCameraTimedOut] = useState(false);
+  useEffect(() => {
+    if (!scanning) { setCameraTimedOut(false); return; }
+    if (device != null) { setCameraTimedOut(false); return; }
+    const t = setTimeout(() => setCameraTimedOut(true), 5000);
+    return () => clearTimeout(t);
+  }, [scanning, device]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [scanned, setScanned] = useState(false);
@@ -51,7 +59,9 @@ export default function ScanScreen({ navigation, embedded = false, initialMode =
   const [isOnline, setIsOnline] = useState(true);
   const [manualInput, setManualInput] = useState('');
   const [manualLoading, setManualLoading] = useState(false);
-  const [mtraceKey, setMtraceKey] = useState(process.env.EXPO_PUBLIC_MTRACE_API_KEY || '');
+  // ⚠️ EXPO_PUBLIC_MTRACE_API_KEY env fallback 제거 (2026-04-25 보안 하드닝)
+  //    번들 노출 방지 — AsyncStorage(MTRACE_KEY_STORAGE)에서만 로드.
+  const [mtraceKey, setMtraceKey] = useState('');
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [keyInput, setKeyInput] = useState('');
 
@@ -161,7 +171,6 @@ export default function ScanScreen({ navigation, embedded = false, initialMode =
     setLoading(true);
     try {
       if (!mtraceKey) {
-        setLoading(false);
         Alert.alert(
           'API 키 필요',
           `스캔된 번호: ${data}\n\ndata.go.kr에서 API 키를 발급받아 설정해야 실제 데이터를 조회할 수 있습니다.`,
@@ -183,7 +192,10 @@ export default function ScanScreen({ navigation, embedded = false, initialMode =
     } catch {
       Alert.alert('오류', '이력 조회에 실패했습니다.');
     } finally {
+      // 성공/실패 무관 항상 해제 — scanned 플래그가 true 로 남으면
+      // 다음 스캔 시 onCodeScanned 가 즉시 return 되어 입력이 막힘.
       setLoading(false);
+      setScanned(false);
     }
   };
 
@@ -389,9 +401,24 @@ export default function ScanScreen({ navigation, embedded = false, initialMode =
         <View style={{ flex: 1, backgroundColor: '#000' }}>
           {device == null ? (
             // 기기 초기화 지연 또는 후면 카메라 없음
-            <View style={[styles.center, { backgroundColor: '#000' }]}>
-              <ActivityIndicator color="#fff" />
-              <Text style={{ color: '#fff', marginTop: 12 }}>카메라 준비 중...</Text>
+            <View style={[styles.center, { backgroundColor: '#000', paddingHorizontal: 32 }]}>
+              {cameraTimedOut ? (
+                <>
+                  <Ionicons name="videocam-off-outline" size={48} color="#fff" />
+                  <Text style={{ color: '#fff', marginTop: 16, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>
+                    이 기기에서 카메라를 사용할 수 없습니다
+                  </Text>
+                  <Text style={{ color: '#94A3B8', marginTop: 8, fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
+                    후면 카메라가 없거나 다른 앱이 사용 중입니다.{'\n'}
+                    이력번호를 직접 입력해 주세요.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={{ color: '#fff', marginTop: 12 }}>카메라 준비 중...</Text>
+                </>
+              )}
             </View>
           ) : (
             <Camera

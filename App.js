@@ -472,9 +472,9 @@ function AppInner() {
   const handleLoginDone = async (type) => {
     try {
       // ⭐ 관리자 체크 — user_profiles.role='admin' 이면 온보딩 스킵
-      console.log('[LOGIN-DONE] Calling checkIsAdmin...');
+      if (__DEV__) console.log('[LOGIN-DONE] Calling checkIsAdmin...');
       const { isAdmin, displayName } = await checkIsAdmin();
-      console.log('[LOGIN-DONE] isAdmin=', isAdmin, 'displayName=', displayName);
+      if (__DEV__) console.log('[LOGIN-DONE] isAdmin=', isAdmin, 'displayName=', displayName);
       if (isAdmin) {
         setBizData(null);
         await initRole('admin', displayName || 'MeatBig 관리자', null);

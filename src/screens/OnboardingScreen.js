@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fontSize, spacing, radius, shadow } from '../theme';
 import { PrimaryBtn, OutlineBtn } from '../components/UI';
 import { supabase } from '../lib/supabase';
+import { getMtraceKey } from '../lib/traceApi';
 
 const SPECIES = ['한우', '육우', '한돈', '수입우', '닭', '오리'];
 const ROLES = ['사장', '직원'];
@@ -59,7 +60,10 @@ function validateBizNo(bizNo) {
 // 공공데이터포털 API: https://api.odcloud.kr/api/nts-businessman/v1/status
 async function checkBizStatus(bizNo) {
   const raw = bizNo.replace(/-/g, '').trim();
-  const apiKey = process.env.EXPO_PUBLIC_MTRACE_API_KEY;
+  // 🔒 보안 하드닝 (2026-04-25): EXPO_PUBLIC_ 접두 env 제거.
+  //    사용자가 ScanScreen 에서 입력해 AsyncStorage 에 저장한 키를 재사용.
+  //    키 없으면 검증 통과 + "조회 불가" 안내 (네트워크/키 부재 폴백).
+  const apiKey = await getMtraceKey();
   if (!apiKey) return { ok: true, status: '조회 불가(키 없음)', taxType: '' };
   try {
     const res = await fetch(

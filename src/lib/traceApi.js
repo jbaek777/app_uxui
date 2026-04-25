@@ -34,17 +34,17 @@ export function toIsoDate(val) {
   return null;
 }
 
-// 저장된 API 키 불러오기
-//   1순위) AsyncStorage @meatbig_mtrace_api_key — ScanScreen에서 사용자가 직접 입력한 값
-//   2순위) .env.local 의 EXPO_PUBLIC_MTRACE_API_KEY — 개발·빌드 단계에서 기본 주입
-//   → 사용자 입력이 있으면 우선, 없으면 env 폴백 (env도 없으면 Mock)
+// 저장된 API 키 불러오기 — AsyncStorage 한 곳만
+//   ⚠️ EXPO_PUBLIC_MTRACE_API_KEY env fallback 제거 (2026-04-25 보안 하드닝)
+//      EXPO_PUBLIC_ 접두는 번들에 포함돼 누구나 추출 가능. 사용자가 직접 키를 입력하거나
+//      추후 Supabase Edge Function `mtrace-proxy` 경유로 전환할 것.
+//   키가 없으면 Mock 모드 (UI 에서 "API 키 미설정" 안내 후 사용자 입력 유도)
 export async function getMtraceKey() {
   try {
     const stored = await AsyncStorage.getItem(MTRACE_KEY_STORAGE);
     if (stored && stored.trim()) return stored.trim();
   } catch {}
-  const envKey = process.env.EXPO_PUBLIC_MTRACE_API_KEY;
-  return envKey && envKey.trim() ? envKey.trim() : '';
+  return '';
 }
 
 // 키 존재 여부 (UI에서 "API 키 미설정" 경고를 띄울지 판단)

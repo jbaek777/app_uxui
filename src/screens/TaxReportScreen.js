@@ -161,9 +161,11 @@ export default function TaxReportScreen() {
     (async () => {
       const raw = await AsyncStorage.getItem('@meatbig_biz').catch(() => null);
       if (raw) {
-        const biz = JSON.parse(raw);
-        setBizName(biz.bizName || '');
-        setBizNo(biz.bizNo || '');
+        try {
+          const biz = JSON.parse(raw);
+          setBizName(biz.bizName || '');
+          setBizNo(biz.bizNo || '');
+        } catch (_) { /* 손상된 JSON — 무시하고 빈 값 유지 */ }
       }
       const items = await meatStore.load(mockMeats);
       const report = buildMonthlyReport(items);

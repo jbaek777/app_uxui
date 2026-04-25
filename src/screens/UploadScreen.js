@@ -257,7 +257,14 @@ export default function UploadScreen({ navigation }) {
     try {
       // 1) ML Kit 으로 텍스트 인식 (한국어 스크립트)
       const ocr = await TextRecognition.recognize(image.uri, TextRecognitionScript.KOREAN);
-      const rawText = ocr?.text || '';
+
+      // 1-a) 결과 객체 자체가 비정상 — ML Kit 모듈 미로드/메모리 부족 등
+      //      사용자 입장에선 복구 불가하므로 데모 폴백 (Alert 대신 인라인 안내)
+      if (!ocr || typeof ocr !== 'object') {
+        return fallbackToDemo('ML Kit returned null/invalid result');
+      }
+
+      const rawText = typeof ocr.text === 'string' ? ocr.text : '';
 
       if (!rawText.trim()) {
         Alert.alert('인식 실패', '글자를 인식하지 못했습니다.\n서류가 잘 보이도록 다시 촬영해주세요.');

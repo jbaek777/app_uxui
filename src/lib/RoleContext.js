@@ -35,6 +35,21 @@ const ROLE_KEY      = '@meatbig_role';          // 앱 재기동 시 role 복원
 const CUR_STAFF_KEY = '@meatbig_current_staff'; // 앱 재기동 시 직원명/ID 복원
 const DEFAULT_PIN   = '0000';
 
+// ── timing-safe 문자열 비교 ─────────────────────────────────
+// PIN 비교 시 `===` 사용 시 짧은 길이/조기 mismatch 로 인해 비교 시간이
+// 달라지면, 이론상 timing 측정으로 PIN 의 자릿수가 유출될 수 있음.
+// 길이 무관 항상 동일한 횟수만큼 XOR 누적해 mismatch 비트를 모은 뒤 1회 비교.
+function safeEqual(a, b) {
+  const sa = String(a == null ? '' : a);
+  const sb = String(b == null ? '' : b);
+  const len = Math.max(sa.length, sb.length);
+  let diff = sa.length ^ sb.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (sa.charCodeAt(i) || 0) ^ (sb.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
 // 직원 모드 허용 탭 (Option D: 조회 탭 제거, 채용 탭 추가)
 export const STAFF_ALLOWED_TABS = ['HomeTab', 'DocsTab', 'JobTab'];
 // 구직자(무소속) 허용 탭 — 채용 + 설정만
@@ -186,10 +201,10 @@ export function RoleProvider({ children }) {
     setStaffPinModal(true);
   };
 
-  // 직원 PIN 확인
+  // 직원 PIN 확인 (timing-safe 비교)
   const confirmStaffPin = () => {
     if (!selectedStaff) return;
-    if (pinInput === selectedStaff.pin) {
+    if (safeEqual(pinInput, selectedStaff.pin)) {
       applyRole('staff', selectedStaff.name, selectedStaff.id);
       setStaffPinModal(false);
       setPinError('');
@@ -207,7 +222,7 @@ export function RoleProvider({ children }) {
   }, []);
 
   const confirmOwnerPin = () => {
-    if (pinInput === ownerPin) {
+    if (safeEqual(pinInput, ownerPin)) {
       applyRole('owner', null, null);
       setOwnerPinModal(false);
       setPinError('');

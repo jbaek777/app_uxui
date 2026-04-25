@@ -48,7 +48,7 @@ function getRedirectUri() {
  */
 async function signInWithOAuth(provider) {
   const redirectTo = getRedirectUri();
-  console.log('[socialAuth] START provider=', provider, 'redirectTo=', redirectTo);
+  if (__DEV__) console.log('[socialAuth] START provider=', provider, 'redirectTo=', redirectTo);
 
   // 1) Supabase 에게 OAuth 시작 URL 을 요청
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -64,16 +64,16 @@ async function signInWithOAuth(provider) {
   });
 
   if (error) {
-    console.log('[socialAuth] signInWithOAuth error=', error);
+    if (__DEV__) console.log('[socialAuth] signInWithOAuth error=', error);
     throw error;
   }
   if (!data?.url) throw new Error('OAuth URL 을 받지 못했습니다.');
-  console.log('[socialAuth] FULL OAuth URL=', data.url);
+  if (__DEV__) console.log('[socialAuth] FULL OAuth URL=', data.url);
 
   // 2) 브라우저(WebBrowser) 로 인증 UI 띄움 → 완료 대기
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  console.log('[socialAuth] WebBrowser result.type=', result.type);
-  console.log('[socialAuth] WebBrowser result.url=', result.url || '(none)');
+  if (__DEV__) console.log('[socialAuth] WebBrowser result.type=', result.type);
+  if (__DEV__) console.log('[socialAuth] WebBrowser result.url=', result.url || '(none)');
 
   if (result.type === 'cancel' || result.type === 'dismiss') {
     throw new Error('로그인이 취소되었습니다.');
@@ -86,20 +86,20 @@ async function signInWithOAuth(provider) {
   //    형식: meatbig://auth-callback#access_token=...&refresh_token=...
   //    또는 쿼리스트링 방식: ?code=...  (PKCE flow)
   const { access_token, refresh_token } = parseTokens(result.url);
-  console.log('[socialAuth] parseTokens access_token?', !!access_token, 'refresh_token?', !!refresh_token);
+  if (__DEV__) console.log('[socialAuth] parseTokens access_token?', !!access_token, 'refresh_token?', !!refresh_token);
 
   if (!access_token || !refresh_token) {
     // PKCE 방식일 수 있음 — 이 경우 exchangeCodeForSession 사용
     const code = parseCode(result.url);
-    console.log('[socialAuth] parseCode code?', !!code);
+    if (__DEV__) console.log('[socialAuth] parseCode code?', !!code);
     if (code) {
       const { data: sessData, error: sessErr } =
         await supabase.auth.exchangeCodeForSession(code);
       if (sessErr) {
-        console.log('[socialAuth] exchangeCodeForSession error=', sessErr);
+        if (__DEV__) console.log('[socialAuth] exchangeCodeForSession error=', sessErr);
         throw sessErr;
       }
-      console.log('[socialAuth] PKCE success user=', sessData.user?.email);
+      if (__DEV__) console.log('[socialAuth] PKCE success user=', sessData.user?.email);
       return { user: sessData.user, session: sessData.session };
     }
     throw new Error('인증 토큰을 받지 못했습니다.');
@@ -111,10 +111,10 @@ async function signInWithOAuth(provider) {
     refresh_token,
   });
   if (sessErr) {
-    console.log('[socialAuth] setSession error=', sessErr);
+    if (__DEV__) console.log('[socialAuth] setSession error=', sessErr);
     throw sessErr;
   }
-  console.log('[socialAuth] Implicit success user=', sessData.user?.email);
+  if (__DEV__) console.log('[socialAuth] Implicit success user=', sessData.user?.email);
 
   return { user: sessData.user, session: sessData.session };
 }
