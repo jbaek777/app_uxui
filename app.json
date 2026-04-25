@@ -15,7 +15,16 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.kmeatmaster.meatmanager",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "com.kmeatmaster.meatmanager.oauth",
+            "CFBundleURLSchemes": ["meatbig"]
+          }
+        ],
+        "LSApplicationQueriesSchemes": ["kakaokompassauth", "kakaolink"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,6 +35,19 @@
       "versionCode": 1,
       "permissions": [
         "android.permission.CAMERA"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "meatbig",
+              "host": "auth-callback"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "plugins": [
